@@ -1,6 +1,4 @@
 package com.privatechat.app.data.repository
-import com.privatechat.app.BuildConfig
-import com.privatechat.app.BuildConfig
 
 import android.util.Log
 import androidx.lifecycle.DefaultLifecycleObserver
