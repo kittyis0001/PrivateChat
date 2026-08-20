@@ -1,7 +1,7 @@
 {
     "logs": [
         {
-            "outputFile": "com.privatechat.app-mergeDebugResources-38:/values-v26/values-v26.xml",
+            "outputFile": "com.privatechat.app-mergeDebugResources-41:/values-v26/values-v26.xml",
             "map": [
                 {
                     "source": "/data/data/com.termux/files/home/.gradle/caches/transforms-4/341ce4e2be64f82c35aaca7ec8e1f192/transformed/appcompat-1.6.1/res/values-v26/values-v26.xml",
