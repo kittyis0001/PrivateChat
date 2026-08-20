@@ -26,7 +26,7 @@ class ChatRepository(
     private val otherUser: String
 ) : DefaultLifecycleObserver {
 
-    private val db: FirebaseDatabase = FirebaseDatabase.getInstance()
+    private val db: FirebaseDatabase = FirebaseDatabase.getInstance(BuildConfig.FIREBASE_DATABASE_URL)
     private val messagesRef: DatabaseReference = db.getReference("messages")
     private val statusRef: DatabaseReference = db.getReference("status")
     private val typingRef: DatabaseReference = db.getReference("typing")

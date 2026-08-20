@@ -63,7 +63,7 @@ class LoginActivity : AppCompatActivity() {
             loginButton.isEnabled = false
             progress.visibility = View.VISIBLE
 
-            FirebaseDatabase.getInstance().getReference("users").child(username)
+            FirebaseDatabase.getInstance(BuildConfig.FIREBASE_DATABASE_URL).getReference("users").child(username)
                 .addListenerForSingleValueEvent(object : ValueEventListener {
                     override fun onDataChange(snapshot: DataSnapshot) {
                         val storedPassword = snapshot.child("password").getValue(String::class.java)
@@ -90,7 +90,7 @@ class LoginActivity : AppCompatActivity() {
 
     private fun registerFcmToken(username: String) {
         FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            FirebaseDatabase.getInstance().getReference("fcmTokens").child(username).setValue(token)
+            FirebaseDatabase.getInstance(BuildConfig.FIREBASE_DATABASE_URL).getReference("fcmTokens").child(username).setValue(token)
         }
     }
 
