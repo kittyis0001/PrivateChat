@@ -9,6 +9,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
+        manifestPlaceholders["firebaseDatabaseUrl"] = "https://private-chat-318a6-default-rtdb.asia-southeast1.firebasedatabase.app"
         applicationId = "com.privatechat.app"
         minSdk = 24
         targetSdk = 34
