@@ -1,4 +1,6 @@
 package com.privatechat.app.ui.login
+import com.privatechat.app.BuildConfig
+import com.privatechat.app.BuildConfig
 
 import android.content.Intent
 import android.os.Bundle
