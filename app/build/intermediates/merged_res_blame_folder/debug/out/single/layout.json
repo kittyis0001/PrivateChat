@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "com.privatechat.app-mergeDebugResources-39:/layout/item_message_incoming.xml",
+        "source": "com.privatechat.app-main-42:/layout/item_message_incoming.xml"
+    },
+    {
+        "merged": "com.privatechat.app-mergeDebugResources-39:/layout/item_message_outgoing.xml",
+        "source": "com.privatechat.app-main-42:/layout/item_message_outgoing.xml"
+    },
+    {
+        "merged": "com.privatechat.app-mergeDebugResources-39:/layout/activity_login.xml",
+        "source": "com.privatechat.app-main-42:/layout/activity_login.xml"
+    },
+    {
+        "merged": "com.privatechat.app-mergeDebugResources-39:/layout/activity_chat.xml",
+        "source": "com.privatechat.app-main-42:/layout/activity_chat.xml"
+    }
+]

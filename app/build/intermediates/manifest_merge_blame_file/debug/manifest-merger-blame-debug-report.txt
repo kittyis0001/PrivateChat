@@ -1,0 +1,392 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.privatechat.app"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:4:5-67
+11-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:4:22-64
+12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+12-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:5:5-79
+12-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:5:22-76
+13    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+13-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:6:5-77
+13-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:6:22-74
+14    <uses-permission android:name="android.permission.WAKE_LOCK" />
+14-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:7:5-68
+14-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:7:22-65
+15    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+15-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:8:5-81
+15-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:8:22-78
+16
+17    <!-- Required by older versions of Google Play services to create IID tokens -->
+18    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+18-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:26:5-82
+18-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:26:22-79
+19
+20    <permission
+20-->[androidx.core:core:1.12.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/b8669a03c0d34c818fabbd1c231be7d7/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
+21        android:name="com.privatechat.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+21-->[androidx.core:core:1.12.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/b8669a03c0d34c818fabbd1c231be7d7/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
+22        android:protectionLevel="signature" />
+22-->[androidx.core:core:1.12.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/b8669a03c0d34c818fabbd1c231be7d7/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
+23
+24    <uses-permission android:name="com.privatechat.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+24-->[androidx.core:core:1.12.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/b8669a03c0d34c818fabbd1c231be7d7/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
+24-->[androidx.core:core:1.12.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/b8669a03c0d34c818fabbd1c231be7d7/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
+25
+26    <application
+26-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:10:5-49:19
+27        android:name="com.privatechat.app.App"
+27-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:11:9-28
+28        android:allowBackup="false"
+28-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:12:9-36
+29        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+29-->[androidx.core:core:1.12.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/b8669a03c0d34c818fabbd1c231be7d7/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
+30        android:debuggable="true"
+31        android:extractNativeLibs="false"
+32        android:fullBackupContent="false"
+32-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:13:9-42
+33        android:icon="@mipmap/ic_launcher"
+33-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:14:9-43
+34        android:label="@string/app_name"
+34-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:15:9-41
+35        android:theme="@style/Theme.PrivateChat"
+35-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:16:9-49
+36        android:usesCleartextTraffic="false" >
+36-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:17:9-45
+37        <activity
+37-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:19:9-27:20
+38            android:name="com.privatechat.app.ui.login.LoginActivity"
+38-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:20:13-51
+39            android:exported="true"
+39-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:21:13-36
+40            android:theme="@style/Theme.PrivateChat" >
+40-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:22:13-53
+41            <intent-filter>
+41-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:23:13-26:29
+42                <action android:name="android.intent.action.MAIN" />
+42-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:24:17-69
+42-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:24:25-66
+43
+44                <category android:name="android.intent.category.LAUNCHER" />
+44-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:25:17-77
+44-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:25:27-74
+45            </intent-filter>
+46        </activity>
+47        <activity
+47-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:29:9-32:58
+48            android:name="com.privatechat.app.ui.chat.ChatActivity"
+48-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:30:13-49
+49            android:exported="false"
+49-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:31:13-37
+50            android:windowSoftInputMode="adjustResize" />
+50-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:32:13-55
+51
+52        <service
+52-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:34:9-40:19
+53            android:name="com.privatechat.app.messaging.ChatFirebaseMessagingService"
+53-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:35:13-67
+54            android:exported="false" >
+54-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:36:13-37
+55            <intent-filter>
+55-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:37:13-39:29
+56                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+56-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:38:17-78
+56-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:38:25-75
+57            </intent-filter>
+58        </service>
+59
+60        <meta-data
+60-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:42:9-44:60
+61            android:name="com.google.firebase.messaging.default_notification_icon"
+61-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:43:13-83
+62            android:resource="@drawable/ic_notification" />
+62-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:44:13-57
+63        <meta-data
+63-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:45:9-47:71
+64            android:name="com.google.firebase.messaging.default_notification_channel_id"
+64-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:46:13-89
+65            android:value="@string/default_notification_channel_id" />
+65-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:47:13-68
+66
+67        <provider
+67-->[androidx.emoji2:emoji2:1.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/f82ee632df0d8331d860cc79ea05d5ec/transformed/emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+68            android:name="androidx.startup.InitializationProvider"
+68-->[androidx.emoji2:emoji2:1.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/f82ee632df0d8331d860cc79ea05d5ec/transformed/emoji2-1.2.0/AndroidManifest.xml:25:13-67
+69            android:authorities="com.privatechat.app.androidx-startup"
+69-->[androidx.emoji2:emoji2:1.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/f82ee632df0d8331d860cc79ea05d5ec/transformed/emoji2-1.2.0/AndroidManifest.xml:26:13-68
+70            android:exported="false" >
+70-->[androidx.emoji2:emoji2:1.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/f82ee632df0d8331d860cc79ea05d5ec/transformed/emoji2-1.2.0/AndroidManifest.xml:27:13-37
+71            <meta-data
+71-->[androidx.emoji2:emoji2:1.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/f82ee632df0d8331d860cc79ea05d5ec/transformed/emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+72                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+72-->[androidx.emoji2:emoji2:1.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/f82ee632df0d8331d860cc79ea05d5ec/transformed/emoji2-1.2.0/AndroidManifest.xml:30:17-75
+73                android:value="androidx.startup" />
+73-->[androidx.emoji2:emoji2:1.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/f82ee632df0d8331d860cc79ea05d5ec/transformed/emoji2-1.2.0/AndroidManifest.xml:31:17-49
+74            <meta-data
+74-->[androidx.lifecycle:lifecycle-process:2.7.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/baebfaee478f73f8d58e6cf003b50253/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:29:13-31:52
+75                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+75-->[androidx.lifecycle:lifecycle-process:2.7.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/baebfaee478f73f8d58e6cf003b50253/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:30:17-78
+76                android:value="androidx.startup" />
+76-->[androidx.lifecycle:lifecycle-process:2.7.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/baebfaee478f73f8d58e6cf003b50253/transformed/lifecycle-process-2.7.0/AndroidManifest.xml:31:17-49
+77            <meta-data
+77-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:29:13-31:52
+78                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+78-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:30:17-85
+79                android:value="androidx.startup" />
+79-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:31:17-49
+80        </provider>
+81
+82        <service
+82-->[com.google.firebase:firebase-storage-ktx:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/2615c9c09062078ea5b5b720fb59b900/transformed/firebase-storage-ktx-20.3.0/AndroidManifest.xml:9:9-15:19
+83            android:name="com.google.firebase.components.ComponentDiscoveryService"
+83-->[com.google.firebase:firebase-storage-ktx:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/2615c9c09062078ea5b5b720fb59b900/transformed/firebase-storage-ktx-20.3.0/AndroidManifest.xml:10:13-84
+84            android:directBootAware="true"
+84-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:32:13-43
+85            android:exported="false" >
+85-->[com.google.firebase:firebase-storage-ktx:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/2615c9c09062078ea5b5b720fb59b900/transformed/firebase-storage-ktx-20.3.0/AndroidManifest.xml:11:13-37
+86            <meta-data
+86-->[com.google.firebase:firebase-storage-ktx:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/2615c9c09062078ea5b5b720fb59b900/transformed/firebase-storage-ktx-20.3.0/AndroidManifest.xml:12:13-14:85
+87                android:name="com.google.firebase.components:com.google.firebase.storage.ktx.FirebaseStorageLegacyRegistrar"
+87-->[com.google.firebase:firebase-storage-ktx:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/2615c9c09062078ea5b5b720fb59b900/transformed/firebase-storage-ktx-20.3.0/AndroidManifest.xml:13:17-125
+88                android:value="com.google.firebase.components.ComponentRegistrar" />
+88-->[com.google.firebase:firebase-storage-ktx:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/2615c9c09062078ea5b5b720fb59b900/transformed/firebase-storage-ktx-20.3.0/AndroidManifest.xml:14:17-82
+89            <meta-data
+89-->[com.google.firebase:firebase-storage:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ad575f4cc2076fc8c21c3f30e092c4d5/transformed/firebase-storage-20.3.0/AndroidManifest.xml:30:13-32:85
+90                android:name="com.google.firebase.components:com.google.firebase.storage.FirebaseStorageKtxRegistrar"
+90-->[com.google.firebase:firebase-storage:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ad575f4cc2076fc8c21c3f30e092c4d5/transformed/firebase-storage-20.3.0/AndroidManifest.xml:31:17-118
+91                android:value="com.google.firebase.components.ComponentRegistrar" />
+91-->[com.google.firebase:firebase-storage:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ad575f4cc2076fc8c21c3f30e092c4d5/transformed/firebase-storage-20.3.0/AndroidManifest.xml:32:17-82
+92            <meta-data
+92-->[com.google.firebase:firebase-storage:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ad575f4cc2076fc8c21c3f30e092c4d5/transformed/firebase-storage-20.3.0/AndroidManifest.xml:33:13-35:85
+93                android:name="com.google.firebase.components:com.google.firebase.storage.StorageRegistrar"
+93-->[com.google.firebase:firebase-storage:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ad575f4cc2076fc8c21c3f30e092c4d5/transformed/firebase-storage-20.3.0/AndroidManifest.xml:34:17-107
+94                android:value="com.google.firebase.components.ComponentRegistrar" />
+94-->[com.google.firebase:firebase-storage:20.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ad575f4cc2076fc8c21c3f30e092c4d5/transformed/firebase-storage-20.3.0/AndroidManifest.xml:35:17-82
+95            <meta-data
+95-->[com.google.firebase:firebase-database-ktx:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/96b68f7e25c887202ecb44a138dcbb0e/transformed/firebase-database-ktx-20.3.1/AndroidManifest.xml:12:13-14:85
+96                android:name="com.google.firebase.components:com.google.firebase.database.ktx.FirebaseDatabaseLegacyRegistrar"
+96-->[com.google.firebase:firebase-database-ktx:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/96b68f7e25c887202ecb44a138dcbb0e/transformed/firebase-database-ktx-20.3.1/AndroidManifest.xml:13:17-127
+97                android:value="com.google.firebase.components.ComponentRegistrar" />
+97-->[com.google.firebase:firebase-database-ktx:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/96b68f7e25c887202ecb44a138dcbb0e/transformed/firebase-database-ktx-20.3.1/AndroidManifest.xml:14:17-82
+98            <meta-data
+98-->[com.google.firebase:firebase-database:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3698d33abd4b5ef79f2f6ee309725462/transformed/firebase-database-20.3.1/AndroidManifest.xml:29:13-31:85
+99                android:name="com.google.firebase.components:com.google.firebase.database.FirebaseDatabaseKtxRegistrar"
+99-->[com.google.firebase:firebase-database:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3698d33abd4b5ef79f2f6ee309725462/transformed/firebase-database-20.3.1/AndroidManifest.xml:30:17-120
+100                android:value="com.google.firebase.components.ComponentRegistrar" />
+100-->[com.google.firebase:firebase-database:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3698d33abd4b5ef79f2f6ee309725462/transformed/firebase-database-20.3.1/AndroidManifest.xml:31:17-82
+101            <meta-data
+101-->[com.google.firebase:firebase-database:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3698d33abd4b5ef79f2f6ee309725462/transformed/firebase-database-20.3.1/AndroidManifest.xml:32:13-34:85
+102                android:name="com.google.firebase.components:com.google.firebase.database.DatabaseRegistrar"
+102-->[com.google.firebase:firebase-database:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3698d33abd4b5ef79f2f6ee309725462/transformed/firebase-database-20.3.1/AndroidManifest.xml:33:17-109
+103                android:value="com.google.firebase.components.ComponentRegistrar" />
+103-->[com.google.firebase:firebase-database:20.3.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3698d33abd4b5ef79f2f6ee309725462/transformed/firebase-database-20.3.1/AndroidManifest.xml:34:17-82
+104            <meta-data
+104-->[com.google.firebase:firebase-messaging-ktx:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/8c2e68e50372bcff547ac8dfbd096dbd/transformed/firebase-messaging-ktx-23.4.1/AndroidManifest.xml:26:13-28:85
+105                android:name="com.google.firebase.components:com.google.firebase.messaging.ktx.FirebaseMessagingLegacyRegistrar"
+105-->[com.google.firebase:firebase-messaging-ktx:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/8c2e68e50372bcff547ac8dfbd096dbd/transformed/firebase-messaging-ktx-23.4.1/AndroidManifest.xml:27:17-129
+106                android:value="com.google.firebase.components.ComponentRegistrar" />
+106-->[com.google.firebase:firebase-messaging-ktx:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/8c2e68e50372bcff547ac8dfbd096dbd/transformed/firebase-messaging-ktx-23.4.1/AndroidManifest.xml:28:17-82
+107            <meta-data
+107-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:57:13-59:85
+108                android:name="com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingKtxRegistrar"
+108-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:58:17-122
+109                android:value="com.google.firebase.components.ComponentRegistrar" />
+109-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:59:17-82
+110            <meta-data
+110-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:60:13-62:85
+111                android:name="com.google.firebase.components:com.google.firebase.messaging.FirebaseMessagingRegistrar"
+111-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:61:17-119
+112                android:value="com.google.firebase.components.ComponentRegistrar" />
+112-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:62:17-82
+113            <meta-data
+113-->[com.google.firebase:firebase-appcheck:17.1.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/a7c334e2474b5b20aaddfb442f173ade/transformed/firebase-appcheck-17.1.2/AndroidManifest.xml:25:13-27:85
+114                android:name="com.google.firebase.components:com.google.firebase.appcheck.FirebaseAppCheckKtxRegistrar"
+114-->[com.google.firebase:firebase-appcheck:17.1.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/a7c334e2474b5b20aaddfb442f173ade/transformed/firebase-appcheck-17.1.2/AndroidManifest.xml:26:17-120
+115                android:value="com.google.firebase.components.ComponentRegistrar" />
+115-->[com.google.firebase:firebase-appcheck:17.1.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/a7c334e2474b5b20aaddfb442f173ade/transformed/firebase-appcheck-17.1.2/AndroidManifest.xml:27:17-82
+116            <meta-data
+116-->[com.google.firebase:firebase-appcheck:17.1.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/a7c334e2474b5b20aaddfb442f173ade/transformed/firebase-appcheck-17.1.2/AndroidManifest.xml:28:13-30:85
+117                android:name="com.google.firebase.components:com.google.firebase.appcheck.FirebaseAppCheckRegistrar"
+117-->[com.google.firebase:firebase-appcheck:17.1.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/a7c334e2474b5b20aaddfb442f173ade/transformed/firebase-appcheck-17.1.2/AndroidManifest.xml:29:17-117
+118                android:value="com.google.firebase.components.ComponentRegistrar" />
+118-->[com.google.firebase:firebase-appcheck:17.1.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/a7c334e2474b5b20aaddfb442f173ade/transformed/firebase-appcheck-17.1.2/AndroidManifest.xml:30:17-82
+119            <meta-data
+119-->[com.google.firebase:firebase-installations:17.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3387b816695931be4f8a9a82914bf576/transformed/firebase-installations-17.2.0/AndroidManifest.xml:15:13-17:85
+120                android:name="com.google.firebase.components:com.google.firebase.installations.FirebaseInstallationsKtxRegistrar"
+120-->[com.google.firebase:firebase-installations:17.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3387b816695931be4f8a9a82914bf576/transformed/firebase-installations-17.2.0/AndroidManifest.xml:16:17-130
+121                android:value="com.google.firebase.components.ComponentRegistrar" />
+121-->[com.google.firebase:firebase-installations:17.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3387b816695931be4f8a9a82914bf576/transformed/firebase-installations-17.2.0/AndroidManifest.xml:17:17-82
+122            <meta-data
+122-->[com.google.firebase:firebase-installations:17.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3387b816695931be4f8a9a82914bf576/transformed/firebase-installations-17.2.0/AndroidManifest.xml:18:13-20:85
+123                android:name="com.google.firebase.components:com.google.firebase.installations.FirebaseInstallationsRegistrar"
+123-->[com.google.firebase:firebase-installations:17.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3387b816695931be4f8a9a82914bf576/transformed/firebase-installations-17.2.0/AndroidManifest.xml:19:17-127
+124                android:value="com.google.firebase.components.ComponentRegistrar" />
+124-->[com.google.firebase:firebase-installations:17.2.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/3387b816695931be4f8a9a82914bf576/transformed/firebase-installations-17.2.0/AndroidManifest.xml:20:17-82
+125            <meta-data
+125-->[com.google.firebase:firebase-common-ktx:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0a2893b6f3160f9c31d9c0c7dfaf6df0/transformed/firebase-common-ktx-20.4.2/AndroidManifest.xml:12:13-14:85
+126                android:name="com.google.firebase.components:com.google.firebase.ktx.FirebaseCommonLegacyRegistrar"
+126-->[com.google.firebase:firebase-common-ktx:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0a2893b6f3160f9c31d9c0c7dfaf6df0/transformed/firebase-common-ktx-20.4.2/AndroidManifest.xml:13:17-116
+127                android:value="com.google.firebase.components.ComponentRegistrar" />
+127-->[com.google.firebase:firebase-common-ktx:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0a2893b6f3160f9c31d9c0c7dfaf6df0/transformed/firebase-common-ktx-20.4.2/AndroidManifest.xml:14:17-82
+128            <meta-data
+128-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:35:13-37:85
+129                android:name="com.google.firebase.components:com.google.firebase.FirebaseCommonKtxRegistrar"
+129-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:36:17-109
+130                android:value="com.google.firebase.components.ComponentRegistrar" />
+130-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:37:17-82
+131            <meta-data
+131-->[com.google.firebase:firebase-datatransport:18.1.7] /data/data/com.termux/files/home/.gradle/caches/transforms-4/72c54a5723cc5d2072fd3b50fa057772/transformed/firebase-datatransport-18.1.7/AndroidManifest.xml:27:13-29:85
+132                android:name="com.google.firebase.components:com.google.firebase.datatransport.TransportRegistrar"
+132-->[com.google.firebase:firebase-datatransport:18.1.7] /data/data/com.termux/files/home/.gradle/caches/transforms-4/72c54a5723cc5d2072fd3b50fa057772/transformed/firebase-datatransport-18.1.7/AndroidManifest.xml:28:17-115
+133                android:value="com.google.firebase.components.ComponentRegistrar" />
+133-->[com.google.firebase:firebase-datatransport:18.1.7] /data/data/com.termux/files/home/.gradle/caches/transforms-4/72c54a5723cc5d2072fd3b50fa057772/transformed/firebase-datatransport-18.1.7/AndroidManifest.xml:29:17-82
+134        </service>
+135
+136        <receiver
+136-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:29:9-40:20
+137            android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver"
+137-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:30:13-78
+138            android:exported="true"
+138-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:31:13-36
+139            android:permission="com.google.android.c2dm.permission.SEND" >
+139-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:32:13-73
+140            <intent-filter>
+140-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:33:13-35:29
+141                <action android:name="com.google.android.c2dm.intent.RECEIVE" />
+141-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:34:17-81
+141-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:34:25-78
+142            </intent-filter>
+143
+144            <meta-data
+144-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:37:13-39:40
+145                android:name="com.google.android.gms.cloudmessaging.FINISHED_AFTER_HANDLED"
+145-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:38:17-92
+146                android:value="true" />
+146-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:39:17-37
+147        </receiver>
+148        <!--
+149             FirebaseMessagingService performs security checks at runtime,
+150             but set to not exported to explicitly avoid allowing another app to call it.
+151        -->
+152        <service
+152-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:46:9-53:19
+153            android:name="com.google.firebase.messaging.FirebaseMessagingService"
+153-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:47:13-82
+154            android:directBootAware="true"
+154-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:48:13-43
+155            android:exported="false" >
+155-->[com.google.firebase:firebase-messaging:23.4.1] /data/data/com.termux/files/home/.gradle/caches/transforms-4/0110d03be269c41b6da2c69aa812ed74/transformed/firebase-messaging-23.4.1/AndroidManifest.xml:49:13-37
+156            <intent-filter android:priority="-500" >
+156-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:37:13-39:29
+157                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+157-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:38:17-78
+157-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:38:25-75
+158            </intent-filter>
+159        </service>
+160
+161        <activity
+161-->[com.google.android.gms:play-services-base:18.1.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/5909f2ba97e63568e804c526a572af1c/transformed/play-services-base-18.1.0/AndroidManifest.xml:20:9-22:45
+162            android:name="com.google.android.gms.common.api.GoogleApiActivity"
+162-->[com.google.android.gms:play-services-base:18.1.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/5909f2ba97e63568e804c526a572af1c/transformed/play-services-base-18.1.0/AndroidManifest.xml:20:19-85
+163            android:exported="false"
+163-->[com.google.android.gms:play-services-base:18.1.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/5909f2ba97e63568e804c526a572af1c/transformed/play-services-base-18.1.0/AndroidManifest.xml:22:19-43
+164            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+164-->[com.google.android.gms:play-services-base:18.1.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/5909f2ba97e63568e804c526a572af1c/transformed/play-services-base-18.1.0/AndroidManifest.xml:21:19-78
+165
+166        <provider
+166-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:23:9-28:39
+167            android:name="com.google.firebase.provider.FirebaseInitProvider"
+167-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:24:13-77
+168            android:authorities="com.privatechat.app.firebaseinitprovider"
+168-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:25:13-72
+169            android:directBootAware="true"
+169-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:26:13-43
+170            android:exported="false"
+170-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:27:13-37
+171            android:initOrder="100" />
+171-->[com.google.firebase:firebase-common:20.4.2] /data/data/com.termux/files/home/.gradle/caches/transforms-4/fb2fa825f8784a5e84dfb51ac7bdf384/transformed/firebase-common-20.4.2/AndroidManifest.xml:28:13-36
+172
+173        <meta-data
+173-->[com.google.android.gms:play-services-basement:18.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/595725a666636be20cc57b673fb987a0/transformed/play-services-basement-18.3.0/AndroidManifest.xml:21:9-23:69
+174            android:name="com.google.android.gms.version"
+174-->[com.google.android.gms:play-services-basement:18.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/595725a666636be20cc57b673fb987a0/transformed/play-services-basement-18.3.0/AndroidManifest.xml:22:13-58
+175            android:value="@integer/google_play_services_version" />
+175-->[com.google.android.gms:play-services-basement:18.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/595725a666636be20cc57b673fb987a0/transformed/play-services-basement-18.3.0/AndroidManifest.xml:23:13-66
+176
+177        <receiver
+177-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:34:9-52:20
+178            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+178-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:35:13-76
+179            android:directBootAware="false"
+179-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:36:13-44
+180            android:enabled="true"
+180-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:37:13-35
+181            android:exported="true"
+181-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:38:13-36
+182            android:permission="android.permission.DUMP" >
+182-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:39:13-57
+183            <intent-filter>
+183-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:40:13-42:29
+184                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+184-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:17-91
+184-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:41:25-88
+185            </intent-filter>
+186            <intent-filter>
+186-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:43:13-45:29
+187                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+187-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:17-85
+187-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:44:25-82
+188            </intent-filter>
+189            <intent-filter>
+189-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:46:13-48:29
+190                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+190-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:17-88
+190-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:47:25-85
+191            </intent-filter>
+192            <intent-filter>
+192-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:49:13-51:29
+193                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+193-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:17-95
+193-->[androidx.profileinstaller:profileinstaller:1.3.0] /data/data/com.termux/files/home/.gradle/caches/transforms-4/29084b32f0848d5603deff86c6098829/transformed/profileinstaller-1.3.0/AndroidManifest.xml:50:25-92
+194            </intent-filter>
+195        </receiver>
+196
+197        <service
+197-->[com.google.android.datatransport:transport-backend-cct:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/27977373773ef14b179cf4113a1e7747/transformed/transport-backend-cct-3.1.8/AndroidManifest.xml:28:9-34:19
+198            android:name="com.google.android.datatransport.runtime.backends.TransportBackendDiscovery"
+198-->[com.google.android.datatransport:transport-backend-cct:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/27977373773ef14b179cf4113a1e7747/transformed/transport-backend-cct-3.1.8/AndroidManifest.xml:29:13-103
+199            android:exported="false" >
+199-->[com.google.android.datatransport:transport-backend-cct:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/27977373773ef14b179cf4113a1e7747/transformed/transport-backend-cct-3.1.8/AndroidManifest.xml:30:13-37
+200            <meta-data
+200-->[com.google.android.datatransport:transport-backend-cct:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/27977373773ef14b179cf4113a1e7747/transformed/transport-backend-cct-3.1.8/AndroidManifest.xml:31:13-33:39
+201                android:name="backend:com.google.android.datatransport.cct.CctBackendFactory"
+201-->[com.google.android.datatransport:transport-backend-cct:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/27977373773ef14b179cf4113a1e7747/transformed/transport-backend-cct-3.1.8/AndroidManifest.xml:32:17-94
+202                android:value="cct" />
+202-->[com.google.android.datatransport:transport-backend-cct:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/27977373773ef14b179cf4113a1e7747/transformed/transport-backend-cct-3.1.8/AndroidManifest.xml:33:17-36
+203        </service>
+204        <service
+204-->[com.google.android.datatransport:transport-runtime:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ff56ea86d388921a9f82c2e08ca9020c/transformed/transport-runtime-3.1.8/AndroidManifest.xml:26:9-30:19
+205            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+205-->[com.google.android.datatransport:transport-runtime:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ff56ea86d388921a9f82c2e08ca9020c/transformed/transport-runtime-3.1.8/AndroidManifest.xml:27:13-117
+206            android:exported="false"
+206-->[com.google.android.datatransport:transport-runtime:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ff56ea86d388921a9f82c2e08ca9020c/transformed/transport-runtime-3.1.8/AndroidManifest.xml:28:13-37
+207            android:permission="android.permission.BIND_JOB_SERVICE" >
+207-->[com.google.android.datatransport:transport-runtime:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ff56ea86d388921a9f82c2e08ca9020c/transformed/transport-runtime-3.1.8/AndroidManifest.xml:29:13-69
+208        </service>
+209
+210        <receiver
+210-->[com.google.android.datatransport:transport-runtime:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ff56ea86d388921a9f82c2e08ca9020c/transformed/transport-runtime-3.1.8/AndroidManifest.xml:32:9-34:40
+211            android:name="com.google.android.datatransport.runtime.scheduling.jobscheduling.AlarmManagerSchedulerBroadcastReceiver"
+211-->[com.google.android.datatransport:transport-runtime:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ff56ea86d388921a9f82c2e08ca9020c/transformed/transport-runtime-3.1.8/AndroidManifest.xml:33:13-132
+212            android:exported="false" />
+212-->[com.google.android.datatransport:transport-runtime:3.1.8] /data/data/com.termux/files/home/.gradle/caches/transforms-4/ff56ea86d388921a9f82c2e08ca9020c/transformed/transport-runtime-3.1.8/AndroidManifest.xml:34:13-37
+213    </application>
+214
+215</manifest>

@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Private Chat</string>
+    <string name="default_notification_channel_id">chat_messages</string>
+</resources>

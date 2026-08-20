@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#F3F0FA</color>
+    <color name="primary">#B09EF5</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="textPrimary">#3A2A5A</color>
+    <color name="textSecondary">#7A6AAA</color>
+    <color name="white">#FFFFFF</color>
+    <string name="app_name">Private Chat</string>
+    <string name="default_notification_channel_id">chat_messages</string>
+    <string name="firebase_database_url" translatable="false">https://private-chat-318a6-default-rtdb.asia-southeast1.firebasedatabase.app</string>
+    <string name="gcm_defaultSenderId" translatable="false">1082000480834</string>
+    <string name="google_api_key" translatable="false">AIzaSyDH1Iz8WIQYqZSBKEYf2-x-0sMq83OxRWc</string>
+    <string name="google_app_id" translatable="false">1:1082000480834:android:9a7f7f56809a003d5a2bdb</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyDH1Iz8WIQYqZSBKEYf2-x-0sMq83OxRWc</string>
+    <string name="google_storage_bucket" translatable="false">private-chat-318a6.firebasestorage.app</string>
+    <string name="project_id" translatable="false">private-chat-318a6</string>
+    <style name="Theme.PrivateChat" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
