@@ -51,7 +51,8 @@ class ChatActivity : AppCompatActivity() {
         repository.onMessageAdded = { message ->
             runOnUiThread {
                 if (messages.none { it.key == message.key }) {
-                    messages.add(message)
+                    messages.removeAll { it.key == message.key }
+                messages.add(message)
                     messages.sortBy { it.time }
                     adapter.submitList(messages.toMutableList()) {
             adapter.notifyDataSetChanged()
