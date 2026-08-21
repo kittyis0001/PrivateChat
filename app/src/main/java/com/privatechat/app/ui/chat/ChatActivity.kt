@@ -38,6 +38,7 @@ class ChatActivity : AppCompatActivity() {
 
         adapter = MessageAdapter(currentUser)
         binding.messagesRecyclerView.adapter = adapter
+        binding.messagesRecyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this).apply { stackFromEnd = true }
 
         val displayName = if (otherUser == "katis1") "Kat" else "Kitty"
         binding.headerName.text = displayName
