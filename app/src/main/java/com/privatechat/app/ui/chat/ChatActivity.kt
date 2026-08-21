@@ -58,6 +58,7 @@ class ChatActivity : AppCompatActivity() {
 adapter.submitList(messages.toMutableList()) {
     binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
             }
+            repository.markSeen(message)
                     updateUnreadState()
                 }
             }
