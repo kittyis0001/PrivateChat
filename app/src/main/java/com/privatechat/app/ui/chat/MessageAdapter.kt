@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import android.text.method.LinkMovementMethod
 import com.privatechat.app.data.model.Message
 import com.privatechat.app.databinding.ItemMessageIncomingBinding
 import com.privatechat.app.databinding.ItemMessageOutgoingBinding
