@@ -57,8 +57,8 @@ class ChatActivity : AppCompatActivity() {
                     messages.sortBy { it.time }
 adapter.submitList(messages.toMutableList()) {
     binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
+            }
 }
-                    }
                     repository.markSeen(message)
                     updateUnreadState()
                 }
@@ -70,8 +70,9 @@ adapter.submitList(messages.toMutableList()) {
                 val index = messages.indexOfFirst { it.key == message.key }
                 if (index >= 0) {
                     messages[index] = message
-}
-                }
+            adapter.submitList(messages.toMutableList()) {
+                binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
+            }
             }
         }
 
