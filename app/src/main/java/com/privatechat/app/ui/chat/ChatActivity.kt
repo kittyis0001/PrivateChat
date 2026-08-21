@@ -114,6 +114,7 @@ adapter.submitList(messages.toMutableList()) {
             }
         })
     }
+    }
 
     private fun updateUnreadState() {
         // Hook point for a launcher/bottom-nav badge once that screen
