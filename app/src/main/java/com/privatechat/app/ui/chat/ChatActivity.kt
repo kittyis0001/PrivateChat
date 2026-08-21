@@ -54,6 +54,8 @@ class ChatActivity : AppCompatActivity() {
                     messages.add(message)
                     messages.sortBy { it.time }
                     adapter.submitList(messages.toMutableList()) {
+            adapter.notifyDataSetChanged()
+                adapter.notifyDataSetChanged()
                         binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
                     }
                     repository.markSeen(message)
@@ -68,6 +70,8 @@ class ChatActivity : AppCompatActivity() {
                 if (index >= 0) {
                     messages[index] = message
                     adapter.submitList(messages.toMutableList())
+            adapter.notifyDataSetChanged()
+                adapter.notifyDataSetChanged()
                 }
             }
         }
