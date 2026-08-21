@@ -47,7 +47,6 @@ class ChatRepository(
         // message ever lost" for temporary offline periods, using the
         // Android SDK's built-in disk persistence rather than any
         // custom polling logic.
-        db.setPersistenceEnabled(true)
         messagesRef.keepSynced(true)
     }
 
