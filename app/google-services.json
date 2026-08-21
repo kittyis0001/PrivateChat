@@ -1,33 +1,14 @@
 {
   "project_info": {
-    "project_number": "1082000480834",
-    "firebase_url": "https://private-chat-318a6-default-rtdb.asia-southeast1.firebasedatabase.app",
-    "project_id": "private-chat-318a6",
-    "storage_bucket": "private-chat-318a6.firebasestorage.app"
+    "project_number": "1013388913033",
+    "firebase_url": "https://private-chat-7a103-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "private-chat-7a103",
+    "storage_bucket": "private-chat-7a103.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1082000480834:android:a30f479d754d63da5a2bdb",
-        "android_client_info": {
-          "package_name": "com.example.kitty_chat"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDH1Iz8WIQYqZSBKEYf2-x-0sMq83OxRWc"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:1082000480834:android:9a7f7f56809a003d5a2bdb",
+        "mobilesdk_app_id": "1:1013388913033:android:712dd862f53774a67e9958",
         "android_client_info": {
           "package_name": "com.privatechat.app"
         }
@@ -35,7 +16,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDH1Iz8WIQYqZSBKEYf2-x-0sMq83OxRWc"
+          "current_key": "AIzaSyB9Z2J5WMmQ2uxnaPblVetwPQ8ymua9UEQ"
         }
       ],
       "services": {
