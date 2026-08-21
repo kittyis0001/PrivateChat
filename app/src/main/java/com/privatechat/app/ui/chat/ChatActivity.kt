@@ -53,7 +53,7 @@ class ChatActivity : AppCompatActivity() {
                 if (messages.none { it.key == message.key }) {
                     messages.add(message)
                     messages.sortBy { it.time }
-                    adapter.submitList(messages.toList()) {
+                    adapter.submitList(messages.toMutableList()) {
                         binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
                     }
                     repository.markSeen(message)
@@ -67,7 +67,7 @@ class ChatActivity : AppCompatActivity() {
                 val index = messages.indexOfFirst { it.key == message.key }
                 if (index >= 0) {
                     messages[index] = message
-                    adapter.submitList(messages.toList())
+                    adapter.submitList(messages.toMutableList())
                 }
             }
         }
