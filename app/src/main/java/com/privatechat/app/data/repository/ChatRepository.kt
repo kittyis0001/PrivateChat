@@ -57,6 +57,11 @@ class ChatRepository(
     // forever, per the architecture requirement.
 
     override fun onStart(owner: LifecycleOwner) {
+        if (!isListenerAttached) {
+            messagesListener = null
+            attachMessagesListener()
+        }
+        markOnline()
         attachMessagesListener()
         attachConnectionMonitor()
         attachPresenceListener()
