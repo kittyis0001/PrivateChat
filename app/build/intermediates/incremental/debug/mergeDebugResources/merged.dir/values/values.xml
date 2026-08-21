@@ -2031,12 +2031,12 @@
     <string name="fab_transformation_scrim_behavior" translatable="false">com.google.android.material.transformation.FabTransformationScrimBehavior</string>
     <string name="fab_transformation_sheet_behavior" translatable="false">com.google.android.material.transformation.FabTransformationSheetBehavior</string>
     <string name="fcm_fallback_notification_channel_label">Miscellaneous</string>
-    <string name="firebase_database_url" translatable="false">https://private-chat-318a6-default-rtdb.asia-southeast1.firebasedatabase.app</string>
-    <string name="gcm_defaultSenderId" translatable="false">1082000480834</string>
-    <string name="google_api_key" translatable="false">AIzaSyDH1Iz8WIQYqZSBKEYf2-x-0sMq83OxRWc</string>
-    <string name="google_app_id" translatable="false">1:1082000480834:android:9a7f7f56809a003d5a2bdb</string>
-    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyDH1Iz8WIQYqZSBKEYf2-x-0sMq83OxRWc</string>
-    <string name="google_storage_bucket" translatable="false">private-chat-318a6.firebasestorage.app</string>
+    <string name="firebase_database_url" translatable="false">https://private-chat-7a103-default-rtdb.asia-southeast1.firebasedatabase.app</string>
+    <string name="gcm_defaultSenderId" translatable="false">1013388913033</string>
+    <string name="google_api_key" translatable="false">AIzaSyB9Z2J5WMmQ2uxnaPblVetwPQ8ymua9UEQ</string>
+    <string name="google_app_id" translatable="false">1:1013388913033:android:712dd862f53774a67e9958</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyB9Z2J5WMmQ2uxnaPblVetwPQ8ymua9UEQ</string>
+    <string name="google_storage_bucket" translatable="false">private-chat-7a103.firebasestorage.app</string>
     <string name="hide_bottom_view_on_scroll_behavior" translatable="false">com.google.android.material.behavior.HideBottomViewOnScrollBehavior</string>
     <string description="Content description for an icon that appears in the title area of a dialog" name="icon_content_description">Dialog Icon</string>
     <string name="item_view_role_description">Tab</string>
@@ -2151,7 +2151,7 @@
     <string name="path_password_eye_mask_strike_through" translatable="false">M2,4.27 L19.73,22 L22.27,19.46 L4.54,1.73 L4.54,1 L23,1 L23,23 L1,23 L1,4.27 Z</string>
     <string name="path_password_eye_mask_visible" translatable="false">M2,4.27 L2,4.27 L4.54,1.73 L4.54,1.73 L4.54,1 L23,1 L23,23 L1,23 L1,4.27 Z</string>
     <string name="path_password_strike_through" translatable="false">M3.27,4.27 L19.74,20.74</string>
-    <string name="project_id" translatable="false">private-chat-318a6</string>
+    <string name="project_id" translatable="false">private-chat-7a103</string>
     <string name="search_menu_title">Search</string>
     <string name="searchbar_scrolling_view_behavior" translatable="false">
     com.google.android.material.search.SearchBar$ScrollingViewBehavior

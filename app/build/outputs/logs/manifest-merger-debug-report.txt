@@ -217,7 +217,7 @@ MERGED from [com.google.android.datatransport:transport-runtime:3.1.8] /data/dat
 	android:usesCleartextTraffic
 		ADDED from /data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:17:9-45
 	android:name
-		ADDED from /data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:11:9-28
+		ADDED from /data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:10:18-37
 activity#com.privatechat.app.ui.login.LoginActivity
 ADDED from /data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:19:9-27:20
 	android:exported

@@ -43,7 +43,7 @@
 26    <application
 26-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:10:5-49:19
 27        android:name="com.privatechat.app.App"
-27-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:11:9-28
+27-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:10:18-37
 28        android:allowBackup="false"
 28-->/data/data/com.termux/files/home/PrivateChat/app/src/main/AndroidManifest.xml:12:9-36
 29        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
