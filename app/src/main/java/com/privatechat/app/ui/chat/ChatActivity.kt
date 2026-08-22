@@ -44,6 +44,14 @@ class ChatActivity : AppCompatActivity() {
     // overlay views, torn down via dismissOverlays() instead.
     private var activeDialog: android.app.Dialog? = null
 
+    private companion object {
+        // Marks the reaction bar / action menu view (as opposed to the
+        // full-screen scrim) inside overlayContainer, so
+        // dismissOverlaysAnimated() knows which child to animate out.
+        const val TAG_OVERLAY_CONTENT = "overlay_content"
+        val UNSEND_RED = android.graphics.Color.parseColor("#E53935")
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -207,6 +215,28 @@ adapter.submitList(messages.toMutableList()) {
         binding.overlayContainer.isClickable = false
     }
 
+    // Same teardown, but fades + shrinks the popup/menu content first —
+    // used for the "tap outside to close" gesture so closing feels like
+    // the reverse of the WhatsApp/Messenger open animation instead of an
+    // abrupt cut.
+    private fun dismissOverlaysAnimated() {
+        val content = (0 until binding.overlayContainer.childCount)
+            .map { binding.overlayContainer.getChildAt(it) }
+            .firstOrNull { it.tag == TAG_OVERLAY_CONTENT }
+        if (content == null) {
+            dismissOverlays()
+            return
+        }
+        binding.overlayContainer.isClickable = false
+        content.animate()
+            .alpha(0f)
+            .scaleX(0.85f)
+            .scaleY(0.85f)
+            .setDuration(120)
+            .withEndAction { dismissOverlays() }
+            .start()
+    }
+
     private fun addScrim(onTap: () -> Unit) {
         val scrim = View(this)
         scrim.setOnClickListener { onTap() }
@@ -250,13 +280,14 @@ adapter.submitList(messages.toMutableList()) {
     // FEATURE 3 — Messenger-style tap-to-react floating emoji bar.
     private fun showReactionBar(message: Message, anchor: View) {
         dismissOverlays()
-        addScrim { dismissOverlays() }
+        addScrim { dismissOverlaysAnimated() }
 
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundResource(com.privatechat.app.R.drawable.bg_reaction_bar)
             elevation = dp(4).toFloat()
             setPadding(dp(6), dp(6), dp(6), dp(6))
+            tag = TAG_OVERLAY_CONTENT
         }
         val emojis = listOf("❤️", "👍", "😂", "😮", "😢")
         for (emoji in emojis) {
@@ -290,21 +321,23 @@ adapter.submitList(messages.toMutableList()) {
     // FEATURE 4 — Messenger-style 2s long-press action menu.
     private fun showActionMenu(message: Message, anchor: View) {
         dismissOverlays()
-        addScrim { dismissOverlays() }
+        addScrim { dismissOverlaysAnimated() }
 
         val isMine = message.name == Session.currentUser()
         val menu = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundResource(com.privatechat.app.R.drawable.bg_popup_menu)
             elevation = dp(6).toFloat()
+            minimumWidth = dp(230)
+            tag = TAG_OVERLAY_CONTENT
         }
 
-        fun addItem(icon: String, label: String, action: () -> Unit) {
+        fun addItem(icon: String, label: String, textColor: Int? = null, action: () -> Unit) {
             val row = TextView(this).apply {
                 text = "$icon   $label"
-                textSize = 15f
-                setTextColor(resources.getColor(com.privatechat.app.R.color.textPrimary, theme))
-                setPadding(dp(20), dp(12), dp(24), dp(12))
+                textSize = 16f
+                setTextColor(textColor ?: resources.getColor(com.privatechat.app.R.color.textPrimary, theme))
+                setPadding(dp(18), dp(14), dp(18), dp(14))
                 isClickable = true
                 val ripple = android.util.TypedValue()
                 theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
@@ -317,10 +350,13 @@ adapter.submitList(messages.toMutableList()) {
             menu.addView(row)
         }
 
-        addItem("😀", "React") { showReactionBar(message, anchor) }
-        if (!message.deleted) addItem("↩", "Reply") { enterReplyMode(message) }
+        addItem("😊", "React") { showReactionBar(message, anchor) }
+        if (!message.deleted) addItem("↩️", "Reply") { enterReplyMode(message) }
         if (isMine && !message.deleted) addItem("✏️", "Edit") { enterEditMode(message) }
-        if (isMine && !message.deleted) addItem("🗑", "Unsend") { repository.deleteMessage(message.key) }
+        if (!message.deleted) addItem("📋", "Copy") { copyMessageToClipboard(message) }
+        if (isMine && !message.deleted) {
+            addItem("🗑️", "Unsend", textColor = UNSEND_RED) { repository.deleteMessage(message.key) }
+        }
 
         menu.layoutParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -328,6 +364,20 @@ adapter.submitList(messages.toMutableList()) {
         )
         binding.overlayContainer.addView(menu)
         popInAboveAnchor(menu, anchor)
+    }
+
+    // FEATURE — Copy (message text, or the underlying URL for a voice/GIF
+    // message), matching the requested WhatsApp/Messenger "Copy" action.
+    private fun copyMessageToClipboard(message: Message) {
+        val content = when {
+            message.isVoice() -> message.voiceUrl()
+            message.isGif() -> message.gifUrl()
+            else -> message.text
+        }
+        val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+            as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Message", content))
+        android.widget.Toast.makeText(this, "Message copied", android.widget.Toast.LENGTH_SHORT).show()
     }
 
     // "+" in the reaction bar. Prefers Android's Jetpack system-style emoji
