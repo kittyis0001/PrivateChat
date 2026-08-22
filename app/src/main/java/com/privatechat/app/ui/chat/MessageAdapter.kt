@@ -234,7 +234,7 @@ class MessageAdapter(private val currentUser: String) :
     companion object {
         private const val VIEW_TYPE_OUTGOING = 1
         private const val VIEW_TYPE_INCOMING = 2
-        private const val LONG_PRESS_MS = 1300L
+        private const val LONG_PRESS_MS = 800L
 
         // Exposed so ChatActivity can build the same short preview text for
         // the reply bar / popup menu, without duplicating the "deleted /
