@@ -13,7 +13,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnPreDraw
+import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.privatechat.app.data.Session
 import com.privatechat.app.data.model.Message
 import com.privatechat.app.data.repository.ChatRepository
@@ -34,10 +36,10 @@ class ChatActivity : AppCompatActivity() {
     // means the compose bar is in its normal (non-reply) state.
     private var replyingTo: Message? = null
 
-    // The one AlertDialog that can be open at a time (edit message / emoji
-    // picker) — the reaction bar and action menu are separate overlay
-    // views, torn down via dismissOverlays() instead.
-    private var activeDialog: AlertDialog? = null
+    // The one dialog/bottom-sheet that can be open at a time (edit message
+    // / emoji picker) — the reaction bar and action menu are separate
+    // overlay views, torn down via dismissOverlays() instead.
+    private var activeDialog: android.app.Dialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -310,9 +312,37 @@ adapter.submitList(messages.toMutableList()) {
             .show()
     }
 
-    // "+" in the reaction bar — a curated emoji grid stands in for the
-    // system emoji picker/BottomSheet without pulling in a new dependency.
+    // "+" in the reaction bar. Prefers Android's Jetpack system-style emoji
+    // picker (EmojiPickerView, the same widget/behavior used system-wide),
+    // hosted in a BottomSheet; if that widget can't be constructed on this
+    // device/build, falls back to a curated emoji grid in its own
+    // BottomSheet so the user still gets a picker either way.
     private fun showEmojiPicker(message: Message) {
+        val sheet = BottomSheetDialog(this)
+        val systemPicker = createSystemEmojiPicker(message, sheet)
+        sheet.setContentView(systemPicker ?: buildCuratedEmojiGrid(message, sheet))
+        activeDialog = sheet
+        sheet.show()
+    }
+
+    private fun createSystemEmojiPicker(message: Message, sheet: BottomSheetDialog): View? {
+        return try {
+            EmojiPickerView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(360))
+                setOnEmojiPickedListener { item ->
+                    toggleReaction(message, item.emoji)
+                    sheet.dismiss()
+                }
+            }
+        } catch (e: Throwable) {
+            // androidx.emoji2's EmojiPickerView failed to construct/render
+            // on this device/build — fall back to the curated grid instead
+            // of crashing the reaction flow.
+            null
+        }
+    }
+
+    private fun buildCuratedEmojiGrid(message: Message, sheet: BottomSheetDialog): View {
         val emojis = listOf(
             "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😜", "🤔", "😎",
             "😢", "😭", "😡", "😱", "🥳", "👍", "👎", "🙏", "👏", "🔥",
@@ -320,7 +350,7 @@ adapter.submitList(messages.toMutableList()) {
         )
         val grid = GridLayout(this).apply {
             columnCount = 6
-            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setPadding(dp(16), dp(16), dp(16), dp(16))
         }
         for (emoji in emojis) {
             grid.addView(TextView(this).apply {
@@ -334,15 +364,11 @@ adapter.submitList(messages.toMutableList()) {
                 isClickable = true
                 setOnClickListener {
                     toggleReaction(message, emoji)
-                    activeDialog?.dismiss()
+                    sheet.dismiss()
                 }
             })
         }
-        activeDialog = AlertDialog.Builder(this)
-            .setTitle("Choose a reaction")
-            .setView(ScrollView(this).apply { addView(grid) })
-            .setNegativeButton("Cancel", null)
-            .show()
+        return ScrollView(this).apply { addView(grid) }
     }
 
     private fun updateUnreadState() {

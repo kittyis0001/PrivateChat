@@ -50,6 +50,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-process:2.7.0")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    // System emoji picker UI for the tap-to-react "+" button, with a
+    // BottomSheet fallback (ChatActivity checks isAvailable() and only
+    // uses this on devices where it actually renders emoji content).
+    implementation("androidx.emoji2:emoji2-emojipicker:1.6.0")
 
     // Firebase — versions managed by BoM, matches "use Firebase BoM" requirement
     implementation(platform("com.google.firebase:firebase-bom:32.7.4"))
