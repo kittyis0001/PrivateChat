@@ -205,7 +205,7 @@ class MessageAdapter(private val currentUser: String) :
         fun bind(message: Message) {
             binding.messageText.text = displayText(message)
             binding.messageTime.text = PresenceFormatter.messageTime(message.time) +
-                if (message.edited) " · edited" else ""
+                if (message.edited) " (edited)" else ""
             binding.messageTick.text = if (message.seen) "✔✔" else "✔"
             bindReplyPreview(message, binding.replyPreview, binding.replyPreviewSender, binding.replyPreviewText)
             bindReactionsBadge(message, binding.reactionsBadge)
@@ -221,7 +221,7 @@ class MessageAdapter(private val currentUser: String) :
         fun bind(message: Message) {
             binding.messageText.text = displayText(message)
             binding.messageTime.text = PresenceFormatter.messageTime(message.time) +
-                if (message.edited) " · edited" else ""
+                if (message.edited) " (edited)" else ""
             bindReplyPreview(message, binding.replyPreview, binding.replyPreviewSender, binding.replyPreviewText)
             bindReactionsBadge(message, binding.reactionsBadge)
             capBubbleWidth(binding.bubbleContainer)
@@ -244,7 +244,7 @@ class MessageAdapter(private val currentUser: String) :
         fun previewText(message: Message, viewerUser: String? = null): String = when {
             message.deleted -> when {
                 viewerUser == null -> "🚫 Message deleted"
-                message.name == viewerUser -> "You unsent a message"
+                message.name == viewerUser -> "You unsent this message"
                 else -> "This message was unsent"
             }
             message.isVoice() -> "🎤 Voice message"

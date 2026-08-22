@@ -30,7 +30,7 @@
         android:layout_gravity="end"
         android:orientation="vertical"
         android:background="@drawable/bg_bubble_outgoing"
-        android:paddingHorizontal="10dp"
+        android:paddingHorizontal="12dp"
         android:paddingVertical="8dp">
 
         <LinearLayout
