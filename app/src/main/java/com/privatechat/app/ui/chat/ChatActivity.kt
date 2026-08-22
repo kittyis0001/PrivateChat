@@ -21,6 +21,10 @@ class ChatActivity : AppCompatActivity() {
     private var typingHandler: Handler? = null
     private var typingRunnable: Runnable? = null
 
+    // The message currently selected via long-press, if any. Null means
+    // the compose bar is in its normal (non-reply) state.
+    private var replyingTo: Message? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -39,6 +43,7 @@ class ChatActivity : AppCompatActivity() {
         adapter = MessageAdapter(currentUser)
         binding.messagesRecyclerView.adapter = adapter
         binding.messagesRecyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this).apply { stackFromEnd = true }
+        adapter.onMessageLongPress = { message -> enterReplyMode(message) }
 
         val displayName = if (otherUser == "katis1") "Kat" else "Kitty"
         binding.headerName.text = displayName
@@ -72,6 +77,7 @@ adapter.submitList(messages.toMutableList()) {
             adapter.submitList(messages.toMutableList()) {
                 binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
             }
+                }
             }
         }
 
@@ -97,10 +103,19 @@ adapter.submitList(messages.toMutableList()) {
         binding.sendButton.setOnClickListener {
             val text = binding.messageInput.text?.toString()?.trim().orEmpty()
             if (text.isNotEmpty()) {
-                repository.sendMessage(text)
+                val reply = replyingTo
+                repository.sendMessage(
+                    text,
+                    replyTo = reply?.key,
+                    replyText = reply?.let { MessageAdapter.previewText(it) },
+                    replySender = reply?.name
+                )
                 binding.messageInput.setText("")
+                exitReplyMode()
             }
         }
+
+        binding.replyPreviewCancel.setOnClickListener { exitReplyMode() }
 
         binding.messageInput.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -114,6 +129,18 @@ adapter.submitList(messages.toMutableList()) {
             }
         })
     }
+
+    private fun enterReplyMode(message: Message) {
+        replyingTo = message
+        val displayName = if (Session.otherUser() == "katis1") "Kat" else "Kitty"
+        binding.replyPreviewBarSender.text = if (message.name == Session.currentUser()) "You" else displayName
+        binding.replyPreviewBarText.text = MessageAdapter.previewText(message)
+        binding.replyPreviewBar.visibility = android.view.View.VISIBLE
+    }
+
+    private fun exitReplyMode() {
+        replyingTo = null
+        binding.replyPreviewBar.visibility = android.view.View.GONE
     }
 
     private fun updateUnreadState() {

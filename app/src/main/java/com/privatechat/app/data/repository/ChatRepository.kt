@@ -140,13 +140,20 @@ class ChatRepository(
         messagesRef.addChildEventListener(listener)
     }
 
-    fun sendMessage(text: String) {
-        val data = mapOf(
+    fun sendMessage(text: String, replyTo: String? = null, replyText: String? = null, replySender: String? = null) {
+        val data = mutableMapOf<String, Any>(
             "name" to currentUser,
             "text" to text,
             "time" to System.currentTimeMillis(),
             "seen" to false
         )
+        // Only attach reply fields when actually replying, so ordinary
+        // messages keep writing the exact same node shape as before.
+        if (!replyTo.isNullOrEmpty()) {
+            data["replyTo"] = replyTo
+            data["replyText"] = replyText.orEmpty()
+            data["replySender"] = replySender.orEmpty()
+        }
         messagesRef.push().setValue(data)
             .addOnFailureListener { e -> Log.e(TAG, "send failed: ${e.message}") }
     }
