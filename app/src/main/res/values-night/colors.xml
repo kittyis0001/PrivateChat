@@ -1,0 +1,15 @@
+<resources>
+    <color name="background">#121016</color>
+    <color name="surface">#1E1B26</color>
+    <color name="textPrimary">#EDE9F7</color>
+    <color name="textSecondary">#A79BC9</color>
+    <color name="white">#FFFFFF</color>
+    <color name="primary">#B09EF5</color>
+
+    <color name="popupSurface">#252131</color>
+    <color name="popupBorder">#3A3448</color>
+    <color name="chatBgBase">#121016</color>
+    <color name="chatBgGlowStart">#332A1F3D</color>
+    <color name="chatBgGlowEnd">#00121016</color>
+    <color name="inputFieldBg">#2A2636</color>
+</resources>

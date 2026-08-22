@@ -31,15 +31,21 @@ class ChatRepository(
     private val statusRef: DatabaseReference = db.getReference("status")
     private val typingRef: DatabaseReference = db.getReference("typing")
     private val connectedRef: DatabaseReference = db.getReference(".info/connected")
+    private val blocksRef: DatabaseReference = db.getReference("blocks")
 
     private var messagesListener: ChildEventListener? = null
     private var isListenerAttached = false
+    private var isBlockListenerAttached = false
 
     var onMessageAdded: ((Message) -> Unit)? = null
     var onMessageChanged: ((Message) -> Unit)? = null
+    var onMessageRemoved: ((String) -> Unit)? = null
     var onConnectionStateChanged: ((Boolean) -> Unit)? = null
     var onOtherUserPresence: ((PresenceStatus) -> Unit)? = null
     var onOtherUserTyping: ((Boolean) -> Unit)? = null
+    // (blocked, blockedAtMillis) — reflects whether *this* user has
+    // blocked the other one, read from blocks/{currentUser}.
+    var onBlockStateChanged: ((Boolean, Long) -> Unit)? = null
 
     init {
         // Keep the messages node synced to local disk cache even while
@@ -66,6 +72,7 @@ class ChatRepository(
         attachConnectionMonitor()
         attachPresenceListener()
         attachTypingListener()
+        attachBlockListener()
         markOnline()
     }
 
@@ -125,7 +132,10 @@ class ChatRepository(
                 onMessageChanged?.invoke(message)
             }
 
-            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {
+                val key = snapshot.key ?: return
+                onMessageRemoved?.invoke(key)
+            }
             override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
             override fun onCancelled(error: DatabaseError) {
                 Log.e(TAG, "messages listener cancelled: ${error.message}")
@@ -186,6 +196,30 @@ class ChatRepository(
 
     fun unreadCount(messages: List<Message>): Int =
         messages.count { it.name == otherUser && !it.seen && !it.deleted && it.type == null }
+
+    // ── Block / Unblock ──────────────────────────────────────────
+    // Only this user's own block state (blocks/{currentUser}) is ever
+    // written or read here — the two users' block states are
+    // independent nodes, so this never touches the other person's data.
+
+    fun setBlocked(blocked: Boolean) {
+        blocksRef.child(currentUser).setValue(
+            mapOf("blocked" to blocked, "timestamp" to System.currentTimeMillis())
+        )
+    }
+
+    private fun attachBlockListener() {
+        if (isBlockListenerAttached) return
+        isBlockListenerAttached = true
+        blocksRef.child(currentUser).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val blocked = snapshot.child("blocked").getValue(Boolean::class.java) ?: false
+                val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
+                onBlockStateChanged?.invoke(blocked, timestamp)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
 
     // ── Presence ──────────────────────────────────────────────────
 

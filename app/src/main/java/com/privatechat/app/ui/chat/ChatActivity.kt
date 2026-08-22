@@ -39,6 +39,12 @@ class ChatActivity : AppCompatActivity() {
     // other. Non-null means Send commits an edit instead of a new message.
     private var editingMessage: Message? = null
 
+    // Whether *this* user has blocked the other one, and when — mirrors
+    // blocks/{currentUser} in Firebase, read-only here (write path is
+    // repository.setBlocked()).
+    private var isBlockedByMe = false
+    private var blockedAtMillis = 0L
+
     // The one dialog/bottom-sheet that can be open at a time (edit message
     // / emoji picker) — the reaction bar and action menu are separate
     // overlay views, torn down via dismissOverlays() instead.
@@ -110,6 +116,20 @@ adapter.submitList(messages.toMutableList()) {
             }
         }
 
+        // Firebase's onChildRemoved fires on BOTH devices the instant a
+        // message node is removed (e.g. deleteAllChat()) — this is what
+        // actually makes "Delete All Chat" vanish messages on both sides;
+        // without it the local list never learned a node was gone.
+        repository.onMessageRemoved = { key ->
+            runOnUiThread {
+                if (messages.removeAll { it.key == key }) {
+                    // ListAdapter's default ItemAnimator fades/slides removed
+                    // rows out on its own — this alone is the "হালকা animation".
+                    adapter.submitList(messages.toMutableList())
+                }
+            }
+        }
+
         repository.onConnectionStateChanged = { connected ->
             runOnUiThread {
                 if (!connected) binding.headerStatus.text = "Connecting..."
@@ -118,7 +138,7 @@ adapter.submitList(messages.toMutableList()) {
 
         repository.onOtherUserPresence = { status ->
             runOnUiThread {
-                binding.headerStatus.text = PresenceFormatter.format(status.last)
+                binding.headerStatus.text = PresenceFormatter.format(status)
             }
         }
 
@@ -127,6 +147,20 @@ adapter.submitList(messages.toMutableList()) {
                 binding.typingIndicator.visibility = if (isTyping) android.view.View.VISIBLE else android.view.View.GONE
                 binding.typingIndicator.text = "$displayName is typing..."
             }
+        }
+
+        repository.onBlockStateChanged = { blocked, timestamp ->
+            runOnUiThread {
+                isBlockedByMe = blocked
+                blockedAtMillis = timestamp
+                updateBlockedUi()
+            }
+        }
+
+        binding.menuButton.setOnClickListener { showTopMenu(it) }
+
+        binding.unblockButton.setOnClickListener {
+            repository.setBlocked(false)
         }
 
         binding.sendButton.setOnClickListener {
@@ -206,6 +240,27 @@ adapter.submitList(messages.toMutableList()) {
         binding.messageInput.setText("")
     }
 
+    // Swaps the compose bar for a "You blocked this contact" banner
+    // (WhatsApp-style) while this user has the other one blocked.
+    private fun updateBlockedUi() {
+        if (isBlockedByMe) {
+            binding.composeBar.visibility = android.view.View.GONE
+            binding.blockedBanner.visibility = android.view.View.VISIBLE
+            val timeStr = if (blockedAtMillis > 0) {
+                java.text.SimpleDateFormat("d MMM, h:mm a", java.util.Locale.getDefault())
+                    .format(java.util.Date(blockedAtMillis))
+            } else null
+            binding.blockedBannerText.text = if (timeStr != null) {
+                "You blocked this contact \u2014 $timeStr"
+            } else {
+                "You blocked this contact"
+            }
+        } else {
+            binding.blockedBanner.visibility = android.view.View.GONE
+            binding.composeBar.visibility = android.view.View.VISIBLE
+        }
+    }
+
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     // Tears down whatever overlay (reaction bar or action menu) is
@@ -270,6 +325,118 @@ adapter.submitList(messages.toMutableList()) {
             view.y = y.toFloat()
             view.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(160).start()
         }
+    }
+
+    // Places `view` right-aligned just below `anchor` and slides it down
+    // (translationY + fade) instead of scaling — the "drops down from the
+    // 3-dot button" WhatsApp-style open animation.
+    private fun popInBelowAnchorRightAligned(view: View, anchor: View) {
+        view.alpha = 0f
+        view.translationY = -dp(16).toFloat()
+        view.doOnPreDraw {
+            val anchorLoc = IntArray(2)
+            anchor.getLocationInWindow(anchorLoc)
+            val containerLoc = IntArray(2)
+            binding.overlayContainer.getLocationInWindow(containerLoc)
+
+            val rightEdge = anchorLoc[0] - containerLoc[0] + anchor.width
+            val maxX = (binding.overlayContainer.width - view.width - dp(8)).coerceAtLeast(dp(8))
+            val x = (rightEdge - view.width).coerceIn(dp(8), maxX)
+            val y = anchorLoc[1] - containerLoc[1] + anchor.height + dp(4)
+            view.x = x.toFloat()
+            view.y = y.toFloat()
+            view.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(200)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .start()
+        }
+    }
+
+    // FEATURE — WhatsApp-style top-right 3-dot overflow menu: Mute
+    // Notifications, Dark Theme, Delete All Chat, Block/Unblock User.
+    private fun showTopMenu(anchor: View) {
+        dismissOverlays()
+        addScrim { dismissOverlaysAnimated() }
+
+        val menu = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(com.privatechat.app.R.drawable.bg_popup_menu)
+            elevation = dp(6).toFloat()
+            minimumWidth = dp(220)
+            tag = TAG_OVERLAY_CONTENT
+        }
+
+        fun addItem(icon: String, label: String, checked: Boolean = false, textColor: Int? = null, action: () -> Unit) {
+            val row = TextView(this).apply {
+                text = if (checked) "$icon   $label   \u2713" else "$icon   $label"
+                textSize = 15f
+                setTextColor(textColor ?: resources.getColor(com.privatechat.app.R.color.textPrimary, theme))
+                setPadding(dp(18), dp(13), dp(18), dp(13))
+                isClickable = true
+                val ripple = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+                setBackgroundResource(ripple.resourceId)
+                setOnClickListener {
+                    dismissOverlays()
+                    action()
+                }
+            }
+            menu.addView(row)
+        }
+
+        val muted = Session.isMuted()
+        addItem(if (muted) "\uD83D\uDD14" else "\uD83D\uDD15", if (muted) "Unmute Notifications" else "Mute Notifications") {
+            toggleMute()
+        }
+        addItem("\uD83C\uDF19", "Dark Theme", checked = Session.isDarkThemeEnabled()) {
+            toggleDarkTheme()
+        }
+        addItem("\uD83D\uDDD1\uFE0F", "Delete All Chat", textColor = UNSEND_RED) {
+            confirmDeleteAllChat()
+        }
+        addItem(if (isBlockedByMe) "\u2705" else "\uD83D\uDEAB", if (isBlockedByMe) "Unblock User" else "Block User") {
+            repository.setBlocked(!isBlockedByMe)
+        }
+
+        menu.layoutParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        )
+        binding.overlayContainer.addView(menu)
+        popInBelowAnchorRightAligned(menu, anchor)
+    }
+
+    private fun toggleMute() {
+        val nowMuted = !Session.isMuted()
+        Session.setMuted(nowMuted)
+        android.widget.Toast.makeText(
+            this,
+            if (nowMuted) "Notifications muted" else "Notifications unmuted",
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
+    }
+
+    // AppCompatDelegate.setDefaultNightMode() automatically recreates the
+    // current AppCompatActivity to apply the new theme immediately — the
+    // instant WhatsApp-style switch, no manual recreate() needed.
+    private fun toggleDarkTheme() {
+        val enabled = !Session.isDarkThemeEnabled()
+        Session.setDarkThemeEnabled(enabled)
+        androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+            if (enabled) androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+            else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+        )
+    }
+
+    private fun confirmDeleteAllChat() {
+        activeDialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Delete all chats?")
+            .setMessage("This will permanently delete all messages for both of you. This can't be undone.")
+            .setPositiveButton("Delete") { _, _ -> repository.deleteAllChat() }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun toggleReaction(message: Message, emoji: String) {
