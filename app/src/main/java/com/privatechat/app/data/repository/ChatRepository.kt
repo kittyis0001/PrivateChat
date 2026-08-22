@@ -140,13 +140,20 @@ class ChatRepository(
         messagesRef.addChildEventListener(listener)
     }
 
-    fun sendMessage(text: String) {
-        val data = mapOf(
+    fun sendMessage(text: String, replyTo: String? = null, replyText: String? = null, replySender: String? = null) {
+        val data = mutableMapOf<String, Any>(
             "name" to currentUser,
             "text" to text,
             "time" to System.currentTimeMillis(),
             "seen" to false
         )
+        // Only attach reply fields when actually replying, so ordinary
+        // messages keep writing the exact same node shape as before.
+        if (!replyTo.isNullOrEmpty()) {
+            data["replyTo"] = replyTo
+            data["replyText"] = replyText.orEmpty()
+            data["replySender"] = replySender.orEmpty()
+        }
         messagesRef.push().setValue(data)
             .addOnFailureListener { e -> Log.e(TAG, "send failed: ${e.message}") }
     }
@@ -157,8 +164,20 @@ class ChatRepository(
         }
     }
 
+    fun editMessage(key: String, newText: String) {
+        messagesRef.child(key).updateChildren(mapOf("text" to newText, "edited" to true))
+    }
+
     fun deleteMessage(key: String) {
         messagesRef.child(key).updateChildren(mapOf("text" to "__deleted__", "deleted" to true))
+    }
+
+    // Reactions live at messages/{key}/reactions/{uid} so any number of
+    // users can react independently without clobbering each other.
+    // Passing emoji = null removes the caller's reaction (tap-to-toggle).
+    fun setReaction(key: String, emoji: String?) {
+        val reactionRef = messagesRef.child(key).child("reactions").child(currentUser)
+        if (emoji == null) reactionRef.removeValue() else reactionRef.setValue(emoji)
     }
 
     fun deleteAllChat() {
