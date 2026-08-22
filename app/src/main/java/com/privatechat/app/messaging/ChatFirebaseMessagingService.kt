@@ -36,6 +36,11 @@ class ChatFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
+        // Local, per-device setting (see Session.isMuted) — checked first
+        // so a muted user never sees a notification, without any network
+        // round trip inside the notification path.
+        if (Session.isMuted()) return
+
         val title = message.data["senderName"] ?: message.notification?.title ?: "New message"
         val body = message.data["preview"] ?: message.notification?.body ?: "New message"
 

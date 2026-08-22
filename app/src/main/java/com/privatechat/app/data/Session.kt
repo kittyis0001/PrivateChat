@@ -14,6 +14,8 @@ import android.content.SharedPreferences
 object Session {
     private const val PREFS = "private_chat_session"
     private const val KEY_USERNAME = "username"
+    private const val KEY_MUTED = "muted"
+    private const val KEY_DARK_THEME = "dark_theme"
 
     private lateinit var prefs: SharedPreferences
 
@@ -37,4 +39,17 @@ object Session {
     }
 
     fun isLoggedIn(): Boolean = currentUser() != null
+
+    // Stored locally per device/install — since each of the two users
+    // has their own device, this is already effectively per-user without
+    // needing to key it by username or sync it through Firebase.
+    fun isMuted(): Boolean = prefs.getBoolean(KEY_MUTED, false)
+    fun setMuted(muted: Boolean) {
+        prefs.edit().putBoolean(KEY_MUTED, muted).apply()
+    }
+
+    fun isDarkThemeEnabled(): Boolean = prefs.getBoolean(KEY_DARK_THEME, false)
+    fun setDarkThemeEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DARK_THEME, enabled).apply()
+    }
 }

@@ -2,7 +2,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#F3F0FA" />
+            <solid android:color="@color/chatBgBase" />
         </shape>
     </item>
     <item>
@@ -10,8 +10,8 @@
             <gradient
                 android:type="radial"
                 android:gradientRadius="420dp"
-                android:startColor="#33F0C1E8"
-                android:endColor="#00F3F0FA" />
+                android:startColor="@color/chatBgGlowStart"
+                android:endColor="@color/chatBgGlowEnd" />
         </shape>
     </item>
 </layer-list>
