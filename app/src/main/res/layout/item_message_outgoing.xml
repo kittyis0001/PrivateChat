@@ -1,11 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:gravity="end"
     android:paddingHorizontal="12dp"
     android:paddingVertical="2dp">
+
+    <TextView
+        android:id="@+id/swipeReplyIcon"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="start|center_vertical"
+        android:layout_marginStart="4dp"
+        android:gravity="center"
+        android:text="↩"
+        android:textSize="16sp"
+        android:textColor="@color/primary"
+        android:alpha="0" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:orientation="vertical">
 
     <LinearLayout
         android:id="@+id/bubbleContainer"
@@ -90,4 +106,19 @@
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
-</LinearLayout>
+
+    <TextView
+        android:id="@+id/reactionsBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="6dp"
+        android:background="@drawable/bg_reaction_badge"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp"
+        android:textSize="11sp"
+        android:textColor="@color/textPrimary"
+        android:visibility="gone" />
+    </LinearLayout>
+</FrameLayout>
