@@ -1,11 +1,9 @@
 package com.privatechat.app.ui.chat
 
-import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.LinearLayout
@@ -35,6 +33,11 @@ class ChatActivity : AppCompatActivity() {
     // The message currently selected via swipe/menu "Reply", if any. Null
     // means the compose bar is in its normal (non-reply) state.
     private var replyingTo: Message? = null
+
+    // The message currently being edited inline via the compose bar, if
+    // any. Mutually exclusive with replyingTo — entering one clears the
+    // other. Non-null means Send commits an edit instead of a new message.
+    private var editingMessage: Message? = null
 
     // The one dialog/bottom-sheet that can be open at a time (edit message
     // / emoji picker) — the reaction bar and action menu are separate
@@ -120,7 +123,16 @@ adapter.submitList(messages.toMutableList()) {
 
         binding.sendButton.setOnClickListener {
             val text = binding.messageInput.text?.toString()?.trim().orEmpty()
-            if (text.isNotEmpty()) {
+            if (text.isEmpty()) return@setOnClickListener
+            val editing = editingMessage
+            if (editing != null) {
+                // WhatsApp-style inline edit: Send commits the edit in
+                // place instead of posting a new message.
+                if (text != editing.text) {
+                    repository.editMessage(editing.key, text)
+                }
+                exitEditMode()
+            } else {
                 val reply = replyingTo
                 repository.sendMessage(
                     text,
@@ -133,7 +145,9 @@ adapter.submitList(messages.toMutableList()) {
             }
         }
 
-        binding.replyPreviewCancel.setOnClickListener { exitReplyMode() }
+        binding.replyPreviewCancel.setOnClickListener {
+            if (editingMessage != null) exitEditMode() else exitReplyMode()
+        }
 
         binding.messageInput.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -149,6 +163,8 @@ adapter.submitList(messages.toMutableList()) {
     }
 
     private fun enterReplyMode(message: Message) {
+        editingMessage = null
+        binding.messageInput.setText("")
         replyingTo = message
         val displayName = if (Session.otherUser() == "katis1") "Kat" else "Kitty"
         binding.replyPreviewBarSender.text = if (message.name == Session.currentUser()) "You" else displayName
@@ -159,6 +175,27 @@ adapter.submitList(messages.toMutableList()) {
     private fun exitReplyMode() {
         replyingTo = null
         binding.replyPreviewBar.visibility = android.view.View.GONE
+    }
+
+    // WhatsApp-style inline edit: reuses the reply preview bar (as an
+    // "Editing message" indicator) and loads the original text straight
+    // into the compose input, so Send commits the edit in place rather
+    // than opening a separate dialog.
+    private fun enterEditMode(message: Message) {
+        replyingTo = null
+        editingMessage = message
+        binding.replyPreviewBarSender.text = "Editing message"
+        binding.replyPreviewBarText.text = ""
+        binding.replyPreviewBar.visibility = android.view.View.VISIBLE
+        binding.messageInput.setText(message.text)
+        binding.messageInput.setSelection(binding.messageInput.text?.length ?: 0)
+        binding.messageInput.requestFocus()
+    }
+
+    private fun exitEditMode() {
+        editingMessage = null
+        binding.replyPreviewBar.visibility = android.view.View.GONE
+        binding.messageInput.setText("")
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -282,7 +319,7 @@ adapter.submitList(messages.toMutableList()) {
 
         addItem("😀", "React") { showReactionBar(message, anchor) }
         if (!message.deleted) addItem("↩", "Reply") { enterReplyMode(message) }
-        if (isMine && !message.deleted) addItem("✏", "Edit") { showEditDialog(message) }
+        if (isMine && !message.deleted) addItem("✏️", "Edit") { enterEditMode(message) }
         if (isMine && !message.deleted) addItem("🗑", "Unsend") { repository.deleteMessage(message.key) }
 
         menu.layoutParams = FrameLayout.LayoutParams(
@@ -291,25 +328,6 @@ adapter.submitList(messages.toMutableList()) {
         )
         binding.overlayContainer.addView(menu)
         popInAboveAnchor(menu, anchor)
-    }
-
-    private fun showEditDialog(message: Message) {
-        val input = EditText(this).apply {
-            setText(message.text)
-            setSelection(text.length)
-            setPadding(dp(20), dp(16), dp(20), dp(16))
-        }
-        activeDialog = AlertDialog.Builder(this)
-            .setTitle("Edit message")
-            .setView(input)
-            .setPositiveButton("Save") { _, _ ->
-                val newText = input.text.toString().trim()
-                if (newText.isNotEmpty() && newText != message.text) {
-                    repository.editMessage(message.key, newText)
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
     }
 
     // "+" in the reaction bar. Prefers Android's Jetpack system-style emoji

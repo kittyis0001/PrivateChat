@@ -31,7 +31,7 @@
         android:orientation="vertical"
         android:elevation="1.5dp"
         android:background="@drawable/bg_bubble_incoming"
-        android:paddingHorizontal="10dp"
+        android:paddingHorizontal="12dp"
         android:paddingVertical="8dp">
 
         <LinearLayout
