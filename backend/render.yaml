@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: privatechat-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: PROJECT_ID
+        sync: false
+      - key: CLIENT_EMAIL
+        sync: false
+      - key: PRIVATE_KEY
+        sync: false
+      - key: API_SECRET
+        sync: false
+      - key: PORT
+        value: 10000

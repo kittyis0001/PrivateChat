@@ -18,12 +18,14 @@ import com.privatechat.app.data.Session
 import com.privatechat.app.data.model.Message
 import com.privatechat.app.data.repository.ChatRepository
 import com.privatechat.app.databinding.ActivityChatBinding
+import com.privatechat.app.notification.NotificationRepository
 import com.privatechat.app.utils.PresenceFormatter
 
 class ChatActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityChatBinding
     private lateinit var repository: ChatRepository
+    private lateinit var notificationRepository: NotificationRepository
     private lateinit var adapter: MessageAdapter
 
     private val messages = mutableListOf<Message>()
@@ -50,12 +52,31 @@ class ChatActivity : AppCompatActivity() {
     // overlay views, torn down via dismissOverlays() instead.
     private var activeDialog: android.app.Dialog? = null
 
-    private companion object {
+    companion object {
         // Marks the reaction bar / action menu view (as opposed to the
         // full-screen scrim) inside overlayContainer, so
         // dismissOverlaysAnimated() knows which child to animate out.
-        const val TAG_OVERLAY_CONTENT = "overlay_content"
-        val UNSEND_RED = android.graphics.Color.parseColor("#E53935")
+        private const val TAG_OVERLAY_CONTENT = "overlay_content"
+        private val UNSEND_RED = android.graphics.Color.parseColor("#E53935")
+
+        // Read by ChatFirebaseMessagingService to suppress showing a
+        // system notification while this chat is already on screen —
+        // the incoming message is about to render directly via the
+        // live Realtime Database listener instead. @Volatile since
+        // it's written on the UI thread (onStart/onStop) and read from
+        // a background/service thread.
+        @Volatile
+        var isForeground = false
+    }
+
+    override fun onStart() {
+        super.onStart()
+        isForeground = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        isForeground = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,7 +104,13 @@ class ChatActivity : AppCompatActivity() {
         val displayName = if (otherUser == "katis1") "Kat" else "Kitty"
         binding.headerName.text = displayName
 
+        // The CURRENT user's own display name — distinct from
+        // displayName above (which is the other person, shown in the
+        // header) — needed as senderName when notifying them.
+        val myDisplayName = if (currentUser == "katis1") "Kat" else "Kitty"
+
         repository = ChatRepository(currentUser, otherUser)
+        notificationRepository = NotificationRepository(applicationContext)
         // Lifecycle-aware: reconnect/resync happens automatically on
         // every onStart, teardown on every onStop, without manually
         // wiring visibilitychange-equivalent logic per screen.
@@ -180,7 +207,23 @@ adapter.submitList(messages.toMutableList()) {
                     text,
                     replyTo = reply?.key,
                     replyText = reply?.let { MessageAdapter.previewText(it) },
-                    replySender = reply?.name
+                    replySender = reply?.name,
+                    onSent = {
+                        // "Android writes a message to Firebase, Android
+                        // immediately calls the Render API" — fires only
+                        // after Firebase confirms the write, using the
+                        // same preview text the recipient's own bubble
+                        // would show (MessageAdapter.previewText handles
+                        // voice/GIF special-casing identically).
+                        notificationRepository.notifyNewMessage(
+                            senderId = currentUser,
+                            receiverId = otherUser,
+                            senderName = myDisplayName,
+                            preview = MessageAdapter.previewText(
+                                Message(name = currentUser, text = text)
+                            )
+                        )
+                    }
                 )
                 binding.messageInput.setText("")
                 exitReplyMode()

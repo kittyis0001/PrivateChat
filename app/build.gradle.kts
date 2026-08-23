@@ -11,6 +11,15 @@ android {
     defaultConfig {
         buildConfigField("String","FIREBASE_DATABASE_URL","\"https://private-chat-318a6-default-rtdb.asia-southeast1.firebasedatabase.app\"")
         manifestPlaceholders["firebaseDatabaseUrl"] = "https://private-chat-318a6-default-rtdb.asia-southeast1.firebasedatabase.app"
+        // Filled in after deploying backend/ to Render — see
+        // backend/README.md step 5. Placeholder value is intentionally
+        // non-functional (Retrofit will fail closed with a network
+        // error, not silently succeed) until it's set for real.
+        buildConfigField("String", "BACKEND_BASE_URL", "\"https://REPLACE-ME.onrender.com/\"")
+        // Must match the API_SECRET env var set in Render's dashboard
+        // exactly. Never the Firebase service account itself — that
+        // stays server-side only, per backend/services/firebase.js.
+        buildConfigField("String", "BACKEND_API_SECRET", "\"REPLACE-ME\"")
         applicationId = "com.privatechat.app"
         minSdk = 24
         targetSdk = 34
@@ -62,6 +71,14 @@ dependencies {
     implementation("com.google.firebase:firebase-storage-ktx")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // Calling the Render notification backend, and queuing/retrying
+    // that call reliably across app restarts and connectivity loss.
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

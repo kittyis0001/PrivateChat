@@ -150,7 +150,13 @@ class ChatRepository(
         messagesRef.addChildEventListener(listener)
     }
 
-    fun sendMessage(text: String, replyTo: String? = null, replyText: String? = null, replySender: String? = null) {
+    fun sendMessage(
+        text: String,
+        replyTo: String? = null,
+        replyText: String? = null,
+        replySender: String? = null,
+        onSent: (() -> Unit)? = null
+    ) {
         val data = mutableMapOf<String, Any>(
             "name" to currentUser,
             "text" to text,
@@ -165,6 +171,7 @@ class ChatRepository(
             data["replySender"] = replySender.orEmpty()
         }
         messagesRef.push().setValue(data)
+            .addOnSuccessListener { onSent?.invoke() }
             .addOnFailureListener { e -> Log.e(TAG, "send failed: ${e.message}") }
     }
 
