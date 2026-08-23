@@ -14,6 +14,9 @@ function requireApiSecret(req, res, next) {
 
   const provided = req.header("X-Api-Secret");
   if (!provided || provided !== expected) {
+    // Temporary diagnostic — doesn't leak either secret value, just
+    // confirms whether a header showed up at all vs. matched wrong.
+    console.log(`[auth] rejected request: header ${provided ? "present but mismatched" : "missing"}`);
     return res.status(401).json({ error: "unauthorized" });
   }
 
