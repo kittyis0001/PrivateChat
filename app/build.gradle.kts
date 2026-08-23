@@ -15,11 +15,11 @@ android {
         // backend/README.md step 5. Placeholder value is intentionally
         // non-functional (Retrofit will fail closed with a network
         // error, not silently succeed) until it's set for real.
-        buildConfigField("String", "BACKEND_BASE_URL", "\"https://REPLACE-ME.onrender.com/\"")
+       buildConfigField("String", "BACKEND_BASE_URL", "\"https://privatechat-u3qz.onrender.com/\"")
         // Must match the API_SECRET env var set in Render's dashboard
         // exactly. Never the Firebase service account itself — that
         // stays server-side only, per backend/services/firebase.js.
-        buildConfigField("String", "BACKEND_API_SECRET", "\"REPLACE-ME\"")
+        buildConfigField("String", "BACKEND_API_SECRET", "\"kitty_chat_2026_secret_x9K2_p9Lm\"")
         applicationId = "com.privatechat.app"
         minSdk = 24
         targetSdk = 34
