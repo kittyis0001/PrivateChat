@@ -14,6 +14,7 @@ import androidx.core.view.doOnPreDraw
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.privatechat.app.data.Nicknames
 import com.privatechat.app.data.Session
 import com.privatechat.app.data.model.Message
 import com.privatechat.app.data.repository.ChatRepository
@@ -46,6 +47,12 @@ class ChatActivity : AppCompatActivity() {
     // repository.setBlocked()).
     private var isBlockedByMe = false
     private var blockedAtMillis = 0L
+
+    // Live custom nicknames (username -> nickname) from
+    // ChatRepository.onNicknamesChanged — read fresh by every display
+    // point below rather than captured once, so a nickname change is
+    // reflected instantly everywhere without extra plumbing.
+    private var nicknames: Map<String, String> = emptyMap()
 
     // The one dialog/bottom-sheet that can be open at a time (edit message
     // / emoji picker) — the reaction bar and action menu are separate
@@ -101,13 +108,10 @@ class ChatActivity : AppCompatActivity() {
         adapter.onMessageTap = { message, anchor -> showReactionBar(message, anchor) }
         adapter.onMessageLongPress = { message, anchor -> showActionMenu(message, anchor) }
 
-        val displayName = if (otherUser == "katis1") "Kat" else "Kitty"
-        binding.headerName.text = displayName
+        fun otherDisplayName() = Nicknames.resolve(otherUser, nicknames)
+        fun myDisplayName() = Nicknames.resolve(currentUser, nicknames)
 
-        // The CURRENT user's own display name — distinct from
-        // displayName above (which is the other person, shown in the
-        // header) — needed as senderName when notifying them.
-        val myDisplayName = if (currentUser == "katis1") "Kat" else "Kitty"
+        binding.headerName.text = otherDisplayName()
 
         repository = ChatRepository(currentUser, otherUser)
         notificationRepository = NotificationRepository(applicationContext)
@@ -172,7 +176,7 @@ adapter.submitList(messages.toMutableList()) {
         repository.onOtherUserTyping = { isTyping ->
             runOnUiThread {
                 binding.typingIndicator.visibility = if (isTyping) android.view.View.VISIBLE else android.view.View.GONE
-                binding.typingIndicator.text = "$displayName is typing..."
+                binding.typingIndicator.text = "${otherDisplayName()} is typing..."
             }
         }
 
@@ -181,6 +185,17 @@ adapter.submitList(messages.toMutableList()) {
                 isBlockedByMe = blocked
                 blockedAtMillis = timestamp
                 updateBlockedUi()
+            }
+        }
+
+        // "নিজের এবং অপরজনের যেন nickname চেঞ্জ করা যায়, instant update
+        // হয় দুজনের বেলায়" — one shared Firebase node, so this fires
+        // instantly on both devices the moment either one saves a change.
+        repository.onNicknamesChanged = { map ->
+            runOnUiThread {
+                nicknames = map
+                adapter.nicknames = map
+                binding.headerName.text = otherDisplayName()
             }
         }
 
@@ -218,7 +233,7 @@ adapter.submitList(messages.toMutableList()) {
                         notificationRepository.notifyNewMessage(
                             senderId = currentUser,
                             receiverId = otherUser,
-                            senderName = myDisplayName,
+                            senderName = myDisplayName(),
                             preview = MessageAdapter.previewText(
                                 Message(name = currentUser, text = text)
                             )
@@ -251,7 +266,7 @@ adapter.submitList(messages.toMutableList()) {
         editingMessage = null
         binding.messageInput.setText("")
         replyingTo = message
-        val displayName = if (Session.otherUser() == "katis1") "Kat" else "Kitty"
+        val displayName = Nicknames.resolve(Session.otherUser().orEmpty(), nicknames)
         binding.replyPreviewBarSender.text = if (message.name == Session.currentUser()) "You" else displayName
         binding.replyPreviewBarText.text = MessageAdapter.previewText(message)
         binding.replyPreviewBar.visibility = android.view.View.VISIBLE
@@ -430,6 +445,9 @@ adapter.submitList(messages.toMutableList()) {
         }
 
         val muted = Session.isMuted()
+        addItem("\u270F\uFE0F", "Change Nickname") {
+            showChangeNicknameDialog()
+        }
         addItem(if (muted) "\uD83D\uDD14" else "\uD83D\uDD15", if (muted) "Unmute Notifications" else "Mute Notifications") {
             toggleMute()
         }
@@ -441,6 +459,9 @@ adapter.submitList(messages.toMutableList()) {
         }
         addItem(if (isBlockedByMe) "\u2705" else "\uD83D\uDEAB", if (isBlockedByMe) "Unblock User" else "Block User") {
             repository.setBlocked(!isBlockedByMe)
+        }
+        addItem("\uD83D\uDEAA", "Log Out") {
+            confirmLogout()
         }
 
         menu.layoutParams = FrameLayout.LayoutParams(
@@ -471,6 +492,67 @@ adapter.submitList(messages.toMutableList()) {
             if (enabled) androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
             else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
         )
+    }
+
+    // "নিজের এবং অপরজনের যেন nickname চেঞ্জ করা যায়" — a single dialog
+    // with both fields at once, since this is always exactly a
+    // two-person conversation. Pre-filled with whatever's currently
+    // resolved (custom nickname if set, otherwise the Kat/Kitty
+    // default) so opening it never shows a blank/misleading value.
+    private fun showChangeNicknameDialog() {
+        val currentUser = Session.currentUser() ?: return
+        val otherUser = Session.otherUser() ?: return
+
+        fun label(text: String) = TextView(this).apply {
+            this.text = text
+            textSize = 13f
+            setTextColor(resources.getColor(com.privatechat.app.R.color.textSecondary, theme))
+            setPadding(dp(20), dp(14), dp(20), dp(4))
+        }
+        fun input(prefill: String) = android.widget.EditText(this).apply {
+            setText(prefill)
+            setSelection(prefill.length)
+            setPadding(dp(20), dp(4), dp(20), dp(4))
+        }
+
+        val myInput = input(Nicknames.resolve(currentUser, nicknames))
+        val otherInput = input(Nicknames.resolve(otherUser, nicknames))
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(label("Your nickname"))
+            addView(myInput)
+            addView(label("${Nicknames.defaultFor(otherUser)}'s nickname"))
+            addView(otherInput)
+        }
+
+        activeDialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Change Nickname")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                repository.setNickname(currentUser, myInput.text.toString())
+                repository.setNickname(otherUser, otherInput.text.toString())
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun confirmLogout() {
+        activeDialog = android.app.AlertDialog.Builder(this)
+            .setTitle("Log out?")
+            .setMessage("You'll need to log in again to open this chat.")
+            .setPositiveButton("Log Out") { _, _ -> performLogout() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun performLogout() {
+        Session.clear()
+        val intent = android.content.Intent(this, com.privatechat.app.ui.login.LoginActivity::class.java).apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        finish()
     }
 
     private fun confirmDeleteAllChat() {
