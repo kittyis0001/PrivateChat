@@ -19,16 +19,26 @@ function isNonEmptyString(value, maxLength) {
 router.post("/notify", async (req, res) => {
   const { senderId, receiverId, senderName, preview } = req.body || {};
 
+  // Temporary diagnostic logging — confirms the request actually
+  // reached this route at all, since nothing else in this file logs
+  // on the success path. Safe to remove once notifications are
+  // confirmed working end-to-end.
+  console.log(`[notify] incoming request: senderId=${senderId} receiverId=${receiverId}`);
+
   if (!KNOWN_USERS.has(senderId) || !KNOWN_USERS.has(receiverId)) {
+    console.log(`[notify] rejected: invalid_user (senderId=${senderId}, receiverId=${receiverId})`);
     return res.status(400).json({ error: "invalid_user" });
   }
   if (senderId === receiverId) {
+    console.log("[notify] rejected: sender_equals_receiver");
     return res.status(400).json({ error: "sender_equals_receiver" });
   }
   if (!isNonEmptyString(senderName, MAX_NAME_LENGTH)) {
+    console.log("[notify] rejected: invalid_sender_name");
     return res.status(400).json({ error: "invalid_sender_name" });
   }
   if (typeof preview !== "string" || preview.length === 0) {
+    console.log("[notify] rejected: invalid_preview");
     return res.status(400).json({ error: "invalid_preview" });
   }
 
@@ -43,6 +53,7 @@ router.post("/notify", async (req, res) => {
     });
 
     if (result.sent) {
+      console.log(`[notify] sent OK to ${receiverId}`);
       return res.status(200).json({ success: true });
     }
     // "No token on file" / "stale token just cleared" are both normal,
@@ -50,9 +61,10 @@ router.post("/notify", async (req, res) => {
     // the app) — not server errors, so they stay a 200 with a reason
     // rather than a 4xx/5xx that would make the Android WorkManager
     // retry pointlessly.
+    console.log(`[notify] not sent, reason=${result.reason} (receiverId=${receiverId})`);
     return res.status(200).json({ success: false, reason: result.reason });
   } catch (err) {
-    console.error("notify failed:", err.message);
+    console.error("[notify] failed:", err.message);
     return res.status(502).json({ error: "notification_failed" });
   }
 });
