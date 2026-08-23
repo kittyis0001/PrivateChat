@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import android.text.method.LinkMovementMethod
+import com.privatechat.app.data.Nicknames
 import com.privatechat.app.data.model.Message
 import com.privatechat.app.databinding.ItemMessageIncomingBinding
 import com.privatechat.app.databinding.ItemMessageOutgoingBinding
@@ -29,6 +30,19 @@ class MessageAdapter(private val currentUser: String) :
     var onSwipeReply: ((Message) -> Unit)? = null
     var onMessageTap: ((Message, View) -> Unit)? = null
     var onMessageLongPress: ((Message, View) -> Unit)? = null
+
+    // Live custom nicknames (username -> nickname), kept in sync by
+    // ChatActivity from ChatRepository.onNicknamesChanged. Re-renders
+    // bound rows on change so reply-preview sender labels update
+    // instantly for both users, without waiting for the message list
+    // itself to change.
+    var nicknames: Map<String, String> = emptyMap()
+        set(value) {
+            if (field != value) {
+                field = value
+                notifyDataSetChanged()
+            }
+        }
 
     override fun getItemViewType(position: Int): Int =
         if (getItem(position).name == currentUser) VIEW_TYPE_OUTGOING else VIEW_TYPE_INCOMING
@@ -53,13 +67,10 @@ class MessageAdapter(private val currentUser: String) :
     private fun displayText(message: Message): String = previewText(message, currentUser)
 
     // Sender label used inside a reply preview ("You" / the other user's
-    // display name), matching the same Kitty/Kat naming ChatActivity uses
-    // for the header.
-    private fun senderLabel(sender: String): String = when {
-        sender == currentUser -> "You"
-        sender == "katis1" -> "Kat"
-        else -> "Kitty"
-    }
+    // display name), reflecting a live custom nickname if one is set,
+    // falling back to the original Kat/Kitty default otherwise.
+    private fun senderLabel(sender: String): String =
+        if (sender == currentUser) "You" else Nicknames.resolve(sender, nicknames)
 
     private fun bindReactionsBadge(message: Message, badge: android.widget.TextView) {
         val summary = message.reactionsSummary()

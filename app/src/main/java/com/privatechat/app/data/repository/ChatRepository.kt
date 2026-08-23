@@ -32,10 +32,12 @@ class ChatRepository(
     private val typingRef: DatabaseReference = db.getReference("typing")
     private val connectedRef: DatabaseReference = db.getReference(".info/connected")
     private val blocksRef: DatabaseReference = db.getReference("blocks")
+    private val nicknamesRef: DatabaseReference = db.getReference("nicknames")
 
     private var messagesListener: ChildEventListener? = null
     private var isListenerAttached = false
     private var isBlockListenerAttached = false
+    private var isNicknamesListenerAttached = false
 
     var onMessageAdded: ((Message) -> Unit)? = null
     var onMessageChanged: ((Message) -> Unit)? = null
@@ -46,6 +48,11 @@ class ChatRepository(
     // (blocked, blockedAtMillis) — reflects whether *this* user has
     // blocked the other one, read from blocks/{currentUser}.
     var onBlockStateChanged: ((Boolean, Long) -> Unit)? = null
+    // Full nicknames/ node as a username -> nickname map, whichever
+    // keys are actually set — fires instantly for BOTH users the
+    // moment either one writes a nickname, since it's one shared node
+    // rather than two independent per-user ones like blocks/.
+    var onNicknamesChanged: ((Map<String, String>) -> Unit)? = null
 
     init {
         // Keep the messages node synced to local disk cache even while
@@ -73,6 +80,7 @@ class ChatRepository(
         attachPresenceListener()
         attachTypingListener()
         attachBlockListener()
+        attachNicknamesListener()
         markOnline()
     }
 
@@ -223,6 +231,40 @@ class ChatRepository(
                 val blocked = snapshot.child("blocked").getValue(Boolean::class.java) ?: false
                 val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
                 onBlockStateChanged?.invoke(blocked, timestamp)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    // ── Nicknames ─────────────────────────────────────────────────
+    // One shared node (not split per-user like blocks/) so either
+    // participant can rename either person, and both devices update
+    // instantly off the same listener — matching "নিজের এবং অপরজনের
+    // যেন nickname চেঞ্জ করা যায়, instant update হয় দুজনের বেলায়".
+
+    fun setNickname(username: String, nickname: String) {
+        val trimmed = nickname.trim()
+        if (trimmed.isEmpty()) {
+            // Empty input clears the custom nickname, reverting to the
+            // built-in Kat/Kitty default rather than storing blank text.
+            nicknamesRef.child(username).removeValue()
+        } else {
+            nicknamesRef.child(username).setValue(trimmed)
+        }
+    }
+
+    private fun attachNicknamesListener() {
+        if (isNicknamesListenerAttached) return
+        isNicknamesListenerAttached = true
+        nicknamesRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val nicknames = mutableMapOf<String, String>()
+                for (child in snapshot.children) {
+                    val key = child.key ?: continue
+                    val value = child.getValue(String::class.java)
+                    if (!value.isNullOrBlank()) nicknames[key] = value
+                }
+                onNicknamesChanged?.invoke(nicknames)
             }
             override fun onCancelled(error: DatabaseError) {}
         })
