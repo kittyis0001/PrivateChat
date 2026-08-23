@@ -66,6 +66,13 @@ class ChatActivity : AppCompatActivity() {
         private const val TAG_OVERLAY_CONTENT = "overlay_content"
         private val UNSEND_RED = android.graphics.Color.parseColor("#E53935")
 
+        // How long after the last keystroke the typing indicator clears
+        // on the other side, when the field isn't emptied first (see
+        // the isBlank() early-clear above). Reduced from 2000ms — short
+        // enough to feel instant, long enough not to flicker between
+        // individual keystrokes during a normal typing pause.
+        private const val TYPING_STOP_DELAY_MS = 1000L
+
         // Read by ChatFirebaseMessagingService to suppress showing a
         // system notification while this chat is already on screen —
         // the incoming message is about to render directly via the
@@ -79,6 +86,19 @@ class ChatActivity : AppCompatActivity() {
     override fun onStart() {
         super.onStart()
         isForeground = true
+        // Catches up on anything that arrived while backgrounded (see
+        // the isForeground guard in onMessageAdded below, in onCreate) —
+        // "app ঢুকলে instant seen mark". Firebase's listener stays
+        // attached the whole time for reliability, so `messages` is
+        // already current; this just marks-seen what wasn't marked
+        // while we were away.
+        if (::repository.isInitialized) {
+            val other = Session.otherUser()
+            if (other != null) {
+                messages.filter { it.name == other && !it.seen && !it.deleted && it.type == null }
+                    .forEach { repository.markSeen(it) }
+            }
+        }
     }
 
     override fun onStop() {
@@ -129,7 +149,20 @@ class ChatActivity : AppCompatActivity() {
 adapter.submitList(messages.toMutableList()) {
     binding.messagesRecyclerView.scrollToPosition(messages.size - 1)
             }
-            repository.markSeen(message)
+            // Only mark seen while the chat is actually visible —
+            // WhatsApp-style "instant seen only while looking at the
+            // screen". Firebase's listener + keepSynced keep delivering
+            // onChildAdded events even while backgrounded (by design,
+            // for reliability — see ChatRepository.onStop), which
+            // previously meant a message got marked seen the instant it
+            // arrived even if nobody was looking at the screen. If the
+            // app is backgrounded when this fires, the message is still
+            // added to the list (so it's there when the user returns)
+            // but stays unseen until onStart's catch-up pass above
+            // actually marks it.
+            if (isForeground) {
+                repository.markSeen(message)
+            }
                     updateUnreadState()
                 }
             }
@@ -253,11 +286,22 @@ adapter.submitList(messages.toMutableList()) {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) {
-                repository.setTyping(true)
                 typingRunnable?.let { typingHandler?.removeCallbacks(it) }
+                if (s.isNullOrBlank()) {
+                    // Field is empty — backspaced clear, or just sent a
+                    // message (setText("") after send fires this too) —
+                    // the user is unambiguously done typing, so clear
+                    // instantly instead of waiting out the debounce
+                    // below. This is also what stops the old bug where
+                    // sending a message could flash "typing..." at the
+                    // other person right after send.
+                    repository.setTyping(false)
+                    return
+                }
+                repository.setTyping(true)
                 typingHandler = typingHandler ?: Handler(Looper.getMainLooper())
                 typingRunnable = Runnable { repository.setTyping(false) }
-                typingHandler?.postDelayed(typingRunnable!!, 2000)
+                typingHandler?.postDelayed(typingRunnable!!, TYPING_STOP_DELAY_MS)
             }
         })
     }
@@ -499,35 +543,87 @@ adapter.submitList(messages.toMutableList()) {
     // two-person conversation. Pre-filled with whatever's currently
     // resolved (custom nickname if set, otherwise the Kat/Kitty
     // default) so opening it never shows a blank/misleading value.
+    // Redesigned to match the app's own rounded-card, purple-accent
+    // aesthetic (colors.xml / bg_popup_menu, already used by the other
+    // popups) instead of a plain system AlertDialog: a circular icon
+    // badge, real title/subtitle typography, and pill-shaped inputs
+    // (reusing @drawable/bg_input_field, the same shape as the compose
+    // bar's own message field) instead of bare EditTexts.
     private fun showChangeNicknameDialog() {
         val currentUser = Session.currentUser() ?: return
         val otherUser = Session.otherUser() ?: return
 
-        fun label(text: String) = TextView(this).apply {
-            this.text = text
-            textSize = 13f
-            setTextColor(resources.getColor(com.privatechat.app.R.color.textSecondary, theme))
-            setPadding(dp(20), dp(14), dp(20), dp(4))
-        }
-        fun input(prefill: String) = android.widget.EditText(this).apply {
-            setText(prefill)
-            setSelection(prefill.length)
-            setPadding(dp(20), dp(4), dp(20), dp(4))
+        val primaryColor = resources.getColor(com.privatechat.app.R.color.primary, theme)
+        val textPrimaryColor = resources.getColor(com.privatechat.app.R.color.textPrimary, theme)
+        val textSecondaryColor = resources.getColor(com.privatechat.app.R.color.textSecondary, theme)
+
+        val iconBadge = TextView(this).apply {
+            text = "\u270F\uFE0F"
+            textSize = 24f
+            gravity = android.view.Gravity.CENTER
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(primaryColor)
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(56), dp(56)).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(6)
+            }
         }
 
-        val myInput = input(Nicknames.resolve(currentUser, nicknames))
-        val otherInput = input(Nicknames.resolve(otherUser, nicknames))
+        val title = TextView(this).apply {
+            text = "Change Nickname"
+            textSize = 18f
+            setTextColor(textPrimaryColor)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+        }
+
+        val subtitle = TextView(this).apply {
+            text = "Personalize how each of you appears in this chat"
+            textSize = 12f
+            setTextColor(textSecondaryColor)
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(12), dp(4), dp(12), dp(18))
+        }
+
+        fun fieldLabel(text: String, topMargin: Int = dp(10)) = TextView(this).apply {
+            this.text = text
+            textSize = 12f
+            setTextColor(textSecondaryColor)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(dp(4), 0, dp(4), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { this.topMargin = topMargin }
+        }
+        fun styledInput(prefill: String) = android.widget.EditText(this).apply {
+            setText(prefill)
+            setSelection(prefill.length)
+            setSingleLine(true)
+            textSize = 15f
+            setTextColor(textPrimaryColor)
+            setBackgroundResource(com.privatechat.app.R.drawable.bg_input_field)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+
+        val myInput = styledInput(Nicknames.resolve(currentUser, nicknames))
+        val otherInput = styledInput(Nicknames.resolve(otherUser, nicknames))
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(label("Your nickname"))
+            setPadding(dp(24), dp(22), dp(24), dp(6))
+            addView(iconBadge)
+            addView(title)
+            addView(subtitle)
+            addView(fieldLabel("Your nickname", topMargin = 0))
             addView(myInput)
-            addView(label("${Nicknames.defaultFor(otherUser)}'s nickname"))
+            addView(fieldLabel("${Nicknames.defaultFor(otherUser)}'s nickname", topMargin = dp(14)))
             addView(otherInput)
         }
 
         activeDialog = android.app.AlertDialog.Builder(this)
-            .setTitle("Change Nickname")
             .setView(container)
             .setPositiveButton("Save") { _, _ ->
                 repository.setNickname(currentUser, myInput.text.toString())
@@ -535,6 +631,12 @@ adapter.submitList(messages.toMutableList()) {
             }
             .setNegativeButton("Cancel", null)
             .show()
+
+        // Rounded, theme-aware window background (the same drawable the
+        // other popups already use) instead of the OS's plain white
+        // rectangle — this is what actually makes it read as part of
+        // this app rather than a generic system dialog.
+        activeDialog?.window?.setBackgroundDrawableResource(com.privatechat.app.R.drawable.bg_popup_menu)
     }
 
     private fun confirmLogout() {
