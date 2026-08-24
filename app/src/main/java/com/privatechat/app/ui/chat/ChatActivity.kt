@@ -54,6 +54,13 @@ class ChatActivity : AppCompatActivity() {
     // reflected instantly everywhere without extra plumbing.
     private var nicknames: Map<String, String> = emptyMap()
 
+    // Current vanish-mode duration in hours, or null if off — mirrors
+    // the shared vanishMode/ Firebase node (write path is
+    // repository.setVanishMode()).
+    private var vanishModeDurationHours: Int? = null
+    private var vanishCheckHandler: Handler? = null
+    private var vanishCheckRunnable: Runnable? = null
+
     // The one dialog/bottom-sheet that can be open at a time (edit message
     // / emoji picker) — the reaction bar and action menu are separate
     // overlay views, torn down via dismissOverlays() instead.
@@ -72,6 +79,14 @@ class ChatActivity : AppCompatActivity() {
         // enough to feel instant, long enough not to flicker between
         // individual keystrokes during a normal typing pause.
         private const val TYPING_STOP_DELAY_MS = 1000L
+
+        // How often the vanish-mode expiry sweep runs while the chat is
+        // foregrounded. There's no server-side job for this (client-
+        // only, per this feature's scope) — a message that ages out
+        // while both users are away simply gets purged the next time
+        // either one opens the app, which this interval keeps prompt
+        // for whoever currently has it open.
+        private const val VANISH_CHECK_INTERVAL_MS = 60_000L
 
         // Read by ChatFirebaseMessagingService to suppress showing a
         // system notification while this chat is already on screen —
@@ -98,12 +113,15 @@ class ChatActivity : AppCompatActivity() {
                 messages.filter { it.name == other && !it.seen && !it.deleted && it.type == null }
                     .forEach { repository.markSeen(it) }
             }
+            purgeExpiredMessages()
+            restartVanishExpiryChecks()
         }
     }
 
     override fun onStop() {
         super.onStop()
         isForeground = false
+        stopVanishExpiryChecks()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -164,6 +182,7 @@ adapter.submitList(messages.toMutableList()) {
                 repository.markSeen(message)
             }
                     updateUnreadState()
+                    purgeExpiredMessages()
                 }
             }
         }
@@ -229,6 +248,20 @@ adapter.submitList(messages.toMutableList()) {
                 nicknames = map
                 adapter.nicknames = map
                 binding.headerName.text = otherDisplayName()
+            }
+        }
+
+        // "যে কোনো একজন user সিলেক্ট করবে সেটা ২ জনের জন্য কাজ করবে" —
+        // one shared node, fires instantly on both devices. Runs an
+        // immediate sweep on every change (covers "turn on 2h when
+        // there are already messages older than 2h" and "turn off"
+        // cleanly stopping further purges) and restarts the periodic
+        // check with the new duration.
+        repository.onVanishModeChanged = { hours ->
+            runOnUiThread {
+                vanishModeDurationHours = hours
+                purgeExpiredMessages()
+                restartVanishExpiryChecks()
             }
         }
 
@@ -501,6 +534,10 @@ adapter.submitList(messages.toMutableList()) {
         addItem("\uD83D\uDDD1\uFE0F", "Delete All Chat", textColor = UNSEND_RED) {
             confirmDeleteAllChat()
         }
+        val vanishLabel = vanishModeDurationHours?.let { "Vanish Mode (${it}h)" } ?: "Custom Vanish Mode"
+        addItem("\uD83D\uDC7B", vanishLabel, checked = vanishModeDurationHours != null) {
+            showVanishModeDialog()
+        }
         addItem(if (isBlockedByMe) "\u2705" else "\uD83D\uDEAB", if (isBlockedByMe) "Unblock User" else "Block User") {
             repository.setBlocked(!isBlockedByMe)
         }
@@ -637,6 +674,130 @@ adapter.submitList(messages.toMutableList()) {
         // rectangle — this is what actually makes it read as part of
         // this app rather than a generic system dialog.
         activeDialog?.window?.setBackgroundDrawableResource(com.privatechat.app.R.drawable.bg_popup_menu)
+    }
+
+    // "same to same nick change এর মতো premium bubble" — same visual
+    // language as showChangeNicknameDialog() (circular icon badge,
+    // title/subtitle, rounded theme-aware window), but a vertical list
+    // of 4 selectable rows instead of input fields: each tap commits
+    // and closes immediately, no separate Save button, with the
+    // currently-active option checked.
+    private fun showVanishModeDialog() {
+        val primaryColor = resources.getColor(com.privatechat.app.R.color.primary, theme)
+        val textPrimaryColor = resources.getColor(com.privatechat.app.R.color.textPrimary, theme)
+        val textSecondaryColor = resources.getColor(com.privatechat.app.R.color.textSecondary, theme)
+        val currentSelection = vanishModeDurationHours
+
+        val iconBadge = TextView(this).apply {
+            text = "\uD83D\uDC7B"
+            textSize = 24f
+            gravity = android.view.Gravity.CENTER
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(primaryColor)
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(56), dp(56)).apply {
+                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                bottomMargin = dp(6)
+            }
+        }
+
+        val title = TextView(this).apply {
+            text = "Vanish Mode"
+            textSize = 18f
+            setTextColor(textPrimaryColor)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            gravity = android.view.Gravity.CENTER
+        }
+
+        val subtitle = TextView(this).apply {
+            text = "New messages disappear for both of you after the selected time"
+            textSize = 12f
+            setTextColor(textSecondaryColor)
+            gravity = android.view.Gravity.CENTER
+            setPadding(dp(12), dp(4), dp(12), dp(16))
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(22), dp(24), dp(10))
+            addView(iconBadge)
+            addView(title)
+            addView(subtitle)
+        }
+
+        lateinit var dialogRef: android.app.AlertDialog
+
+        fun optionRow(label: String, duration: Int?): View {
+            val isActive = duration == currentSelection
+            return TextView(this).apply {
+                text = if (isActive) "$label   \u2713" else label
+                textSize = 15f
+                setTextColor(if (isActive) primaryColor else textPrimaryColor)
+                setTypeface(typeface, if (isActive) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                setPadding(dp(4), dp(14), dp(4), dp(14))
+                isClickable = true
+                val ripple = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+                setBackgroundResource(ripple.resourceId)
+                setOnClickListener {
+                    val myName = Nicknames.resolve(Session.currentUser().orEmpty(), nicknames)
+                    repository.setVanishMode(duration, myName)
+                    dialogRef.dismiss()
+                }
+            }
+        }
+
+        listOf("2 hours" to 2, "8 hours" to 8, "24 hours" to 24, "Off" to null).forEach { (label, duration) ->
+            container.addView(optionRow(label, duration))
+        }
+
+        dialogRef = android.app.AlertDialog.Builder(this)
+            .setView(container)
+            .create()
+        activeDialog = dialogRef
+        dialogRef.show()
+        dialogRef.window?.setBackgroundDrawableResource(com.privatechat.app.R.drawable.bg_popup_menu)
+    }
+
+    // Deletes any loaded message older than the active vanish-mode
+    // duration, for both users — "২ ঘন্টা পর message seen হোক বা না
+    // হোক vanish হয়ে যাবে ২ জনের পক্ষ থেকে". Uses each message's own
+    // `time` (when it was sent), not seen state. System messages
+    // (type == "system", the on/off announcements themselves) are
+    // excluded so the vanish-mode history stays visible.
+    private fun purgeExpiredMessages() {
+        val hours = vanishModeDurationHours ?: return
+        val cutoffAgeMillis = hours * 60L * 60L * 1000L
+        val now = System.currentTimeMillis()
+        messages.filter { it.type == null && (now - it.time) >= cutoffAgeMillis }
+            .forEach { repository.deleteExpiredMessage(it.key) }
+    }
+
+    // No server-side job exists for this (client-only, per this
+    // feature's scope) — this periodic sweep is what keeps expiry
+    // prompt while at least one device has the chat open, on top of
+    // the immediate checks in onStart/onMessageAdded/onVanishModeChanged
+    // that catch anything that aged out while nobody was looking.
+    private fun restartVanishExpiryChecks() {
+        stopVanishExpiryChecks()
+        if (vanishModeDurationHours == null) return
+        val handler = Handler(Looper.getMainLooper())
+        vanishCheckHandler = handler
+        val runnable = object : Runnable {
+            override fun run() {
+                purgeExpiredMessages()
+                handler.postDelayed(this, VANISH_CHECK_INTERVAL_MS)
+            }
+        }
+        vanishCheckRunnable = runnable
+        handler.postDelayed(runnable, VANISH_CHECK_INTERVAL_MS)
+    }
+
+    private fun stopVanishExpiryChecks() {
+        vanishCheckRunnable?.let { vanishCheckHandler?.removeCallbacks(it) }
+        vanishCheckHandler = null
+        vanishCheckRunnable = null
     }
 
     private fun confirmLogout() {
