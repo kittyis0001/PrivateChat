@@ -38,6 +38,7 @@ class ChatRepository(
     private var messagesListener: ChildEventListener? = null
     private var isListenerAttached = false
     private var isBlockListenerAttached = false
+    private var isBlockedByOtherListenerAttached = false
     private var isNicknamesListenerAttached = false
     private var isVanishModeListenerAttached = false
 
@@ -50,6 +51,12 @@ class ChatRepository(
     // (blocked, blockedAtMillis) — reflects whether *this* user has
     // blocked the other one, read from blocks/{currentUser}.
     var onBlockStateChanged: ((Boolean, Long) -> Unit)? = null
+    // Whether the OTHER user has blocked THIS one — the piece that was
+    // missing entirely: onBlockStateChanged only ever reflected
+    // blocks/{currentUser} (have I blocked them), never
+    // blocks/{otherUser} (have they blocked me), so a blocked user's
+    // own device had no way to know and could still send freely.
+    var onBlockedByOtherChanged: ((Boolean) -> Unit)? = null
     // Full nicknames/ node as a username -> nickname map, whichever
     // keys are actually set — fires instantly for BOTH users the
     // moment either one writes a nickname, since it's one shared node
@@ -86,6 +93,7 @@ class ChatRepository(
         attachPresenceListener()
         attachTypingListener()
         attachBlockListener()
+        attachBlockedByOtherListener()
         attachNicknamesListener()
         attachVanishModeListener()
         markOnline()
@@ -238,6 +246,18 @@ class ChatRepository(
                 val blocked = snapshot.child("blocked").getValue(Boolean::class.java) ?: false
                 val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
                 onBlockStateChanged?.invoke(blocked, timestamp)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    private fun attachBlockedByOtherListener() {
+        if (isBlockedByOtherListenerAttached) return
+        isBlockedByOtherListenerAttached = true
+        blocksRef.child(otherUser).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val blocked = snapshot.child("blocked").getValue(Boolean::class.java) ?: false
+                onBlockedByOtherChanged?.invoke(blocked)
             }
             override fun onCancelled(error: DatabaseError) {}
         })
