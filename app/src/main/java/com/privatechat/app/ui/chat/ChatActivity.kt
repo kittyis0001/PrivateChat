@@ -1,26 +1,36 @@
 package com.privatechat.app.ui.chat
 
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnPreDraw
 import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CircleCrop
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.privatechat.app.data.Nicknames
 import com.privatechat.app.data.Session
 import com.privatechat.app.data.model.Message
 import com.privatechat.app.data.repository.ChatRepository
 import com.privatechat.app.databinding.ActivityChatBinding
+import com.privatechat.app.media.CloudinaryUploader
 import com.privatechat.app.notification.NotificationRepository
+import com.privatechat.app.ui.photo.PhotoViewerActivity
+import com.privatechat.app.utils.NotificationAvatarFactory
 import com.privatechat.app.utils.PresenceFormatter
+import kotlinx.coroutines.launch
 
 class ChatActivity : AppCompatActivity() {
 
@@ -66,6 +76,30 @@ class ChatActivity : AppCompatActivity() {
     private var vanishModeDurationHours: Int? = null
     private var vanishCheckHandler: Handler? = null
     private var vanishCheckRunnable: Runnable? = null
+
+    // Live profile photos (username -> Cloudinary URL) from
+    // ChatRepository.onPhotosChanged — same live-map pattern as
+    // nicknames above, so a Change DP on either device updates both
+    // instantly with no refresh/re-login.
+    private var photos: Map<String, String> = emptyMap()
+
+    // Gallery permission (Change DP, step 1) — the actual image pick
+    // below (photoPickerLauncher) doesn't need this on most modern
+    // devices (Android's Photo Picker is permission-less on API 30+
+    // with current Play services, and native on 33+), but the explicit
+    // request is kept as requested and as the fallback path for
+    // devices where that isn't available. Registered as property
+    // initializers (same pattern LoginActivity's notification
+    // permission launcher already uses) since registerForActivityResult
+    // must happen before the Activity reaches STARTED.
+    private val galleryPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchPhotoPicker()
+        }
+    private val photoPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) uploadAndSavePhoto(uri)
+        }
 
     // The one dialog/bottom-sheet that can be open at a time (edit message
     // / emoji picker) — the reaction bar and action menu are separate
@@ -156,6 +190,22 @@ class ChatActivity : AppCompatActivity() {
         fun myDisplayName() = Nicknames.resolve(currentUser, nicknames)
 
         binding.headerName.text = otherDisplayName()
+
+        // "HEADER AVATAR — add the other user's avatar in the chat
+        // header (left of the username)". Falls back to the same
+        // generated colored-initial circle used elsewhere in the app
+        // (NotificationAvatarFactory) when no custom photo is set yet,
+        // so the header never shows a blank/broken image.
+        fun refreshHeaderAvatar() {
+            loadAvatarInto(binding.headerAvatar, otherUser, photos[otherUser])
+        }
+        refreshHeaderAvatar()
+        binding.headerAvatar.setOnClickListener {
+            val url = photos[otherUser]
+            if (!url.isNullOrBlank()) {
+                startActivity(PhotoViewerActivity.newIntent(this, url))
+            }
+        }
 
         repository = ChatRepository(currentUser, otherUser)
         notificationRepository = NotificationRepository(applicationContext)
@@ -264,6 +314,18 @@ adapter.submitList(messages.toMutableList()) {
                 nicknames = map
                 adapter.nicknames = map
                 binding.headerName.text = otherDisplayName()
+            }
+        }
+
+        // "Both users see the new DP instantly without refresh or
+        // re-login" — one shared Firebase node (same pattern as
+        // nicknames/), so this callback alone is the entire sync
+        // mechanism for both the chat header and the 3-dot menu's own
+        // avatar.
+        repository.onPhotosChanged = { map ->
+            runOnUiThread {
+                photos = map
+                refreshHeaderAvatar()
             }
         }
 
@@ -426,6 +488,74 @@ adapter.submitList(messages.toMutableList()) {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    // Shared by the chat header's other-user avatar and the 3-dot
+    // menu's own-avatar section: a Cloudinary photo if one's been set,
+    // otherwise the same generated colored-initial circle
+    // NotificationAvatarFactory already draws for notifications — one
+    // fallback look used everywhere an avatar can be missing.
+    private fun loadAvatarInto(imageView: ImageView, username: String, photoUrl: String?) {
+        if (!photoUrl.isNullOrBlank()) {
+            Glide.with(this)
+                .load(photoUrl)
+                .transform(CircleCrop())
+                .into(imageView)
+        } else {
+            val initial = Nicknames.resolve(username, nicknames).firstOrNull() ?: '?'
+            val color = resources.getColor(com.privatechat.app.R.color.primary, theme)
+            imageView.setImageBitmap(
+                NotificationAvatarFactory.create(resources.displayMetrics.density, initial, color)
+            )
+        }
+    }
+
+    // "CHANGE DP FEATURE — When tapped: 1. Request Gallery permission."
+    private fun requestChangeDp() {
+        val permission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            android.Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(this, permission) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            launchPhotoPicker()
+        } else {
+            galleryPermissionLauncher.launch(permission)
+        }
+    }
+
+    // Steps 2-3: open the gallery/photo picker. PickVisualMedia is the
+    // modern picker — on API 30+ (via Play services) and 33+ natively
+    // it needs no storage permission at all, but requestChangeDp()
+    // above still requests one first as the explicit fallback path for
+    // older devices, per the task's literal steps.
+    private fun launchPhotoPicker() {
+        photoPickerLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
+    }
+
+    // Steps 4-6: upload to Cloudinary, save the URL to Firebase — step
+    // 6 ("both users see it instantly") is then just
+    // repository.onPhotosChanged firing on both devices, already wired
+    // in onCreate.
+    private fun uploadAndSavePhoto(uri: Uri) {
+        val currentUser = Session.currentUser() ?: return
+        android.widget.Toast.makeText(this, "Uploading photo…", android.widget.Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            try {
+                val url = CloudinaryUploader.uploadImage(applicationContext, uri)
+                repository.setPhotoUrl(currentUser, url)
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    this@ChatActivity,
+                    e.message ?: "Photo upload failed",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
     // Tears down whatever overlay (reaction bar or action menu) is
     // currently showing, plus its outside-tap scrim.
     private fun dismissOverlays() {
@@ -549,9 +679,88 @@ adapter.submitList(messages.toMutableList()) {
             menu.addView(row)
         }
 
+        // "ONLY ADD THIS SECTION" — top profile row: own avatar with a
+        // small "+" badge (opens Change DP), own nickname, and an
+        // "Upload Story" subtitle line matching the reference image.
+        // Nothing below this point in the menu (existing items,
+        // spacing, colors, radius, animation) was touched.
+        val currentUserForProfile = Session.currentUser()
+        if (currentUserForProfile != null) {
+            val avatarSize = dp(52)
+            val avatarFrame = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(avatarSize, avatarSize)
+            }
+            val avatarImage = ImageView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize)
+                isClickable = true
+                setOnClickListener {
+                    val url = photos[currentUserForProfile]
+                    if (!url.isNullOrBlank()) {
+                        dismissOverlays()
+                        startActivity(PhotoViewerActivity.newIntent(this@ChatActivity, url))
+                    }
+                }
+            }
+            loadAvatarInto(avatarImage, currentUserForProfile, photos[currentUserForProfile])
+            avatarFrame.addView(avatarImage)
+
+            val plusBadgeSize = dp(20)
+            val plusBadge = TextView(this).apply {
+                text = "+"
+                textSize = 13f
+                gravity = android.view.Gravity.CENTER
+                setTextColor(resources.getColor(com.privatechat.app.R.color.white, theme))
+                setBackgroundResource(com.privatechat.app.R.drawable.bg_dp_plus_badge)
+                layoutParams = FrameLayout.LayoutParams(plusBadgeSize, plusBadgeSize).apply {
+                    gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
+                }
+                isClickable = true
+                setOnClickListener {
+                    dismissOverlays()
+                    requestChangeDp()
+                }
+            }
+            avatarFrame.addView(plusBadge)
+
+            val nameColumn = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = dp(14)
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                }
+                addView(TextView(this@ChatActivity).apply {
+                    text = Nicknames.resolve(currentUserForProfile, nicknames)
+                    textSize = 16f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextColor(resources.getColor(com.privatechat.app.R.color.textPrimary, theme))
+                })
+                addView(TextView(this@ChatActivity).apply {
+                    text = "Upload Story"
+                    textSize = 12f
+                    setTextColor(resources.getColor(com.privatechat.app.R.color.textSecondary, theme))
+                    setPadding(0, dp(2), 0, 0)
+                })
+            }
+
+            menu.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(16), dp(16), dp(14))
+                addView(avatarFrame)
+                addView(nameColumn)
+            })
+            menu.addView(View(this).apply {
+                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1))
+                setBackgroundColor(resources.getColor(com.privatechat.app.R.color.popupBorder, theme))
+            })
+        }
+
         val muted = Session.isMuted()
         addItem("\u270F\uFE0F", "Change Nickname") {
             showChangeNicknameDialog()
+        }
+        addItem("\uD83D\uDDBC\uFE0F", "Change DP") {
+            requestChangeDp()
         }
         addItem(if (muted) "\uD83D\uDD14" else "\uD83D\uDD15", if (muted) "Unmute Notifications" else "Mute Notifications") {
             toggleMute()

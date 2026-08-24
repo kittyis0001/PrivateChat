@@ -4,4 +4,16 @@
         <item name="android:statusBarColor">@color/surface</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
+
+    <!-- Full-screen Instagram-style photo viewer — always dark
+         regardless of the app's own light/dark theme setting, since
+         that's the standard behavior for this kind of full-image
+         viewer (Instagram, WhatsApp, Telegram all do the same). -->
+    <style name="Theme.PhotoViewer" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowIsTranslucent">false</item>
+    </style>
 </resources>
+
