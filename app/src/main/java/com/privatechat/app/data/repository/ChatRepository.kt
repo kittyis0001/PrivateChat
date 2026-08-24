@@ -33,11 +33,13 @@ class ChatRepository(
     private val connectedRef: DatabaseReference = db.getReference(".info/connected")
     private val blocksRef: DatabaseReference = db.getReference("blocks")
     private val nicknamesRef: DatabaseReference = db.getReference("nicknames")
+    private val vanishModeRef: DatabaseReference = db.getReference("vanishMode")
 
     private var messagesListener: ChildEventListener? = null
     private var isListenerAttached = false
     private var isBlockListenerAttached = false
     private var isNicknamesListenerAttached = false
+    private var isVanishModeListenerAttached = false
 
     var onMessageAdded: ((Message) -> Unit)? = null
     var onMessageChanged: ((Message) -> Unit)? = null
@@ -53,6 +55,10 @@ class ChatRepository(
     // moment either one writes a nickname, since it's one shared node
     // rather than two independent per-user ones like blocks/.
     var onNicknamesChanged: ((Map<String, String>) -> Unit)? = null
+    // Current vanish-mode duration in hours, or null if off — one
+    // shared node (like nicknames/, not per-user like blocks/), so
+    // whichever user sets it applies to both instantly.
+    var onVanishModeChanged: ((Int?) -> Unit)? = null
 
     init {
         // Keep the messages node synced to local disk cache even while
@@ -81,6 +87,7 @@ class ChatRepository(
         attachTypingListener()
         attachBlockListener()
         attachNicknamesListener()
+        attachVanishModeListener()
         markOnline()
     }
 
@@ -265,6 +272,68 @@ class ChatRepository(
                     if (!value.isNullOrBlank()) nicknames[key] = value
                 }
                 onNicknamesChanged?.invoke(nicknames)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    // ── Vanish Mode ───────────────────────────────────────────────
+    // One shared node (like nicknames/) so whichever user picks a
+    // duration applies to both — "যে কোনো একজন user সিলেক্ট করবে সেটা
+    // ২ জনের জন্য কাজ করবে". Actual expiry/deletion of aged-out
+    // messages happens in ChatActivity (it needs the live message
+    // list + foreground lifecycle to enforce this without a server-
+    // side job); this only tracks and announces the on/off state.
+
+    fun setVanishMode(durationHours: Int?, actorDisplayName: String) {
+        if (durationHours == null) {
+            vanishModeRef.removeValue()
+        } else {
+            vanishModeRef.setValue(
+                mapOf(
+                    "durationHours" to durationHours,
+                    "setBy" to currentUser,
+                    "setAt" to System.currentTimeMillis()
+                )
+            )
+        }
+        // WhatsApp-style small system notice in the chat itself,
+        // announcing who changed it and to what — reuses the existing
+        // messages/ pipeline (type: "system") so it syncs to both
+        // devices instantly via the same listener as everything else,
+        // and MessageAdapter renders it as a centered light-gray line
+        // rather than a bubble.
+        val text = if (durationHours != null) {
+            "$actorDisplayName turned on vanish mode ($durationHours hours)"
+        } else {
+            "$actorDisplayName turned off vanish mode"
+        }
+        val systemData = mapOf(
+            "name" to currentUser,
+            "text" to text,
+            "time" to System.currentTimeMillis(),
+            "seen" to true,
+            "type" to "system"
+        )
+        messagesRef.push().setValue(systemData)
+    }
+
+    // Used by ChatActivity's expiry sweep once a message's age passes
+    // the active vanish-mode duration. Reuses the same removeValue()
+    // deleteAllChat() already uses — onMessageRemoved fires on both
+    // devices off the existing listener, no extra plumbing needed for
+    // the deletion to actually propagate.
+    fun deleteExpiredMessage(key: String) {
+        messagesRef.child(key).removeValue()
+    }
+
+    private fun attachVanishModeListener() {
+        if (isVanishModeListenerAttached) return
+        isVanishModeListenerAttached = true
+        vanishModeRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val hours = snapshot.child("durationHours").getValue(Int::class.java)
+                onVanishModeChanged?.invoke(hours)
             }
             override fun onCancelled(error: DatabaseError) {}
         })

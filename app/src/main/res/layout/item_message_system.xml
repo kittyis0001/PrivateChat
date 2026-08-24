@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:paddingHorizontal="24dp"
+    android:paddingVertical="6dp">
+
+    <TextView
+        android:id="@+id/systemMessageText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_reaction_badge"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:gravity="center"
+        android:textSize="11sp"
+        android:textColor="@color/textSecondary" />
+
+</LinearLayout>

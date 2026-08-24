@@ -19,6 +19,7 @@ import com.privatechat.app.data.Nicknames
 import com.privatechat.app.data.model.Message
 import com.privatechat.app.databinding.ItemMessageIncomingBinding
 import com.privatechat.app.databinding.ItemMessageOutgoingBinding
+import com.privatechat.app.databinding.ItemMessageSystemBinding
 import com.privatechat.app.utils.PresenceFormatter
 import kotlin.math.abs
 
@@ -44,15 +45,21 @@ class MessageAdapter(private val currentUser: String) :
             }
         }
 
-    override fun getItemViewType(position: Int): Int =
-        if (getItem(position).name == currentUser) VIEW_TYPE_OUTGOING else VIEW_TYPE_INCOMING
+    override fun getItemViewType(position: Int): Int {
+        val message = getItem(position)
+        return when {
+            message.type == "system" -> VIEW_TYPE_SYSTEM
+            message.name == currentUser -> VIEW_TYPE_OUTGOING
+            else -> VIEW_TYPE_INCOMING
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         val inflater = LayoutInflater.from(parent.context)
-        return if (viewType == VIEW_TYPE_OUTGOING) {
-            OutgoingHolder(ItemMessageOutgoingBinding.inflate(inflater, parent, false))
-        } else {
-            IncomingHolder(ItemMessageIncomingBinding.inflate(inflater, parent, false))
+        return when (viewType) {
+            VIEW_TYPE_OUTGOING -> OutgoingHolder(ItemMessageOutgoingBinding.inflate(inflater, parent, false))
+            VIEW_TYPE_SYSTEM -> SystemHolder(ItemMessageSystemBinding.inflate(inflater, parent, false))
+            else -> IncomingHolder(ItemMessageIncomingBinding.inflate(inflater, parent, false))
         }
     }
 
@@ -61,6 +68,7 @@ class MessageAdapter(private val currentUser: String) :
         when (holder) {
             is OutgoingHolder -> holder.bind(message)
             is IncomingHolder -> holder.bind(message)
+            is SystemHolder -> holder.bind(message)
         }
     }
 
@@ -242,9 +250,20 @@ class MessageAdapter(private val currentUser: String) :
         }
     }
 
+    // No gestures, no bubble — just centered, light-gray informational
+    // text (vanish mode on/off, etc.), matching WhatsApp's own system
+    // notice style.
+    inner class SystemHolder(private val binding: ItemMessageSystemBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+        fun bind(message: Message) {
+            binding.systemMessageText.text = message.text
+        }
+    }
+
     companion object {
         private const val VIEW_TYPE_OUTGOING = 1
         private const val VIEW_TYPE_INCOMING = 2
+        private const val VIEW_TYPE_SYSTEM = 3
         private const val LONG_PRESS_MS = 800L
 
         // Exposed so ChatActivity can build the same short preview text for
