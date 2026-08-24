@@ -8,6 +8,17 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Gallery access for Change DP. READ_MEDIA_IMAGES on API 33+;
+         READ_EXTERNAL_STORAGE (capped at 32) covers older devices. On
+         API 30+ with a recent Play services, the PickVisualMedia photo
+         picker used in ChatActivity doesn't actually need either
+         permission at all — these exist as the explicit fallback path
+         requested, and so the app still works correctly on devices
+         without the modern picker. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <application android:name=".App"
         
@@ -32,6 +43,11 @@
             android:name=".ui.chat.ChatActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.photo.PhotoViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PhotoViewer" />
 
         <service
             android:name=".messaging.ChatFirebaseMessagingService"

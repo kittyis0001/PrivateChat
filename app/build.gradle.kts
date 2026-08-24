@@ -20,6 +20,16 @@ android {
         // exactly. Never the Firebase service account itself — that
         // stays server-side only, per backend/services/firebase.js.
         buildConfigField("String", "BACKEND_API_SECRET", "\"kitty_chat_2026_secret_x9K2_p9Lm\"")
+        // Cloudinary unsigned upload — a cloud name + unsigned upload
+        // preset are safe to ship in the app (unlike an API secret):
+        // Cloudinary's own dashboard scopes exactly what an unsigned
+        // preset is allowed to do, so no backend call is needed for
+        // this (and the Render backend, explicitly out of scope for
+        // this feature, was never touched). Create both at
+        // https://cloudinary.com/console/settings/upload — an unsigned
+        // preset under Upload presets — then replace these two values.
+        buildConfigField("String", "CLOUDINARY_CLOUD_NAME", "\"REPLACE-ME\"")
+        buildConfigField("String", "CLOUDINARY_UPLOAD_PRESET", "\"REPLACE-ME\"")
         applicationId = "com.privatechat.app"
         minSdk = 24
         targetSdk = 34
@@ -79,6 +89,16 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Profile photo loading (circleCrop for avatars, memory-safe
+    // caching) and the Instagram-style full-screen viewer.
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    // Modern in-app photo picker — needs no storage/gallery permission
+    // at all on API 30+ (backed by Google Play services) and API 33+
+    // natively; the explicit READ_MEDIA_IMAGES/READ_EXTERNAL_STORAGE
+    // request in AndroidManifest.xml covers the older-API fallback
+    // path this pulls in.
+    implementation("androidx.activity:activity-ktx:1.9.3")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

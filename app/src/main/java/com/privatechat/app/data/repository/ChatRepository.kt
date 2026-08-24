@@ -34,6 +34,7 @@ class ChatRepository(
     private val blocksRef: DatabaseReference = db.getReference("blocks")
     private val nicknamesRef: DatabaseReference = db.getReference("nicknames")
     private val vanishModeRef: DatabaseReference = db.getReference("vanishMode")
+    private val photosRef: DatabaseReference = db.getReference("photos")
 
     private var messagesListener: ChildEventListener? = null
     private var isListenerAttached = false
@@ -41,6 +42,7 @@ class ChatRepository(
     private var isBlockedByOtherListenerAttached = false
     private var isNicknamesListenerAttached = false
     private var isVanishModeListenerAttached = false
+    private var isPhotosListenerAttached = false
 
     var onMessageAdded: ((Message) -> Unit)? = null
     var onMessageChanged: ((Message) -> Unit)? = null
@@ -66,6 +68,10 @@ class ChatRepository(
     // shared node (like nicknames/, not per-user like blocks/), so
     // whichever user sets it applies to both instantly.
     var onVanishModeChanged: ((Int?) -> Unit)? = null
+    // Full photos/ node as a username -> Cloudinary URL map — same
+    // shared-node pattern as nicknames/, so a Change DP on either
+    // device reaches both instantly with no refresh/re-login needed.
+    var onPhotosChanged: ((Map<String, String>) -> Unit)? = null
 
     init {
         // Keep the messages node synced to local disk cache even while
@@ -96,6 +102,7 @@ class ChatRepository(
         attachBlockedByOtherListener()
         attachNicknamesListener()
         attachVanishModeListener()
+        attachPhotosListener()
         markOnline()
     }
 
@@ -292,6 +299,33 @@ class ChatRepository(
                     if (!value.isNullOrBlank()) nicknames[key] = value
                 }
                 onNicknamesChanged?.invoke(nicknames)
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
+
+    // ── Profile photos ────────────────────────────────────────────
+    // Same shared-node pattern as nicknames/ — each user only ever
+    // writes their own photos/{username} entry, but everyone reads the
+    // whole node, so a Change DP on either device reaches both
+    // instantly with no refresh/re-login needed.
+
+    fun setPhotoUrl(username: String, url: String) {
+        photosRef.child(username).setValue(url)
+    }
+
+    private fun attachPhotosListener() {
+        if (isPhotosListenerAttached) return
+        isPhotosListenerAttached = true
+        photosRef.addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val photos = mutableMapOf<String, String>()
+                for (child in snapshot.children) {
+                    val key = child.key ?: continue
+                    val value = child.getValue(String::class.java)
+                    if (!value.isNullOrBlank()) photos[key] = value
+                }
+                onPhotosChanged?.invoke(photos)
             }
             override fun onCancelled(error: DatabaseError) {}
         })
