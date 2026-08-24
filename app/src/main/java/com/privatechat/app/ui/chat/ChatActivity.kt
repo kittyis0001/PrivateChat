@@ -48,6 +48,12 @@ class ChatActivity : AppCompatActivity() {
     private var isBlockedByMe = false
     private var blockedAtMillis = 0L
 
+    // Whether the OTHER user has blocked THIS one — mirrors
+    // blocks/{otherUser}. This is the actual fix: previously nothing
+    // read this, so a blocked user's own device never knew and could
+    // still send messages freely.
+    private var isBlockedByOther = false
+
     // Live custom nicknames (username -> nickname) from
     // ChatRepository.onNicknamesChanged — read fresh by every display
     // point below rather than captured once, so a nickname change is
@@ -240,6 +246,16 @@ adapter.submitList(messages.toMutableList()) {
             }
         }
 
+        // The actual fix: know when the OTHER user has blocked me, so
+        // sending can actually be prevented on the blocked user's own
+        // device (guarded in the sendButton listener below) instead of
+        // only ever hiding the compose bar on the blocker's screen.
+        repository.onBlockedByOtherChanged = { blocked ->
+            runOnUiThread {
+                isBlockedByOther = blocked
+            }
+        }
+
         // "নিজের এবং অপরজনের যেন nickname চেঞ্জ করা যায়, instant update
         // হয় দুজনের বেলায়" — one shared Firebase node, so this fires
         // instantly on both devices the moment either one saves a change.
@@ -274,6 +290,18 @@ adapter.submitList(messages.toMutableList()) {
         binding.sendButton.setOnClickListener {
             val text = binding.messageInput.text?.toString()?.trim().orEmpty()
             if (text.isEmpty()) return@setOnClickListener
+            if (isBlockedByOther) {
+                // The other user has blocked this one — this is the
+                // actual fix: previously nothing checked this, so a
+                // blocked user could still send freely and it would
+                // reach Firebase with no restriction.
+                android.widget.Toast.makeText(
+                    this,
+                    "You can't send messages to this user",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                return@setOnClickListener
+            }
             val editing = editingMessage
             if (editing != null) {
                 // WhatsApp-style inline edit: Send commits the edit in
