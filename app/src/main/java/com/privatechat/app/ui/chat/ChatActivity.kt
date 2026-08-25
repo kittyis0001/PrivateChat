@@ -724,7 +724,17 @@ adapter.submitList(messages.toMutableList()) {
 
             val nameColumn = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                // No weight here — this is a WRAP_CONTENT menu, and
+                // layout_weight on a child of a WRAP_CONTENT parent
+                // makes Android measure that child against near-max
+                // available width instead of its actual content, which
+                // is exactly what blew the whole menu out wide. Plain
+                // WRAP_CONTENT sizes it to just the name/subtitle text,
+                // same width the menu had before this section existed.
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
                     marginStart = dp(14)
                     gravity = android.view.Gravity.CENTER_VERTICAL
                 }
