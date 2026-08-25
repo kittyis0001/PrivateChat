@@ -759,10 +759,25 @@ adapter.submitList(messages.toMutableList()) {
                 addView(avatarFrame)
                 addView(nameColumn)
             })
-            menu.addView(View(this).apply {
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1))
+            val divider = View(this).apply {
+                // Starts at 0dp width on purpose: unlike MATCH_PARENT
+                // (which caused the exact width bug just fixed for
+                // nameColumn — a child asking for more space than its
+                // WRAP_CONTENT parent has forces that parent to expand
+                // toward the screen width during measurement), a 0dp
+                // child contributes nothing to menu's own width
+                // calculation. Once menu has settled to its real,
+                // content-driven width (from the existing text rows),
+                // doOnPreDraw below stretches this one view to match it
+                // — a full-width-looking line without ever influencing
+                // how wide the menu itself measures as.
+                layoutParams = LinearLayout.LayoutParams(0, dp(1))
                 setBackgroundColor(resources.getColor(com.privatechat.app.R.color.popupBorder, theme))
-            })
+            }
+            menu.addView(divider)
+            menu.doOnPreDraw {
+                divider.layoutParams = divider.layoutParams.apply { width = menu.width }
+            }
         }
 
         val muted = Session.isMuted()
