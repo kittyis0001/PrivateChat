@@ -28,8 +28,8 @@ android {
         // this feature, was never touched). Create both at
         // https://cloudinary.com/console/settings/upload — an unsigned
         // preset under Upload presets — then replace these two values.
-        buildConfigField("String", "CLOUDINARY_CLOUD_NAME", "\"REPLACE-ME\"")
-        buildConfigField("String", "CLOUDINARY_UPLOAD_PRESET", "\"REPLACE-ME\"")
+        buildConfigField("String", "CLOUDINARY_CLOUD_NAME", "\"dlnomi3ny\"")
+        buildConfigField("String", "CLOUDINARY_UPLOAD_PRESET", "\"privatechat_upload\"")
         applicationId = "com.privatechat.app"
         minSdk = 24
         targetSdk = 34
