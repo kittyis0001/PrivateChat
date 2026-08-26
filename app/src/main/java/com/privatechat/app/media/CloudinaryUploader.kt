@@ -38,14 +38,7 @@ object CloudinaryUploader {
 
     class UploadException(message: String) : Exception(message)
 
-    /**
-     * Copies the picked image into the app's cache (content:// Uris
-     * from the photo picker aren't directly readable as a File by
-     * OkHttp's multipart body), uploads it, and returns Cloudinary's
-     * secure_url. Runs entirely on Dispatchers.IO — call from a
-     * coroutine.
-     */
-    suspend fun uploadImage(context: Context, imageUri: Uri): String = withContext(Dispatchers.IO) {
+    private fun requireConfigured(): Pair<String, String> {
         val cloudName = BuildConfig.CLOUDINARY_CLOUD_NAME
         val uploadPreset = BuildConfig.CLOUDINARY_UPLOAD_PRESET
         if (cloudName == "REPLACE-ME" || uploadPreset == "REPLACE-ME") {
@@ -54,6 +47,30 @@ object CloudinaryUploader {
                     "CLOUDINARY_UPLOAD_PRESET in app/build.gradle.kts."
             )
         }
+        return cloudName to uploadPreset
+    }
+
+    private fun secureUrlFrom(response: okhttp3.Response): String {
+        val bodyString = response.body?.string().orEmpty()
+        if (!response.isSuccessful) {
+            throw UploadException("Cloudinary upload failed (${response.code}): $bodyString")
+        }
+        val secureUrl = JSONObject(bodyString).optString("secure_url", "")
+        if (secureUrl.isEmpty()) {
+            throw UploadException("Cloudinary response had no secure_url.")
+        }
+        return secureUrl
+    }
+
+    /**
+     * Copies the picked image into the app's cache (content:// Uris
+     * from the photo picker aren't directly readable as a File by
+     * OkHttp's multipart body), uploads it, and returns Cloudinary's
+     * secure_url. Runs entirely on Dispatchers.IO — call from a
+     * coroutine.
+     */
+    suspend fun uploadImage(context: Context, imageUri: Uri): String = withContext(Dispatchers.IO) {
+        val (cloudName, uploadPreset) = requireConfigured()
 
         val tempFile = File.createTempFile("dp_upload_", ".jpg", context.cacheDir)
         try {
@@ -76,19 +93,40 @@ object CloudinaryUploader {
                 .post(requestBody)
                 .build()
 
-            client.newCall(request).execute().use { response ->
-                val bodyString = response.body?.string().orEmpty()
-                if (!response.isSuccessful) {
-                    throw UploadException("Cloudinary upload failed (${response.code}): $bodyString")
-                }
-                val secureUrl = JSONObject(bodyString).optString("secure_url", "")
-                if (secureUrl.isEmpty()) {
-                    throw UploadException("Cloudinary response had no secure_url.")
-                }
-                secureUrl
-            }
+            client.newCall(request).execute().use { response -> secureUrlFrom(response) }
         } finally {
             tempFile.delete()
         }
+    }
+
+    /**
+     * Uploads a recorded voice message. Cloudinary treats audio as
+     * part of its "video" resource type (audio files use the same
+     * pipeline as video without a visual track — this is Cloudinary's
+     * own convention, not something specific to this app), so this
+     * hits the /video/upload endpoint rather than /image/upload,
+     * reusing the same unsigned preset. Uploads directly from the
+     * local recording file — MediaRecorder already writes a real File,
+     * so no content-resolver copy is needed here unlike uploadImage.
+     */
+    suspend fun uploadAudio(audioFile: File): String = withContext(Dispatchers.IO) {
+        val (cloudName, uploadPreset) = requireConfigured()
+
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("upload_preset", uploadPreset)
+            .addFormDataPart(
+                "file",
+                audioFile.name,
+                audioFile.asRequestBody("audio/mp4".toMediaTypeOrNull())
+            )
+            .build()
+
+        val request = Request.Builder()
+            .url("https://api.cloudinary.com/v1_1/$cloudName/video/upload")
+            .post(requestBody)
+            .build()
+
+        client.newCall(request).execute().use { response -> secureUrlFrom(response) }
     }
 }

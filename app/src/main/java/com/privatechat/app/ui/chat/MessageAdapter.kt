@@ -21,6 +21,7 @@ import com.privatechat.app.databinding.ItemMessageIncomingBinding
 import com.privatechat.app.databinding.ItemMessageOutgoingBinding
 import com.privatechat.app.databinding.ItemMessageSystemBinding
 import com.privatechat.app.utils.PresenceFormatter
+import com.privatechat.app.voice.VoicePlaybackController
 import kotlin.math.abs
 
 class MessageAdapter(private val currentUser: String) :
@@ -44,6 +45,40 @@ class MessageAdapter(private val currentUser: String) :
                 notifyDataSetChanged()
             }
         }
+
+    // Cached durations (Cloudinary URL -> ms) so scrolling past an
+    // already-measured voice bubble doesn't re-fetch its metadata.
+    private val voiceDurationCache = mutableMapOf<String, Int>()
+
+    // Whichever bound row currently shows a given voice URL — looked
+    // up by VoicePlaybackController's single shared state callback
+    // (registered once below, not per-bind) so live progress reaches
+    // whichever row currently owns that URL, without every bind()
+    // overwriting a single global listener and losing already-playing
+    // rows' updates.
+    private data class VoiceViews(
+        val playButton: android.widget.ImageButton,
+        val seekBar: android.widget.SeekBar,
+        val durationText: android.widget.TextView
+    )
+    private val voiceViewsByUrl = mutableMapOf<String, VoiceViews>()
+
+    // Called from ChatActivity's single VoicePlaybackController listener
+    // (registered there, not here — see the comment on that listener
+    // for why only one place should own that callback slot) so a
+    // playing bubble's play/pause icon, progress, and duration update
+    // live without the adapter needing its own separate registration.
+    fun updateVoicePlaybackState(source: String?, isPlaying: Boolean, positionMs: Int, durationMs: Int) {
+        val views = source?.let { voiceViewsByUrl[it] } ?: return
+        views.playButton.setImageResource(
+            if (isPlaying) com.privatechat.app.R.drawable.ic_pause
+            else com.privatechat.app.R.drawable.ic_play_arrow
+        )
+        if (durationMs > 0) views.seekBar.max = durationMs
+        views.seekBar.progress = positionMs
+        val shownMs = if (isPlaying || positionMs > 0) positionMs else (voiceDurationCache[source] ?: durationMs)
+        views.durationText.text = formatVoiceDuration(shownMs)
+    }
 
     override fun getItemViewType(position: Int): Int {
         val message = getItem(position)
@@ -219,6 +254,81 @@ class MessageAdapter(private val currentUser: String) :
         }
     }
 
+    private fun formatVoiceDuration(ms: Int): String {
+        val totalSeconds = (ms / 1000).coerceAtLeast(0)
+        return String.format("%d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
+
+    // Shows the play/seekbar/duration row instead of the plain text
+    // row for a voice message, and hides it (restoring the normal text
+    // row) for everything else — deleted voice messages still fall
+    // back to the ordinary "This message was unsent" text via
+    // displayText(), never the player.
+    private fun bindVoiceMessage(
+        message: Message,
+        voiceRow: View,
+        playButton: android.widget.ImageButton,
+        seekBar: android.widget.SeekBar,
+        durationText: android.widget.TextView,
+        messageTextView: android.widget.TextView
+    ) {
+        if (!message.isVoice() || message.deleted) {
+            voiceRow.visibility = View.GONE
+            messageTextView.visibility = View.VISIBLE
+            return
+        }
+        messageTextView.visibility = View.GONE
+        voiceRow.visibility = View.VISIBLE
+
+        val url = message.voiceUrl()
+        voiceViewsByUrl[url] = VoiceViews(playButton, seekBar, durationText)
+
+        val isPlayingNow = VoicePlaybackController.isPlaying(url)
+        playButton.setImageResource(
+            if (isPlayingNow) com.privatechat.app.R.drawable.ic_pause
+            else com.privatechat.app.R.drawable.ic_play_arrow
+        )
+        seekBar.isEnabled = false // progress indicator only — scrubbing not supported
+
+        val cachedDuration = voiceDurationCache[url]
+        if (cachedDuration != null) {
+            seekBar.max = cachedDuration.coerceAtLeast(1)
+            if (!isPlayingNow) durationText.text = formatVoiceDuration(cachedDuration)
+        } else {
+            durationText.text = "0:00"
+            seekBar.max = 100
+            // One-shot, off the main thread — small and cheap, but a
+            // real network read, so it's cached per-URL above rather
+            // than repeated on every re-bind/scroll.
+            Thread {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(url, HashMap())
+                    val durationMs = retriever
+                        .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        ?.toIntOrNull() ?: 0
+                    retriever.release()
+                    voiceDurationCache[url] = durationMs
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        if (voiceViewsByUrl[url]?.durationText === durationText) {
+                            seekBar.max = durationMs.coerceAtLeast(1)
+                            if (!VoicePlaybackController.isPlaying(url)) {
+                                durationText.text = formatVoiceDuration(durationMs)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Bad network / corrupted file — leave the 0:00
+                    // placeholder rather than crash the bind.
+                }
+            }.start()
+        }
+
+        playButton.setOnClickListener {
+            VoicePlaybackController.togglePlayback(url)
+        }
+    }
+
     inner class OutgoingHolder(private val binding: ItemMessageOutgoingBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(message: Message) {
@@ -228,6 +338,14 @@ class MessageAdapter(private val currentUser: String) :
             binding.messageTick.text = if (message.seen) "✔✔" else "✔"
             bindReplyPreview(message, binding.replyPreview, binding.replyPreviewSender, binding.replyPreviewText)
             bindReactionsBadge(message, binding.reactionsBadge)
+            bindVoiceMessage(
+                message,
+                binding.voiceMessageRow,
+                binding.voicePlayButton,
+                binding.voiceSeekBar,
+                binding.voiceDuration,
+                binding.messageText
+            )
             capBubbleWidth(binding.bubbleContainer)
             binding.bubbleContainer.translationX = 0f
             binding.swipeReplyIcon.alpha = 0f
@@ -243,6 +361,14 @@ class MessageAdapter(private val currentUser: String) :
                 if (message.edited) " (edited)" else ""
             bindReplyPreview(message, binding.replyPreview, binding.replyPreviewSender, binding.replyPreviewText)
             bindReactionsBadge(message, binding.reactionsBadge)
+            bindVoiceMessage(
+                message,
+                binding.voiceMessageRow,
+                binding.voicePlayButton,
+                binding.voiceSeekBar,
+                binding.voiceDuration,
+                binding.messageText
+            )
             capBubbleWidth(binding.bubbleContainer)
             binding.bubbleContainer.translationX = 0f
             binding.swipeReplyIcon.alpha = 0f

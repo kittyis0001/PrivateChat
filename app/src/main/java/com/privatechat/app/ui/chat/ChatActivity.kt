@@ -26,6 +26,7 @@ import com.privatechat.app.data.model.Message
 import com.privatechat.app.data.repository.ChatRepository
 import com.privatechat.app.databinding.ActivityChatBinding
 import com.privatechat.app.media.CloudinaryUploader
+import com.privatechat.app.voice.VoicePlaybackController
 import com.privatechat.app.notification.NotificationRepository
 import com.privatechat.app.ui.photo.PhotoViewerActivity
 import com.privatechat.app.utils.NotificationAvatarFactory
@@ -100,6 +101,22 @@ class ChatActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) uploadAndSavePhoto(uri)
         }
+
+    // Voice messages — mic permission requested the same way gallery
+    // permission is above.
+    private val micPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) beginVoiceRecording()
+        }
+    private var voiceRecorder: com.privatechat.app.voice.VoiceRecorder? = null
+    private var recordingStartTimeMs = 0L
+    private var recordingTimerHandler: Handler? = null
+    private var recordingTimerRunnable: Runnable? = null
+    // The recorded-but-not-yet-sent file currently shown in
+    // voicePreviewBar, if any. Its absolute path doubles as the
+    // "source" VoicePlaybackController uses to identify this specific
+    // local preview versus any bubble's remote URL.
+    private var voicePreviewFile: java.io.File? = null
 
     // The one dialog/bottom-sheet that can be open at a time (edit message
     // / emoji picker) — the reaction bar and action menu are separate
@@ -351,7 +368,14 @@ adapter.submitList(messages.toMutableList()) {
 
         binding.sendButton.setOnClickListener {
             val text = binding.messageInput.text?.toString()?.trim().orEmpty()
-            if (text.isEmpty()) return@setOnClickListener
+            if (text.isEmpty()) {
+                // Mic mode (see updateSendButtonIcon) — while actively
+                // editing an existing message, this button always shows
+                // Send instead, so empty+editing still means "nothing
+                // to do", same as before this feature existed.
+                if (editingMessage == null) requestVoiceRecording()
+                return@setOnClickListener
+            }
             if (isBlockedByOther) {
                 // The other user has blocked this one — this is the
                 // actual fix: previously nothing checked this, so a
@@ -401,6 +425,45 @@ adapter.submitList(messages.toMutableList()) {
             }
         }
 
+        // WhatsApp-style recording bar: cancel discards, the checkmark
+        // stops and moves to the preview bar below.
+        binding.voiceRecordingCancel.setOnClickListener { cancelVoiceRecording() }
+        binding.voiceRecordingStop.setOnClickListener { finishVoiceRecording() }
+
+        // Preview bar: delete discards and returns to the normal
+        // compose bar (re-record), play/pause previews the exact file
+        // that would be sent, send uploads it.
+        binding.voicePreviewDelete.setOnClickListener { discardVoicePreview() }
+        binding.voicePreviewPlayPause.setOnClickListener {
+            voicePreviewFile?.let { VoicePlaybackController.togglePlayback(it.absolutePath) }
+        }
+        binding.voicePreviewSend.setOnClickListener { sendVoicePreview() }
+
+        // Single owner of this callback slot — see MessageAdapter.
+        // updateVoicePlaybackState's own comment for why bubbles don't
+        // register their own listener here too. Reassigned fresh every
+        // onCreate, which correctly replaces a previous (now-destroyed)
+        // Activity instance's stale callback on recreate (e.g. the
+        // dark-theme toggle), the same pattern every repository.onX
+        // callback in this file already relies on.
+        VoicePlaybackController.onStateChanged = { source, isPlaying, positionMs, durationMs ->
+            runOnUiThread {
+                adapter.updateVoicePlaybackState(source, isPlaying, positionMs, durationMs)
+                val previewPath = voicePreviewFile?.absolutePath
+                if (source != null && source == previewPath) {
+                    binding.voicePreviewPlayPause.setImageResource(
+                        if (isPlaying) com.privatechat.app.R.drawable.ic_pause
+                        else com.privatechat.app.R.drawable.ic_play_arrow
+                    )
+                    if (durationMs > 0) binding.voicePreviewSeekBar.max = durationMs
+                    binding.voicePreviewSeekBar.progress = positionMs
+                    binding.voicePreviewTimer.text = formatVoiceTime(
+                        if (isPlaying || positionMs > 0) positionMs else durationMs
+                    )
+                }
+            }
+        }
+
         binding.replyPreviewCancel.setOnClickListener {
             if (editingMessage != null) exitEditMode() else exitReplyMode()
         }
@@ -409,6 +472,7 @@ adapter.submitList(messages.toMutableList()) {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) {
+                updateSendButtonIcon()
                 typingRunnable?.let { typingHandler?.removeCallbacks(it) }
                 if (s.isNullOrBlank()) {
                     // Field is empty — backspaced clear, or just sent a
@@ -552,6 +616,172 @@ adapter.submitList(messages.toMutableList()) {
                     e.message ?: "Photo upload failed",
                     android.widget.Toast.LENGTH_LONG
                 ).show()
+            }
+        }
+    }
+
+    // ── Voice messages ───────────────────────────────────────────
+
+    // Mic when the input is empty, Send once there's text — "কোনো word
+    // type করলে send button, instant change হয়". While editing an
+    // existing message, always Send (see the sendButton click
+    // listener's early-return comment for why).
+    private fun updateSendButtonIcon() {
+        val hasText = binding.messageInput.text?.toString()?.trim().orEmpty().isNotEmpty()
+        binding.sendButton.setImageResource(
+            if (hasText || editingMessage != null) com.privatechat.app.R.drawable.ic_send
+            else com.privatechat.app.R.drawable.ic_mic
+        )
+    }
+
+    private fun formatVoiceTime(ms: Int): String {
+        val totalSeconds = (ms / 1000).coerceAtLeast(0)
+        return String.format("%d:%02d", totalSeconds / 60, totalSeconds % 60)
+    }
+
+    private fun requestVoiceRecording() {
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            beginVoiceRecording()
+        } else {
+            micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun beginVoiceRecording() {
+        val recorder = com.privatechat.app.voice.VoiceRecorder(applicationContext)
+        if (!recorder.start()) {
+            android.widget.Toast.makeText(this, "Couldn't start recording", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        voiceRecorder = recorder
+        binding.composeBar.visibility = android.view.View.GONE
+        binding.voiceRecordingBar.visibility = android.view.View.VISIBLE
+        recordingStartTimeMs = System.currentTimeMillis()
+        startRecordingTimer()
+    }
+
+    private fun cancelVoiceRecording() {
+        stopRecordingTimer()
+        voiceRecorder?.cancel()
+        voiceRecorder = null
+        binding.voiceRecordingBar.visibility = android.view.View.GONE
+        binding.composeBar.visibility = android.view.View.VISIBLE
+    }
+
+    private fun finishVoiceRecording() {
+        stopRecordingTimer()
+        val recorder = voiceRecorder ?: return
+        val stopped = recorder.stop()
+        val file = recorder.outputFile
+        voiceRecorder = null
+        binding.voiceRecordingBar.visibility = android.view.View.GONE
+        if (!stopped || file == null || !file.exists() || file.length() == 0L) {
+            android.widget.Toast.makeText(this, "Recording too short", android.widget.Toast.LENGTH_SHORT).show()
+            binding.composeBar.visibility = android.view.View.VISIBLE
+            return
+        }
+        showVoicePreview(file)
+    }
+
+    private fun startRecordingTimer() {
+        stopRecordingTimer()
+        val handler = Handler(Looper.getMainLooper())
+        recordingTimerHandler = handler
+        val runnable = object : Runnable {
+            override fun run() {
+                val elapsedMs = (System.currentTimeMillis() - recordingStartTimeMs).toInt()
+                binding.voiceRecordingTimer.text = formatVoiceTime(elapsedMs)
+                handler.postDelayed(this, 500)
+            }
+        }
+        recordingTimerRunnable = runnable
+        handler.post(runnable)
+    }
+
+    private fun stopRecordingTimer() {
+        recordingTimerRunnable?.let { recordingTimerHandler?.removeCallbacks(it) }
+        recordingTimerRunnable = null
+    }
+
+    // "Voice message send করার আগে pause, resume থাকবে এবং শোনা যাবে,
+    // delete থাকবে আবার record করার জন্য" — this is that preview state.
+    private fun showVoicePreview(file: java.io.File) {
+        voicePreviewFile = file
+        binding.voicePreviewBar.visibility = android.view.View.VISIBLE
+        binding.voicePreviewPlayPause.setImageResource(com.privatechat.app.R.drawable.ic_play_arrow)
+        binding.voicePreviewSeekBar.progress = 0
+
+        try {
+            val retriever = android.media.MediaMetadataRetriever()
+            retriever.setDataSource(file.absolutePath)
+            val durationMs = retriever
+                .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toIntOrNull() ?: 0
+            retriever.release()
+            binding.voicePreviewSeekBar.max = durationMs.coerceAtLeast(1)
+            binding.voicePreviewTimer.text = formatVoiceTime(durationMs)
+        } catch (e: Exception) {
+            binding.voicePreviewSeekBar.max = 100
+            binding.voicePreviewTimer.text = "0:00"
+        }
+    }
+
+    private fun discardVoicePreview() {
+        val file = voicePreviewFile
+        if (file != null) {
+            VoicePlaybackController.stopIfSource(file.absolutePath)
+            file.delete()
+        }
+        voicePreviewFile = null
+        binding.voicePreviewBar.visibility = android.view.View.GONE
+        binding.composeBar.visibility = android.view.View.VISIBLE
+    }
+
+    // "Cloudinary use করবে voice message এর জন্য" — CloudinaryUploader.
+    // uploadAudio() (video/upload endpoint — Cloudinary's own
+    // convention for audio, see that function's comment), then the
+    // exact same __voice__ prefix Message.kt/MessageAdapter already
+    // recognized before this feature existed.
+    private fun sendVoicePreview() {
+        val file = voicePreviewFile ?: return
+        if (isBlockedByOther) {
+            android.widget.Toast.makeText(
+                this, "You can't send messages to this user", android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val currentUser = Session.currentUser() ?: return
+        val otherUser = Session.otherUser() ?: return
+        VoicePlaybackController.stopIfSource(file.absolutePath)
+        voicePreviewFile = null
+        binding.voicePreviewBar.visibility = android.view.View.GONE
+        binding.composeBar.visibility = android.view.View.VISIBLE
+
+        lifecycleScope.launch {
+            try {
+                val url = CloudinaryUploader.uploadAudio(file)
+                repository.sendMessage(
+                    "__voice__$url",
+                    onSent = {
+                        notificationRepository.notifyNewMessage(
+                            senderId = currentUser,
+                            receiverId = otherUser,
+                            senderName = Nicknames.resolve(currentUser, nicknames),
+                            preview = "🎤 Voice message"
+                        )
+                    }
+                )
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(
+                    this@ChatActivity,
+                    e.message ?: "Voice message failed to send",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                file.delete()
             }
         }
     }
@@ -1267,6 +1497,9 @@ adapter.submitList(messages.toMutableList()) {
     override fun onDestroy() {
         super.onDestroy()
         activeDialog?.dismiss()
+        stopRecordingTimer()
+        voiceRecorder?.cancel()
+        VoicePlaybackController.stop()
         repository.detachAll()
     }
 }
