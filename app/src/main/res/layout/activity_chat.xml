@@ -161,6 +161,112 @@
             android:contentDescription="Send" />
     </LinearLayout>
 
+    <!-- WhatsApp-style active recording row: cancel (trash), a
+         pulsing red dot + live timer, and a checkmark to stop and
+         move to the preview row below. Swaps in for composeBar. -->
+    <LinearLayout
+        android:id="@+id/voiceRecordingBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:padding="8dp"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/voiceRecordingCancel"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_trash_voice"
+            android:contentDescription="Cancel recording" />
+
+        <View
+            android:id="@+id/voiceRecordingDot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_recording_dot" />
+
+        <TextView
+            android:id="@+id/voiceRecordingTimer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:textColor="@color/textPrimary"
+            android:textSize="15sp"
+            android:text="0:00" />
+
+        <ImageButton
+            android:id="@+id/voiceRecordingStop"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_send_button"
+            android:src="@drawable/ic_check_voice"
+            android:contentDescription="Stop recording" />
+    </LinearLayout>
+
+    <!-- Post-recording preview: delete (re-record), play/pause the
+         local recording, a progress bar + timer, and send. Swaps in
+         for voiceRecordingBar once recording is stopped. -->
+    <LinearLayout
+        android:id="@+id/voicePreviewBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:padding="8dp"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/voicePreviewDelete"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_trash_voice"
+            android:contentDescription="Delete recording" />
+
+        <ImageButton
+            android:id="@+id/voicePreviewPlayPause"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_voice_play_button"
+            android:src="@drawable/ic_play_arrow"
+            android:contentDescription="Play" />
+
+        <SeekBar
+            android:id="@+id/voicePreviewSeekBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="8dp"
+            android:maxHeight="3dp"
+            android:progressTint="@color/primary"
+            android:thumbTint="@color/primary" />
+
+        <TextView
+            android:id="@+id/voicePreviewTimer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/textSecondary"
+            android:textSize="12sp"
+            android:text="0:00" />
+
+        <ImageButton
+            android:id="@+id/voicePreviewSend"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_send_button"
+            android:src="@drawable/ic_send"
+            android:contentDescription="Send voice message" />
+    </LinearLayout>
+
     <LinearLayout
         android:id="@+id/blockedBanner"
         android:layout_width="match_parent"
