@@ -112,11 +112,20 @@ class ChatActivity : AppCompatActivity() {
     private var recordingStartTimeMs = 0L
     private var recordingTimerHandler: Handler? = null
     private var recordingTimerRunnable: Runnable? = null
+    // Live amplitude samples (0f..1f, normalized) captured while
+    // recording via VoiceRecorder.currentAmplitude() — this device's
+    // own real waveform data for the clip it's actively recording,
+    // reused as-is for the preview row once recording stops (same
+    // clip, same samples). Never sent anywhere — see WaveformUtils'
+    // doc comment for why a received/replayed bubble instead shows a
+    // stable pattern rather than this real data.
+    private val recordingAmplitudes = mutableListOf<Float>()
     // The recorded-but-not-yet-sent file currently shown in
     // voicePreviewBar, if any. Its absolute path doubles as the
     // "source" VoicePlaybackController uses to identify this specific
     // local preview versus any bubble's remote URL.
     private var voicePreviewFile: java.io.File? = null
+    private var voicePreviewDurationMs: Int = 0
 
     // The one dialog/bottom-sheet that can be open at a time (edit message
     // / emoji picker) — the reaction bar and action menu are separate
@@ -144,6 +153,11 @@ class ChatActivity : AppCompatActivity() {
         // either one opens the app, which this interval keeps prompt
         // for whoever currently has it open.
         private const val VANISH_CHECK_INTERVAL_MS = 60_000L
+
+        // How often the recording timer/waveform tick — a real
+        // amplitude sample is captured on each tick, so this doubles
+        // as the waveform's time resolution while recording.
+        private const val RECORDING_TICK_MS = 200L
 
         // Read by ChatFirebaseMessagingService to suppress showing a
         // system notification while this chat is already on screen —
@@ -451,14 +465,12 @@ adapter.submitList(messages.toMutableList()) {
                 adapter.updateVoicePlaybackState(source, isPlaying, positionMs, durationMs)
                 val previewPath = voicePreviewFile?.absolutePath
                 if (source != null && source == previewPath) {
-                    binding.voicePreviewPlayPause.setImageResource(
-                        if (isPlaying) com.privatechat.app.R.drawable.ic_pause
-                        else com.privatechat.app.R.drawable.ic_play_arrow
-                    )
-                    if (durationMs > 0) binding.voicePreviewSeekBar.max = durationMs
-                    binding.voicePreviewSeekBar.progress = positionMs
+                    updateVoicePreviewPill(isPlaying)
+                    val effectiveDuration = if (durationMs > 0) durationMs else voicePreviewDurationMs
+                    binding.voicePreviewWaveform.progress =
+                        if (effectiveDuration > 0) positionMs.toFloat() / effectiveDuration else 0f
                     binding.voicePreviewTimer.text = formatVoiceTime(
-                        if (isPlaying || positionMs > 0) positionMs else durationMs
+                        if (isPlaying || positionMs > 0) positionMs else effectiveDuration
                     )
                 }
             }
@@ -657,6 +669,8 @@ adapter.submitList(messages.toMutableList()) {
             return
         }
         voiceRecorder = recorder
+        recordingAmplitudes.clear()
+        binding.voiceRecordingWaveform.amplitudes = emptyList()
         binding.composeBar.visibility = android.view.View.GONE
         binding.voiceRecordingBar.visibility = android.view.View.VISIBLE
         recordingStartTimeMs = System.currentTimeMillis()
@@ -667,6 +681,7 @@ adapter.submitList(messages.toMutableList()) {
         stopRecordingTimer()
         voiceRecorder?.cancel()
         voiceRecorder = null
+        recordingAmplitudes.clear()
         binding.voiceRecordingBar.visibility = android.view.View.GONE
         binding.composeBar.visibility = android.view.View.VISIBLE
     }
@@ -680,12 +695,19 @@ adapter.submitList(messages.toMutableList()) {
         binding.voiceRecordingBar.visibility = android.view.View.GONE
         if (!stopped || file == null || !file.exists() || file.length() == 0L) {
             android.widget.Toast.makeText(this, "Recording too short", android.widget.Toast.LENGTH_SHORT).show()
+            recordingAmplitudes.clear()
             binding.composeBar.visibility = android.view.View.VISIBLE
             return
         }
         showVoicePreview(file)
     }
 
+    // Ticks the recording timer AND samples live amplitude on the same
+    // 200ms beat — one Handler loop instead of two, since both need to
+    // run at roughly the same cadence for the rest of this recording's
+    // life anyway. "Show a live waveform while recording": each tick
+    // appends one real sample from VoiceRecorder.currentAmplitude(),
+    // normalized against MediaRecorder's raw 0..32767 scale.
     private fun startRecordingTimer() {
         stopRecordingTimer()
         val handler = Handler(Looper.getMainLooper())
@@ -694,7 +716,14 @@ adapter.submitList(messages.toMutableList()) {
             override fun run() {
                 val elapsedMs = (System.currentTimeMillis() - recordingStartTimeMs).toInt()
                 binding.voiceRecordingTimer.text = formatVoiceTime(elapsedMs)
-                handler.postDelayed(this, 500)
+
+                val amplitude = voiceRecorder?.currentAmplitude()
+                if (amplitude != null) {
+                    recordingAmplitudes.add((amplitude / 32767f).coerceIn(0f, 1f))
+                    binding.voiceRecordingWaveform.amplitudes = recordingAmplitudes.toList()
+                }
+
+                handler.postDelayed(this, RECORDING_TICK_MS)
             }
         }
         recordingTimerRunnable = runnable
@@ -708,11 +737,14 @@ adapter.submitList(messages.toMutableList()) {
 
     // "Voice message send করার আগে pause, resume থাকবে এবং শোনা যাবে,
     // delete থাকবে আবার record করার জন্য" — this is that preview state.
+    // Reuses recordingAmplitudes as-is: same clip, same real samples
+    // already captured while it was being recorded.
     private fun showVoicePreview(file: java.io.File) {
         voicePreviewFile = file
         binding.voicePreviewBar.visibility = android.view.View.VISIBLE
-        binding.voicePreviewPlayPause.setImageResource(com.privatechat.app.R.drawable.ic_play_arrow)
-        binding.voicePreviewSeekBar.progress = 0
+        updateVoicePreviewPill(isPlaying = false)
+        binding.voicePreviewWaveform.amplitudes = recordingAmplitudes.toList()
+        binding.voicePreviewWaveform.progress = 0f
 
         try {
             val retriever = android.media.MediaMetadataRetriever()
@@ -721,12 +753,29 @@ adapter.submitList(messages.toMutableList()) {
                 .extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toIntOrNull() ?: 0
             retriever.release()
-            binding.voicePreviewSeekBar.max = durationMs.coerceAtLeast(1)
+            voicePreviewDurationMs = durationMs
             binding.voicePreviewTimer.text = formatVoiceTime(durationMs)
         } catch (e: Exception) {
-            binding.voicePreviewSeekBar.max = 100
+            voicePreviewDurationMs = 0
             binding.voicePreviewTimer.text = "0:00"
         }
+    }
+
+    // Pause/Resume pill: icon + text + accent color swap, matching the
+    // reference screenshots — gray "Pause" while playing, primary-
+    // colored "Resume" while paused.
+    private fun updateVoicePreviewPill(isPlaying: Boolean) {
+        binding.voicePreviewPlayPauseIcon.setImageResource(
+            if (isPlaying) com.privatechat.app.R.drawable.ic_pause
+            else com.privatechat.app.R.drawable.ic_mic
+        )
+        binding.voicePreviewPlayPauseLabel.text = if (isPlaying) "Pause" else "Resume"
+        val pillColor = if (isPlaying) {
+            resources.getColor(com.privatechat.app.R.color.textSecondary, theme)
+        } else {
+            resources.getColor(com.privatechat.app.R.color.primary, theme)
+        }
+        binding.voicePreviewPlayPause.background.setTint(pillColor)
     }
 
     private fun discardVoicePreview() {
@@ -736,6 +785,7 @@ adapter.submitList(messages.toMutableList()) {
             file.delete()
         }
         voicePreviewFile = null
+        recordingAmplitudes.clear()
         binding.voicePreviewBar.visibility = android.view.View.GONE
         binding.composeBar.visibility = android.view.View.VISIBLE
     }
@@ -757,6 +807,7 @@ adapter.submitList(messages.toMutableList()) {
         val otherUser = Session.otherUser() ?: return
         VoicePlaybackController.stopIfSource(file.absolutePath)
         voicePreviewFile = null
+        recordingAmplitudes.clear()
         binding.voicePreviewBar.visibility = android.view.View.GONE
         binding.composeBar.visibility = android.view.View.VISIBLE
 

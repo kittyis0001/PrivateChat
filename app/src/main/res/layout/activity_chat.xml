@@ -189,12 +189,18 @@
             android:layout_marginStart="12dp"
             android:background="@drawable/bg_recording_dot" />
 
+        <com.privatechat.app.voice.WaveformView
+            android:id="@+id/voiceRecordingWaveform"
+            android:layout_width="0dp"
+            android:layout_height="32dp"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp" />
+
         <TextView
             android:id="@+id/voiceRecordingTimer"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="8dp"
             android:textColor="@color/textPrimary"
             android:textSize="15sp"
             android:text="0:00" />
@@ -230,32 +236,54 @@
             android:src="@drawable/ic_trash_voice"
             android:contentDescription="Delete recording" />
 
-        <ImageButton
-            android:id="@+id/voicePreviewPlayPause"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/bg_voice_play_button"
-            android:src="@drawable/ic_play_arrow"
-            android:contentDescription="Play" />
-
-        <SeekBar
-            android:id="@+id/voicePreviewSeekBar"
+        <com.privatechat.app.voice.WaveformView
+            android:id="@+id/voicePreviewWaveform"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="32dp"
             android:layout_weight="1"
-            android:layout_marginHorizontal="8dp"
-            android:maxHeight="3dp"
-            android:progressTint="@color/primary"
-            android:thumbTint="@color/primary" />
+            android:layout_marginStart="8dp" />
 
         <TextView
             android:id="@+id/voicePreviewTimer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:textColor="@color/textSecondary"
             android:textSize="12sp"
             android:text="0:00" />
+
+        <!-- WhatsApp-style Pause/Resume pill: icon + text label,
+             swapped and re-tinted at runtime in ChatActivity depending
+             on whether the preview is currently playing or paused. -->
+        <LinearLayout
+            android:id="@+id/voicePreviewPlayPause"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginStart="8dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:background="@drawable/bg_voice_pause_resume_pill"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:id="@+id/voicePreviewPlayPauseIcon"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_pause"
+                android:contentDescription="Pause" />
+
+            <TextView
+                android:id="@+id/voicePreviewPlayPauseLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:text="Pause" />
+        </LinearLayout>
 
         <ImageButton
             android:id="@+id/voicePreviewSend"

@@ -93,15 +93,12 @@
                 android:src="@drawable/ic_play_arrow"
                 android:contentDescription="Play voice message" />
 
-            <SeekBar
-                android:id="@+id/voiceSeekBar"
+            <com.privatechat.app.voice.WaveformView
+                android:id="@+id/voiceWaveform"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="28dp"
                 android:layout_weight="1"
-                android:layout_marginHorizontal="8dp"
-                android:maxHeight="3dp"
-                android:progressTint="@color/primary"
-                android:thumbTint="@color/primary" />
+                android:layout_marginHorizontal="8dp" />
 
             <TextView
                 android:id="@+id/voiceDuration"
