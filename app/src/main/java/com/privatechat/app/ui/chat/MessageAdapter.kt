@@ -22,6 +22,7 @@ import com.privatechat.app.databinding.ItemMessageOutgoingBinding
 import com.privatechat.app.databinding.ItemMessageSystemBinding
 import com.privatechat.app.utils.PresenceFormatter
 import com.privatechat.app.voice.VoicePlaybackController
+import com.privatechat.app.voice.WaveformUtils
 import kotlin.math.abs
 
 class MessageAdapter(private val currentUser: String) :
@@ -58,7 +59,7 @@ class MessageAdapter(private val currentUser: String) :
     // rows' updates.
     private data class VoiceViews(
         val playButton: android.widget.ImageButton,
-        val seekBar: android.widget.SeekBar,
+        val waveform: com.privatechat.app.voice.WaveformView,
         val durationText: android.widget.TextView
     )
     private val voiceViewsByUrl = mutableMapOf<String, VoiceViews>()
@@ -66,17 +67,18 @@ class MessageAdapter(private val currentUser: String) :
     // Called from ChatActivity's single VoicePlaybackController listener
     // (registered there, not here — see the comment on that listener
     // for why only one place should own that callback slot) so a
-    // playing bubble's play/pause icon, progress, and duration update
-    // live without the adapter needing its own separate registration.
+    // playing bubble's play/pause icon, waveform progress, and
+    // duration update live without the adapter needing its own
+    // separate registration.
     fun updateVoicePlaybackState(source: String?, isPlaying: Boolean, positionMs: Int, durationMs: Int) {
         val views = source?.let { voiceViewsByUrl[it] } ?: return
         views.playButton.setImageResource(
             if (isPlaying) com.privatechat.app.R.drawable.ic_pause
             else com.privatechat.app.R.drawable.ic_play_arrow
         )
-        if (durationMs > 0) views.seekBar.max = durationMs
-        views.seekBar.progress = positionMs
-        val shownMs = if (isPlaying || positionMs > 0) positionMs else (voiceDurationCache[source] ?: durationMs)
+        val effectiveDuration = if (durationMs > 0) durationMs else (voiceDurationCache[source] ?: 0)
+        views.waveform.progress = if (effectiveDuration > 0) positionMs.toFloat() / effectiveDuration else 0f
+        val shownMs = if (isPlaying || positionMs > 0) positionMs else effectiveDuration
         views.durationText.text = formatVoiceDuration(shownMs)
     }
 
@@ -268,7 +270,7 @@ class MessageAdapter(private val currentUser: String) :
         message: Message,
         voiceRow: View,
         playButton: android.widget.ImageButton,
-        seekBar: android.widget.SeekBar,
+        waveform: com.privatechat.app.voice.WaveformView,
         durationText: android.widget.TextView,
         messageTextView: android.widget.TextView
     ) {
@@ -281,22 +283,28 @@ class MessageAdapter(private val currentUser: String) :
         voiceRow.visibility = View.VISIBLE
 
         val url = message.voiceUrl()
-        voiceViewsByUrl[url] = VoiceViews(playButton, seekBar, durationText)
+        voiceViewsByUrl[url] = VoiceViews(playButton, waveform, durationText)
 
         val isPlayingNow = VoicePlaybackController.isPlaying(url)
         playButton.setImageResource(
             if (isPlayingNow) com.privatechat.app.R.drawable.ic_pause
             else com.privatechat.app.R.drawable.ic_play_arrow
         )
-        seekBar.isEnabled = false // progress indicator only — scrubbing not supported
+
+        // The real amplitude curve only exists on the device that
+        // recorded this clip — it was never sent to Firebase (no
+        // schema change for this feature), so playback here uses a
+        // stable pattern seeded by the URL instead: same shape every
+        // time this message is viewed, never a real waveform. See
+        // WaveformUtils' own doc comment for why.
+        waveform.amplitudes = WaveformUtils.pseudoWaveform(url, WAVEFORM_BAR_COUNT)
+        if (!isPlayingNow) waveform.progress = 0f
 
         val cachedDuration = voiceDurationCache[url]
         if (cachedDuration != null) {
-            seekBar.max = cachedDuration.coerceAtLeast(1)
             if (!isPlayingNow) durationText.text = formatVoiceDuration(cachedDuration)
         } else {
             durationText.text = "0:00"
-            seekBar.max = 100
             // One-shot, off the main thread — small and cheap, but a
             // real network read, so it's cached per-URL above rather
             // than repeated on every re-bind/scroll.
@@ -310,11 +318,10 @@ class MessageAdapter(private val currentUser: String) :
                     retriever.release()
                     voiceDurationCache[url] = durationMs
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
-                        if (voiceViewsByUrl[url]?.durationText === durationText) {
-                            seekBar.max = durationMs.coerceAtLeast(1)
-                            if (!VoicePlaybackController.isPlaying(url)) {
-                                durationText.text = formatVoiceDuration(durationMs)
-                            }
+                        if (voiceViewsByUrl[url]?.durationText === durationText &&
+                            !VoicePlaybackController.isPlaying(url)
+                        ) {
+                            durationText.text = formatVoiceDuration(durationMs)
                         }
                     }
                 } catch (e: Exception) {
@@ -342,7 +349,7 @@ class MessageAdapter(private val currentUser: String) :
                 message,
                 binding.voiceMessageRow,
                 binding.voicePlayButton,
-                binding.voiceSeekBar,
+                binding.voiceWaveform,
                 binding.voiceDuration,
                 binding.messageText
             )
@@ -365,9 +372,15 @@ class MessageAdapter(private val currentUser: String) :
                 message,
                 binding.voiceMessageRow,
                 binding.voicePlayButton,
-                binding.voiceSeekBar,
+                binding.voiceWaveform,
                 binding.voiceDuration,
                 binding.messageText
+            )
+            binding.voiceWaveform.playedColor = itemView.context.resources.getColor(
+                com.privatechat.app.R.color.primary, itemView.context.theme
+            )
+            binding.voiceWaveform.unplayedColor = itemView.context.resources.getColor(
+                com.privatechat.app.R.color.popupBorder, itemView.context.theme
             )
             capBubbleWidth(binding.bubbleContainer)
             binding.bubbleContainer.translationX = 0f
@@ -391,6 +404,7 @@ class MessageAdapter(private val currentUser: String) :
         private const val VIEW_TYPE_INCOMING = 2
         private const val VIEW_TYPE_SYSTEM = 3
         private const val LONG_PRESS_MS = 800L
+        private const val WAVEFORM_BAR_COUNT = 40
 
         // Exposed so ChatActivity can build the same short preview text for
         // the reply bar / popup menu, without duplicating the "deleted /

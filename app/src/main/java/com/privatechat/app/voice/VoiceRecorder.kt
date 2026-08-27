@@ -88,4 +88,16 @@ class VoiceRecorder(private val context: Context) {
         recorder?.release()
         recorder = null
     }
+
+    /**
+     * Current peak amplitude (0..32767 raw MediaRecorder scale) since
+     * the last call — for the live waveform. Returns null while not
+     * actively recording, or if the platform call itself fails
+     * (harmless — the waveform just skips a sample rather than crash).
+     */
+    fun currentAmplitude(): Int? = try {
+        recorder?.maxAmplitude
+    } catch (e: RuntimeException) {
+        null
+    }
 }
