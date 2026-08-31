@@ -21,6 +21,9 @@
         android:maxSdkVersion="32" />
     <!-- Voice messages -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Voice calls — same RECORD_AUDIO above covers the mic;
+         MODIFY_AUDIO_SETTINGS is for the in-call speakerphone toggle. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <application android:name=".App"
         
@@ -50,6 +53,14 @@
             android:name=".ui.photo.PhotoViewerActivity"
             android:exported="false"
             android:theme="@style/Theme.PhotoViewer" />
+
+        <activity
+            android:name=".call.CallActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PhotoViewer"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true" />
 
         <service
             android:name=".messaging.ChatFirebaseMessagingService"
