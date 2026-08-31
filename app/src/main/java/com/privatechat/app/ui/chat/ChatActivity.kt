@@ -39,6 +39,12 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var repository: ChatRepository
     private lateinit var notificationRepository: NotificationRepository
     private lateinit var adapter: MessageAdapter
+    // Voice calls — independent of ChatRepository since a call needs
+    // to ring whenever this device's process is alive, not tied to
+    // whether the chat screen itself is currently open. See
+    // CallSignalingRepository's own comment for why.
+    private var callSignaling: com.privatechat.app.call.CallSignalingRepository? = null
+    private var isLaunchingIncomingCall = false
 
     private val messages = mutableListOf<Message>()
     private var typingHandler: Handler? = null
@@ -214,6 +220,7 @@ class ChatActivity : AppCompatActivity() {
             purgeExpiredMessages()
             restartVanishExpiryChecks()
         }
+        callSignaling?.attachSessionListener()
     }
 
     override fun onStop() {
@@ -271,6 +278,43 @@ class ChatActivity : AppCompatActivity() {
         // every onStart, teardown on every onStop, without manually
         // wiring visibilitychange-equivalent logic per screen.
         lifecycle.addObserver(repository)
+
+        binding.callButton.setOnClickListener {
+            startActivity(
+                android.content.Intent(this, com.privatechat.app.call.CallActivity::class.java).apply {
+                    putExtra(com.privatechat.app.call.CallActivity.EXTRA_REMOTE_USER, otherUser)
+                    putExtra(com.privatechat.app.call.CallActivity.EXTRA_IS_OUTGOING, true)
+                    putExtra(com.privatechat.app.call.CallActivity.EXTRA_REMOTE_PHOTO_URL, photos[otherUser])
+                }
+            )
+        }
+
+        // Rings this device whenever a new call session appears
+        // addressed to this user — see CallSignalingRepository's own
+        // comment for why this is independent of ChatRepository's
+        // Activity-lifecycle-bound listeners (still attached/detached
+        // in onStart/onStop below, just as its own separate pair).
+        callSignaling = com.privatechat.app.call.CallSignalingRepository(currentUser).apply {
+            onSessionChanged = { session ->
+                runOnUiThread {
+                    if (session != null && session.status == "ringing" &&
+                        session.callee == currentUser && !isLaunchingIncomingCall
+                    ) {
+                        isLaunchingIncomingCall = true
+                        startActivity(
+                            android.content.Intent(this@ChatActivity, com.privatechat.app.call.CallActivity::class.java).apply {
+                                putExtra(com.privatechat.app.call.CallActivity.EXTRA_REMOTE_USER, session.caller)
+                                putExtra(com.privatechat.app.call.CallActivity.EXTRA_IS_OUTGOING, false)
+                                putExtra(com.privatechat.app.call.CallActivity.EXTRA_REMOTE_PHOTO_URL, photos[session.caller])
+                            }
+                        )
+                    }
+                    if (session == null || session.status != "ringing") {
+                        isLaunchingIncomingCall = false
+                    }
+                }
+            }
+        }
 
         repository.onMessageAdded = { message ->
             runOnUiThread {
@@ -1721,5 +1765,6 @@ adapter.submitList(messages.toMutableList()) {
         voiceRecorder?.cancel()
         VoicePlaybackController.stop()
         repository.detachAll()
+        callSignaling?.detachAll(null)
     }
 }
