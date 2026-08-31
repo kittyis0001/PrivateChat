@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Square on purpose — the parent bubbleContainer's own rounded
+     background + clipToOutline now does the corner rounding for any
+     edge the media bleeds to (see MessageAdapter.bindMediaMessage),
+     so this placeholder itself doesn't need corners. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="@color/inputFieldBg" />
-    <corners android:radius="10dp" />
 </shape>
