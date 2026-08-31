@@ -12,4 +12,5 @@
     <color name="chatBgGlowStart">#332A1F3D</color>
     <color name="chatBgGlowEnd">#00121016</color>
     <color name="inputFieldBg">#2A2636</color>
+    <color name="menuIconTint">#FFFFFF</color>
 </resources>

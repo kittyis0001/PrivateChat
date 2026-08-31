@@ -1168,11 +1168,21 @@ adapter.submitList(messages.toMutableList()) {
             tag = TAG_OVERLAY_CONTENT
         }
 
-        fun addItem(icon: String, label: String, checked: Boolean = false, textColor: Int? = null, action: () -> Unit) {
-            val row = TextView(this).apply {
-                text = if (checked) "$icon   $label   \u2713" else "$icon   $label"
-                textSize = 15f
-                setTextColor(textColor ?: resources.getColor(com.privatechat.app.R.color.textPrimary, theme))
+        fun addItem(
+            icon: Int?,
+            emojiIcon: String?,
+            label: String,
+            checked: Boolean = false,
+            textColor: Int? = null,
+            action: () -> Unit
+        ) {
+            val resolvedColor = textColor
+                ?: resources.getColor(com.privatechat.app.R.color.textPrimary, theme)
+            val iconColor = textColor
+                ?: resources.getColor(com.privatechat.app.R.color.menuIconTint, theme)
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
                 setPadding(dp(18), dp(13), dp(18), dp(13))
                 isClickable = true
                 val ripple = android.util.TypedValue()
@@ -1183,6 +1193,29 @@ adapter.submitList(messages.toMutableList()) {
                     action()
                 }
             }
+            if (icon != null) {
+                // Instagram-style outline icon — tinted per-theme (or
+                // red, for Delete All Chat) via imageTintList rather
+                // than baked into the vector, same "one drawable, tint
+                // at use site" pattern as the rest of the app's icons.
+                row.addView(ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(20), dp(20))
+                    setImageResource(icon)
+                    imageTintList = android.content.res.ColorStateList.valueOf(iconColor)
+                })
+            } else if (emojiIcon != null) {
+                // Custom Vanish Mode keeps its ghost sticker as-is.
+                row.addView(TextView(this).apply {
+                    text = emojiIcon
+                    textSize = 15f
+                })
+            }
+            row.addView(TextView(this).apply {
+                text = if (checked) "$label   \u2713" else label
+                textSize = 15f
+                setTextColor(resolvedColor)
+                setPadding(dp(10), 0, 0, 0)
+            })
             menu.addView(row)
         }
 
@@ -1288,29 +1321,37 @@ adapter.submitList(messages.toMutableList()) {
         }
 
         val muted = Session.isMuted()
-        addItem("\u270F\uFE0F", "Change Nickname") {
+        addItem(com.privatechat.app.R.drawable.ic_menu_edit, null, "Change Nickname") {
             showChangeNicknameDialog()
         }
-        addItem("\uD83D\uDDBC\uFE0F", "Change DP") {
+        addItem(com.privatechat.app.R.drawable.ic_menu_profile, null, "Change DP") {
             requestChangeDp()
         }
-        addItem(if (muted) "\uD83D\uDD14" else "\uD83D\uDD15", if (muted) "Unmute Notifications" else "Mute Notifications") {
+        addItem(
+            if (muted) com.privatechat.app.R.drawable.ic_menu_bell else com.privatechat.app.R.drawable.ic_menu_bell_off,
+            null,
+            if (muted) "Unmute Notifications" else "Mute Notifications"
+        ) {
             toggleMute()
         }
-        addItem("\uD83C\uDF19", "Dark Theme", checked = Session.isDarkThemeEnabled()) {
+        addItem(com.privatechat.app.R.drawable.ic_menu_moon, null, "Dark Theme", checked = Session.isDarkThemeEnabled()) {
             toggleDarkTheme()
         }
-        addItem("\uD83D\uDDD1\uFE0F", "Delete All Chat", textColor = UNSEND_RED) {
+        addItem(com.privatechat.app.R.drawable.ic_menu_trash, null, "Delete All Chat", textColor = UNSEND_RED) {
             confirmDeleteAllChat()
         }
         val vanishLabel = vanishModeDurationHours?.let { "Vanish Mode (${it}h)" } ?: "Custom Vanish Mode"
-        addItem("\uD83D\uDC7B", vanishLabel, checked = vanishModeDurationHours != null) {
+        addItem(null, "\uD83D\uDC7B", vanishLabel, checked = vanishModeDurationHours != null) {
             showVanishModeDialog()
         }
-        addItem(if (isBlockedByMe) "\u2705" else "\uD83D\uDEAB", if (isBlockedByMe) "Unblock User" else "Block User") {
+        addItem(
+            if (isBlockedByMe) com.privatechat.app.R.drawable.ic_menu_check_circle else com.privatechat.app.R.drawable.ic_menu_block,
+            null,
+            if (isBlockedByMe) "Unblock User" else "Block User"
+        ) {
             repository.setBlocked(!isBlockedByMe)
         }
-        addItem("\uD83D\uDEAA", "Log Out") {
+        addItem(com.privatechat.app.R.drawable.ic_menu_logout, null, "Log Out") {
             confirmLogout()
         }
 
