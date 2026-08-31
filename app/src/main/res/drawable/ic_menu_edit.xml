@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Instagram-style outline icon for "Change Nickname". Tinted at
-     runtime via ImageView.imageTintList (menuIconTint / red for
-     danger rows), same as every other icon in showTopMenu's addItem. -->
+<!-- Instagram-style THIN OUTLINE icon for "Change Nickname" — a
+     stroked, transparent-fill pencil, not a solid Material silhouette.
+     Tinted at runtime via ImageView.imageTintList (menuIconTint /
+     red for danger rows), same as every icon in showTopMenu's addItem. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
     <path
-        android:fillColor="#000000"
-        android:pathData="M3,17.25V21h3.75L17.81,9.94l-3.75,-3.75L3,17.25zM5,19.5v-1.21l9.06,-9.06 1.21,1.21L6.21,19.5H5zM18.37,3.29c-0.39,-0.39 -1.02,-0.39 -1.41,0l-1.83,1.83 3.75,3.75 1.83,-1.83c0.39,-0.39 0.39,-1.02 0,-1.41L18.37,3.29z" />
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#000000"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M13.5,4.5 L19.5,10.5 L8.5,21.5 L3,21.5 L3,16 Z M16,7 L11,12" />
 </vector>
