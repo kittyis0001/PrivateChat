@@ -14,3 +14,10 @@ data class NotifyResponse(
     val reason: String? = null,
     val error: String? = null
 )
+
+// Mirrors backend/routes/notify.js's /notify-call body exactly.
+data class NotifyCallRequest(
+    val callerId: String,
+    val calleeId: String,
+    val callerName: String
+)

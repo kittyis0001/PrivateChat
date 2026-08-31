@@ -49,7 +49,41 @@ class NotificationRepository(private val context: Context) {
         )
     }
 
+    /**
+     * Enqueued right after CallSignalingRepository.startCall() writes
+     * the "ringing" session — this is what lets the call actually ring
+     * the other device while its app is backgrounded or fully killed,
+     * not just while its ChatActivity happens to have a live Firebase
+     * listener attached. A separate unique work name from
+     * notifyNewMessage's so a queued burst of message notifications can
+     * never delay this.
+     */
+    fun notifyIncomingCall(callerId: String, calleeId: String, callerName: String) {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val data = workDataOf(
+            CallNotifyWorker.KEY_CALLER_ID to callerId,
+            CallNotifyWorker.KEY_CALLEE_ID to calleeId,
+            CallNotifyWorker.KEY_CALLER_NAME to callerName
+        )
+
+        val request = OneTimeWorkRequestBuilder<CallNotifyWorker>()
+            .setConstraints(constraints)
+            .setInputData(data)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            UNIQUE_CALL_WORK_NAME,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            request
+        )
+    }
+
     companion object {
         private const val UNIQUE_WORK_NAME = "notify_new_message"
+        private const val UNIQUE_CALL_WORK_NAME = "notify_incoming_call"
     }
 }

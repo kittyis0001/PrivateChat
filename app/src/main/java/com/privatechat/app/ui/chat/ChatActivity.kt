@@ -300,6 +300,16 @@ class ChatActivity : AppCompatActivity() {
                     putExtra(com.privatechat.app.call.CallActivity.EXTRA_REMOTE_PHOTO_URL, photos[otherUser])
                 }
             )
+            // Rings the other device even if its app is backgrounded or
+            // fully killed — see CallSignalingRepository/CallActivity's
+            // own comments. CallActivity itself writes the "ringing"
+            // session to Firebase in parallel; this is purely the
+            // push-notification side of the same call start.
+            notificationRepository.notifyIncomingCall(
+                callerId = currentUser,
+                calleeId = otherUser,
+                callerName = Nicknames.defaultFor(currentUser)
+            )
         }
 
         // Rings this device whenever a new call session appears

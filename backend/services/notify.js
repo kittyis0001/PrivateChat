@@ -51,4 +51,43 @@ async function sendMessageNotification({ senderId, receiverId, senderName, previ
   }
 }
 
-module.exports = { sendMessageNotification };
+/**
+ * Same data-only/high-priority shape as sendMessageNotification, but
+ * with type: "call" so ChatFirebaseMessagingService.onMessageReceived
+ * branches to the full-screen incoming-call notification instead of
+ * the normal message one — this is what lets a call actually ring the
+ * other device while its app is backgrounded or fully killed, instead
+ * of only while ChatActivity's live Firebase listener happens to be
+ * attached (see CallActivity's own comment on this).
+ */
+async function sendCallNotification({ callerId, calleeId, callerName }) {
+  const token = await getFcmToken(calleeId);
+  if (!token) {
+    return { sent: false, reason: "no_token" };
+  }
+
+  const payload = {
+    token,
+    data: {
+      type: "call",
+      callerId,
+      callerName,
+    },
+    android: {
+      priority: "high",
+    },
+  };
+
+  try {
+    await messaging().send(payload);
+    return { sent: true };
+  } catch (err) {
+    if (STALE_TOKEN_CODES.has(err.code)) {
+      await removeStaleToken(calleeId);
+      return { sent: false, reason: "stale_token" };
+    }
+    throw err;
+  }
+}
+
+module.exports = { sendMessageNotification, sendCallNotification };

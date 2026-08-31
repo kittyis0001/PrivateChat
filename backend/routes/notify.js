@@ -1,5 +1,5 @@
 const express = require("express");
-const { sendMessageNotification } = require("../services/notify");
+const { sendMessageNotification, sendCallNotification } = require("../services/notify");
 
 const router = express.Router();
 
@@ -65,6 +65,43 @@ router.post("/notify", async (req, res) => {
     return res.status(200).json({ success: false, reason: result.reason });
   } catch (err) {
     console.error("[notify] failed:", err.message);
+    return res.status(502).json({ error: "notification_failed" });
+  }
+});
+
+router.post("/notify-call", async (req, res) => {
+  const { callerId, calleeId, callerName } = req.body || {};
+
+  console.log(`[notify-call] incoming request: callerId=${callerId} calleeId=${calleeId}`);
+
+  if (!KNOWN_USERS.has(callerId) || !KNOWN_USERS.has(calleeId)) {
+    console.log(`[notify-call] rejected: invalid_user (callerId=${callerId}, calleeId=${calleeId})`);
+    return res.status(400).json({ error: "invalid_user" });
+  }
+  if (callerId === calleeId) {
+    console.log("[notify-call] rejected: caller_equals_callee");
+    return res.status(400).json({ error: "caller_equals_callee" });
+  }
+  if (!isNonEmptyString(callerName, MAX_NAME_LENGTH)) {
+    console.log("[notify-call] rejected: invalid_caller_name");
+    return res.status(400).json({ error: "invalid_caller_name" });
+  }
+
+  try {
+    const result = await sendCallNotification({
+      callerId,
+      calleeId,
+      callerName: callerName.trim(),
+    });
+
+    if (result.sent) {
+      console.log(`[notify-call] sent OK to ${calleeId}`);
+      return res.status(200).json({ success: true });
+    }
+    console.log(`[notify-call] not sent, reason=${result.reason} (calleeId=${calleeId})`);
+    return res.status(200).json({ success: false, reason: result.reason });
+  } catch (err) {
+    console.error("[notify-call] failed:", err.message);
     return res.status(502).json({ error: "notification_failed" });
   }
 });

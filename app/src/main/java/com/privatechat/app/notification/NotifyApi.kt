@@ -11,4 +11,10 @@ interface NotifyApi {
         @Header("X-Api-Secret") apiSecret: String,
         @Body body: NotifyRequest
     ): Response<NotifyResponse>
+
+    @POST("api/notify-call")
+    suspend fun notifyCall(
+        @Header("X-Api-Secret") apiSecret: String,
+        @Body body: NotifyCallRequest
+    ): Response<NotifyResponse>
 }
