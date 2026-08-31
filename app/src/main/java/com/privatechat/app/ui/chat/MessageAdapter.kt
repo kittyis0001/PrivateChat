@@ -343,16 +343,34 @@ class MessageAdapter(private val currentUser: String) :
     // text row visible (as the caption) when the sender attached one.
     // Deleted media messages fall back to the ordinary "unsent" text via
     // displayText(), same as a deleted voice message.
+    //
+    // Also does the "no bubble around the photo" look: bleeds the media
+    // block past whichever of the bubble's own padded edges have
+    // nothing else next to it, so the parent bubbleContainer's own
+    // clipToOutline (see the layout) rounds those bled edges to the
+    // bubble's actual shape instead of leaving a colored padding
+    // border around the image — same technique WhatsApp uses. When
+    // there's no caption, media bleeds to the bottom edge too, so the
+    // normal timeRow has nowhere to sit — a small overlay chip on the
+    // image itself takes over showing the time (+ tick, outgoing only).
     private fun bindMediaMessage(
         message: Message,
         thumbContainer: View,
         imageView: android.widget.ImageView,
         videoPlayIcon: View,
-        messageTextView: android.widget.TextView
+        messageTextView: android.widget.TextView,
+        timeRow: View,
+        timeOverlay: View,
+        overlayTimeView: android.widget.TextView,
+        overlayTickView: android.widget.TextView?,
+        timeText: CharSequence,
+        tickText: CharSequence?
     ) {
         if ((!message.isImage() && !message.isVideo()) || message.deleted) {
             thumbContainer.visibility = View.GONE
             videoPlayIcon.visibility = View.GONE
+            timeOverlay.visibility = View.GONE
+            timeRow.visibility = View.VISIBLE
             return
         }
         thumbContainer.visibility = View.VISIBLE
@@ -365,11 +383,32 @@ class MessageAdapter(private val currentUser: String) :
 
         // Caption row: reuse the normal text row, hidden when there
         // isn't one so the bubble is just the media with no empty gap.
-        if (!message.caption.isNullOrBlank()) {
+        val hasCaption = !message.caption.isNullOrBlank()
+        if (hasCaption) {
             messageTextView.visibility = View.VISIBLE
             messageTextView.text = message.caption
         } else {
             messageTextView.visibility = View.GONE
+        }
+
+        val density = thumbContainer.resources.displayMetrics.density
+        fun px(dp: Int) = (dp * density).toInt()
+        val lp = thumbContainer.layoutParams as android.view.ViewGroup.MarginLayoutParams
+        lp.leftMargin = -px(12)
+        lp.rightMargin = -px(12)
+        lp.topMargin = if (message.hasReply()) 0 else -px(8)
+        lp.bottomMargin = if (hasCaption) px(4) else -px(8)
+        thumbContainer.layoutParams = lp
+
+        if (hasCaption) {
+            timeRow.visibility = View.VISIBLE
+            timeOverlay.visibility = View.GONE
+        } else {
+            timeRow.visibility = View.GONE
+            timeOverlay.visibility = View.VISIBLE
+            overlayTimeView.text = timeText
+            overlayTickView?.visibility = if (tickText != null) View.VISIBLE else View.GONE
+            overlayTickView?.text = tickText
         }
     }
 
@@ -395,7 +434,13 @@ class MessageAdapter(private val currentUser: String) :
                 binding.mediaThumbContainer,
                 binding.mediaImage,
                 binding.videoPlayIcon,
-                binding.messageText
+                binding.messageText,
+                binding.timeRow,
+                binding.mediaTimeOverlay,
+                binding.mediaOverlayTime,
+                binding.mediaOverlayTick,
+                binding.messageTime.text,
+                binding.messageTick.text
             )
             capBubbleWidth(binding.bubbleContainer)
             binding.bubbleContainer.translationX = 0f
@@ -431,7 +476,13 @@ class MessageAdapter(private val currentUser: String) :
                 binding.mediaThumbContainer,
                 binding.mediaImage,
                 binding.videoPlayIcon,
-                binding.messageText
+                binding.messageText,
+                binding.messageTime,
+                binding.mediaTimeOverlay,
+                binding.mediaOverlayTime,
+                null,
+                binding.messageTime.text,
+                null
             )
             capBubbleWidth(binding.bubbleContainer)
             binding.bubbleContainer.translationX = 0f

@@ -248,7 +248,20 @@ class ChatActivity : AppCompatActivity() {
         binding.messagesRecyclerView.adapter = adapter
         binding.messagesRecyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this).apply { stackFromEnd = true }
         adapter.onSwipeReply = { message -> enterReplyMode(message) }
-        adapter.onMessageTap = { message, anchor -> showReactionBar(message, anchor) }
+        // Tapping an image/video bubble opens the full-screen viewer
+        // (pinch-zoom for photos via PhotoViewerActivity, play/pause
+        // for video via VideoViewerActivity) — WhatsApp behavior.
+        // Every other message keeps the existing tap-for-reactions
+        // behavior unchanged.
+        adapter.onMessageTap = { message, anchor ->
+            when {
+                !message.deleted && message.isImage() ->
+                    startActivity(PhotoViewerActivity.newIntent(this, message.mediaUrl()))
+                !message.deleted && message.isVideo() ->
+                    startActivity(com.privatechat.app.ui.media.VideoViewerActivity.newIntent(this, message.mediaUrl()))
+                else -> showReactionBar(message, anchor)
+            }
+        }
         adapter.onMessageLongPress = { message, anchor -> showActionMenu(message, anchor) }
 
         fun otherDisplayName() = Nicknames.resolve(otherUser, nicknames)
