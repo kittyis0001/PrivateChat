@@ -16,6 +16,8 @@
          requested, and so the app still works correctly on devices
          without the modern picker. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Same as above, for the chat camera-icon media picker's video option. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -48,6 +50,17 @@
 
         <activity
             android:name=".ui.photo.PhotoViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PhotoViewer" />
+
+        <activity
+            android:name=".ui.media.MediaPreviewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PhotoViewer"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.media.VideoViewerActivity"
             android:exported="false"
             android:theme="@style/Theme.PhotoViewer" />
 

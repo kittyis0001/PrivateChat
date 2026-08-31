@@ -151,6 +151,20 @@
             android:maxLines="4"
             android:inputType="textMultiLine|textCapSentences" />
 
+        <!-- WhatsApp-style camera icon: visible only while messageInput is
+             empty, hidden the instant typing starts (see
+             ChatActivity.updateCameraButtonVisibility). Tapping opens the
+             image/video picker bottom sheet. -->
+        <ImageButton
+            android:id="@+id/cameraButton"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_camera"
+            android:tint="@color/textSecondary"
+            android:contentDescription="Send photo or video" />
+
         <ImageButton
             android:id="@+id/sendButton"
             android:layout_width="44dp"
