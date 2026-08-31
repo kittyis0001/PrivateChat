@@ -90,6 +90,12 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
+    // Voice calling — signaling goes through the existing Firebase
+    // Realtime Database (an additive calls/ node, no schema change to
+    // anything existing), audio flows peer-to-peer over WebRTC once
+    // connected.
+    implementation("io.github.webrtc-sdk:android:144.7559.09")
+
     // Profile photo loading (circleCrop for avatars, memory-safe
     // caching) and the Instagram-style full-screen viewer.
     implementation("com.github.bumptech.glide:glide:4.16.0")
