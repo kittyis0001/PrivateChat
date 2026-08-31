@@ -29,11 +29,13 @@ import org.webrtc.PeerConnection
  * arbitrary mobile-carrier NAT without a TURN relay — see
  * WebRtcClient's own comment for where to add one once you have it.
  *
- * Also: this app has no background call service or push-triggered
- * ringing (that would need the Render backend, deliberately left
- * untouched again here) — an incoming call rings on the other device
- * only while its process is alive (ChatActivity started at least
- * once since last kill), not after the app has been fully closed.
+ * Incoming calls DO ring even while the app is backgrounded or fully
+ * killed: starting a call also sends a data-only FCM push (see
+ * NotificationRepository.notifyIncomingCall / ChatFirebaseMessagingService
+ * .handleIncomingCallPush), which shows a full-screen incoming-call
+ * notification with Accept/Decline actions and launches this exact
+ * screen on tap — the actual signaling/WebRTC connection below is
+ * unchanged either way, this only affects how the screen gets opened.
  */
 class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
 
@@ -45,6 +47,7 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
     private lateinit var remoteUser: String
     private var isOutgoing = false
     private var remotePhotoUrl: String? = null
+    private var autoAccept = false
 
     private var state = CallState.CONNECTING
     private var isMuted = false
@@ -81,6 +84,7 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         remoteUser = other
         isOutgoing = intent.getBooleanExtra(EXTRA_IS_OUTGOING, false)
         remotePhotoUrl = intent.getStringExtra(EXTRA_REMOTE_PHOTO_URL)
+        autoAccept = intent.getBooleanExtra(EXTRA_AUTO_ACCEPT, false)
 
         signaling = CallSignalingRepository(currentUser)
 
@@ -107,6 +111,14 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
 
         if (!isOutgoing) {
             startRingtone()
+        }
+        // Tapped Accept directly from the incoming-call notification —
+        // skip straight to the accept flow (still goes through the same
+        // mic-permission check userAcceptedCall() always does) instead
+        // of making the user tap Accept a second time once this screen
+        // is on top.
+        if (!isOutgoing && autoAccept) {
+            userAcceptedCall()
         }
 
         checkPermissionAndProceed()
@@ -363,9 +375,28 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         signaling.detachAll(remoteUser)
     }
 
+    override fun onStart() {
+        super.onStart()
+        isForeground = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        isForeground = false
+    }
+
     companion object {
         const val EXTRA_REMOTE_USER = "remote_user"
         const val EXTRA_IS_OUTGOING = "is_outgoing"
         const val EXTRA_REMOTE_PHOTO_URL = "remote_photo_url"
+        const val EXTRA_AUTO_ACCEPT = "auto_accept"
+
+        // Read by ChatFirebaseMessagingService to skip showing a
+        // redundant full-screen incoming-call notification when this
+        // screen is already open and ringing (call arrived while the
+        // app was in the foreground, via the live Firebase listener in
+        // ChatActivity) — same pattern as ChatActivity.isForeground.
+        @Volatile
+        var isForeground = false
     }
 }

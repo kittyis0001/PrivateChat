@@ -33,6 +33,7 @@ class App : Application() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(NotificationManager::class.java)
             val channel = NotificationChannel(
                 getString(R.string.default_notification_channel_id),
                 "Messages",
@@ -41,8 +42,37 @@ class App : Application() {
                 description = "New chat message notifications"
                 enableVibration(true)
             }
-            val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
+
+            // Separate, higher-urgency channel for incoming calls —
+            // IMPORTANCE_HIGH plus a ringtone-category audio attribute
+            // is what makes this actually ring/vibrate continuously
+            // (not just a single notification buzz) and is eligible to
+            // show as a full-screen incoming-call UI, matching how a
+            // real call is expected to interrupt regardless of the
+            // Messages channel's own settings.
+            val callChannel = NotificationChannel(
+                CALL_NOTIFICATION_CHANNEL_ID,
+                "Incoming calls",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Incoming voice call alerts"
+                enableVibration(true)
+                setSound(
+                    android.media.RingtoneManager.getActualDefaultRingtoneUri(
+                        this@App, android.media.RingtoneManager.TYPE_RINGTONE
+                    ),
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+            }
+            manager.createNotificationChannel(callChannel)
         }
+    }
+
+    companion object {
+        const val CALL_NOTIFICATION_CHANNEL_ID = "incoming_calls"
     }
 }
