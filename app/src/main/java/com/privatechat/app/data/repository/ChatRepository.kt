@@ -185,6 +185,10 @@ class ChatRepository(
         replyTo: String? = null,
         replyText: String? = null,
         replySender: String? = null,
+        // Optional caption for image/video messages (see Message.caption's
+        // doc comment) — null for every other message, so ordinary text
+        // sends keep writing the exact same node shape as before.
+        caption: String? = null,
         onSent: (() -> Unit)? = null
     ) {
         val data = mutableMapOf<String, Any>(
@@ -199,6 +203,9 @@ class ChatRepository(
             data["replyTo"] = replyTo
             data["replyText"] = replyText.orEmpty()
             data["replySender"] = replySender.orEmpty()
+        }
+        if (!caption.isNullOrEmpty()) {
+            data["caption"] = caption
         }
         messagesRef.push().setValue(data)
             .addOnSuccessListener { onSent?.invoke() }

@@ -15,11 +15,13 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import android.text.method.LinkMovementMethod
+import com.bumptech.glide.Glide
 import com.privatechat.app.data.Nicknames
 import com.privatechat.app.data.model.Message
 import com.privatechat.app.databinding.ItemMessageIncomingBinding
 import com.privatechat.app.databinding.ItemMessageOutgoingBinding
 import com.privatechat.app.databinding.ItemMessageSystemBinding
+import com.privatechat.app.media.CloudinaryUploader
 import com.privatechat.app.utils.PresenceFormatter
 import com.privatechat.app.voice.VoicePlaybackController
 import com.privatechat.app.voice.WaveformUtils
@@ -336,6 +338,41 @@ class MessageAdapter(private val currentUser: String) :
         }
     }
 
+    // WhatsApp-style image/video bubble. Mirrors bindVoiceMessage's shape:
+    // hides/restores the plain text row, and — unlike voice — leaves the
+    // text row visible (as the caption) when the sender attached one.
+    // Deleted media messages fall back to the ordinary "unsent" text via
+    // displayText(), same as a deleted voice message.
+    private fun bindMediaMessage(
+        message: Message,
+        thumbContainer: View,
+        imageView: android.widget.ImageView,
+        videoPlayIcon: View,
+        messageTextView: android.widget.TextView
+    ) {
+        if ((!message.isImage() && !message.isVideo()) || message.deleted) {
+            thumbContainer.visibility = View.GONE
+            videoPlayIcon.visibility = View.GONE
+            return
+        }
+        thumbContainer.visibility = View.VISIBLE
+        val url = message.mediaUrl()
+        val isVideo = message.isVideo()
+        videoPlayIcon.visibility = if (isVideo) View.VISIBLE else View.GONE
+
+        val thumbUrl = if (isVideo) CloudinaryUploader.videoThumbnailUrl(url) else url
+        Glide.with(imageView).load(thumbUrl).centerCrop().into(imageView)
+
+        // Caption row: reuse the normal text row, hidden when there
+        // isn't one so the bubble is just the media with no empty gap.
+        if (!message.caption.isNullOrBlank()) {
+            messageTextView.visibility = View.VISIBLE
+            messageTextView.text = message.caption
+        } else {
+            messageTextView.visibility = View.GONE
+        }
+    }
+
     inner class OutgoingHolder(private val binding: ItemMessageOutgoingBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(message: Message) {
@@ -351,6 +388,13 @@ class MessageAdapter(private val currentUser: String) :
                 binding.voicePlayButton,
                 binding.voiceWaveform,
                 binding.voiceDuration,
+                binding.messageText
+            )
+            bindMediaMessage(
+                message,
+                binding.mediaThumbContainer,
+                binding.mediaImage,
+                binding.videoPlayIcon,
                 binding.messageText
             )
             capBubbleWidth(binding.bubbleContainer)
@@ -381,6 +425,13 @@ class MessageAdapter(private val currentUser: String) :
             )
             binding.voiceWaveform.unplayedColor = itemView.context.resources.getColor(
                 com.privatechat.app.R.color.popupBorder, itemView.context.theme
+            )
+            bindMediaMessage(
+                message,
+                binding.mediaThumbContainer,
+                binding.mediaImage,
+                binding.videoPlayIcon,
+                binding.messageText
             )
             capBubbleWidth(binding.bubbleContainer)
             binding.bubbleContainer.translationX = 0f
@@ -419,6 +470,8 @@ class MessageAdapter(private val currentUser: String) :
             }
             message.isVoice() -> "🎤 Voice message"
             message.isGif() -> "🎞️ GIF"
+            message.isImage() -> if (!message.caption.isNullOrBlank()) "📷 ${message.caption}" else "📷 Photo"
+            message.isVideo() -> if (!message.caption.isNullOrBlank()) "🎥 ${message.caption}" else "🎥 Video"
             else -> message.text
         }
 

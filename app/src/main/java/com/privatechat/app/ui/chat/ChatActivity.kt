@@ -108,6 +108,33 @@ class ChatActivity : AppCompatActivity() {
             if (uri != null) uploadAndSavePhoto(uri)
         }
 
+    // ── Chat image/video send (camera icon) ─────────────────────────
+    // Same permission-then-picker shape as galleryPermissionLauncher/
+    // photoPickerLauncher above, kept as its own pair of launchers
+    // (rather than reusing the DP ones) so a media send never collides
+    // with an in-flight Change-DP pick, and so image vs video request
+    // the correct media-type permission on API 33+.
+    private val mediaImagePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchMediaImagePicker()
+        }
+    private val mediaVideoPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchMediaVideoPicker()
+        }
+    private val mediaImagePickerLauncher =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) openMediaPreview(uri, isVideo = false)
+        }
+    private val mediaVideoPickerLauncher =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) openMediaPreview(uri, isVideo = true)
+        }
+    private val mediaPreviewLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            handleMediaPreviewResult(result)
+        }
+
     // Voice messages — mic permission requested the same way gallery
     // permission is above.
     private val micPermissionLauncher =
@@ -424,6 +451,10 @@ adapter.submitList(messages.toMutableList()) {
             repository.setBlocked(false)
         }
 
+        // Camera icon (see updateCameraButtonVisibility) — opens the
+        // WhatsApp-style Photo/Video picker sheet.
+        binding.cameraButton.setOnClickListener { showMediaPickerSheet() }
+
         binding.sendButton.setOnClickListener {
             val text = binding.messageInput.text?.toString()?.trim().orEmpty()
             if (text.isEmpty()) {
@@ -529,6 +560,7 @@ adapter.submitList(messages.toMutableList()) {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: android.text.Editable?) {
                 updateSendButtonIcon()
+                updateCameraButtonVisibility()
                 typingRunnable?.let { typingHandler?.removeCallbacks(it) }
                 if (s.isNullOrBlank()) {
                     // Field is empty — backspaced clear, or just sent a
@@ -674,6 +706,143 @@ adapter.submitList(messages.toMutableList()) {
                 ).show()
             }
         }
+    }
+
+    // ── Chat image/video send (camera icon) ─────────────────────────
+
+    // Mic when the input is empty, Send once there's text (see
+    // updateSendButtonIcon's own comment) — the camera icon mirrors
+    // that same empty/non-empty split, WhatsApp-style: visible while
+    // composing is empty, hidden the instant typing starts, and hidden
+    // while inline-editing an existing message (Send always shows then).
+    private fun updateCameraButtonVisibility() {
+        val hasText = binding.messageInput.text?.toString()?.trim().orEmpty().isNotEmpty()
+        binding.cameraButton.visibility =
+            if (hasText || editingMessage != null) android.view.View.GONE else android.view.View.VISIBLE
+    }
+
+    // Lightweight WhatsApp-style attach sheet — reuses the same simple
+    // "TextView row in a BottomSheetDialog" shape as showEmojiPicker's
+    // curated grid / showTopMenu's addItem rows elsewhere in this file,
+    // rather than introducing a new XML bottom-sheet layout for two items.
+    private fun showMediaPickerSheet() {
+        val sheet = BottomSheetDialog(this)
+        val menu = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundResource(com.privatechat.app.R.drawable.bg_popup_menu)
+            elevation = dp(6).toFloat()
+            setPadding(0, dp(8), 0, dp(8))
+        }
+
+        fun addRow(icon: String, label: String, action: () -> Unit) {
+            val row = TextView(this).apply {
+                text = "$icon   $label"
+                textSize = 15f
+                setTextColor(resources.getColor(com.privatechat.app.R.color.textPrimary, theme))
+                setPadding(dp(20), dp(14), dp(20), dp(14))
+                isClickable = true
+                val ripple = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+                setBackgroundResource(ripple.resourceId)
+                setOnClickListener {
+                    sheet.dismiss()
+                    action()
+                }
+            }
+            menu.addView(row)
+        }
+
+        addRow("🖼️", "Photo") { requestMediaImagePick() }
+        addRow("🎥", "Video") { requestMediaVideoPick() }
+
+        sheet.setContentView(menu)
+        activeDialog = sheet
+        sheet.show()
+    }
+
+    private fun requestMediaImagePick() {
+        val permission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            android.Manifest.permission.READ_MEDIA_IMAGES
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(this, permission) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) launchMediaImagePicker() else mediaImagePermissionLauncher.launch(permission)
+    }
+
+    private fun requestMediaVideoPick() {
+        val permission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            android.Manifest.permission.READ_MEDIA_VIDEO
+        } else {
+            android.Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        val granted = androidx.core.content.ContextCompat.checkSelfPermission(this, permission) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (granted) launchMediaVideoPicker() else mediaVideoPermissionLauncher.launch(permission)
+    }
+
+    private fun launchMediaImagePicker() {
+        mediaImagePickerLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
+    }
+
+    private fun launchMediaVideoPicker() {
+        mediaVideoPickerLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly)
+        )
+    }
+
+    private fun openMediaPreview(uri: Uri, isVideo: Boolean) {
+        mediaPreviewLauncher.launch(
+            com.privatechat.app.ui.media.MediaPreviewActivity.newIntent(this, uri, isVideo)
+        )
+    }
+
+    // Fires once MediaPreviewActivity finishes: RESULT_OK means the
+    // upload already succeeded there (Cloudinary secure_url in hand),
+    // so this only has to write the Firebase message — the exact same
+    // messagesRef.push() path every other message type already uses,
+    // via repository.sendMessage, so reactions/reply/edit/delete/vanish
+    // mode all keep working on image/video messages for free.
+    private fun handleMediaPreviewResult(result: androidx.activity.result.ActivityResult) {
+        if (result.resultCode != android.app.Activity.RESULT_OK) return
+        val data = result.data ?: return
+        val url = data.getStringExtra(com.privatechat.app.ui.media.MediaPreviewActivity.RESULT_MEDIA_URL)
+            ?: return
+        val type = data.getStringExtra(com.privatechat.app.ui.media.MediaPreviewActivity.RESULT_MEDIA_TYPE)
+        val caption = data.getStringExtra(com.privatechat.app.ui.media.MediaPreviewActivity.RESULT_CAPTION)
+            ?.takeIf { it.isNotBlank() }
+
+        if (isBlockedByOther) {
+            android.widget.Toast.makeText(
+                this, "You can't send messages to this user", android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val prefix = if (type == com.privatechat.app.ui.media.MediaPreviewActivity.TYPE_VIDEO) "__video__" else "__image__"
+        val text = "$prefix$url"
+        val reply = replyingTo
+        val sender = Session.currentUser() ?: return
+        val receiver = Session.otherUser() ?: return
+        repository.sendMessage(
+            text,
+            replyTo = reply?.key,
+            replyText = reply?.let { MessageAdapter.previewText(it) },
+            replySender = reply?.name,
+            caption = caption,
+            onSent = {
+                notificationRepository.notifyNewMessage(
+                    senderId = sender,
+                    receiverId = receiver,
+                    senderName = Nicknames.resolve(sender, nicknames),
+                    preview = MessageAdapter.previewText(Message(name = sender, text = text, caption = caption))
+                )
+            }
+        )
+        exitReplyMode()
     }
 
     // ── Voice messages ───────────────────────────────────────────

@@ -109,6 +109,37 @@
                 android:text="0:00" />
         </LinearLayout>
 
+        <!-- WhatsApp-style image/video bubble — hidden unless
+             message.isImage()/isVideo(); see MessageAdapter.bindMediaMessage. -->
+        <FrameLayout
+            android:id="@+id/mediaThumbContainer"
+            android:layout_width="200dp"
+            android:layout_height="200dp"
+            android:layout_marginBottom="4dp"
+            android:background="@drawable/bg_media_thumb_placeholder"
+            android:clipToOutline="true"
+            android:outlineProvider="background"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/mediaImage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="Media message" />
+
+            <ImageView
+                android:id="@+id/videoPlayIcon"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_video_play_overlay"
+                android:padding="12dp"
+                android:src="@drawable/ic_play_arrow"
+                android:visibility="gone"
+                android:contentDescription="Play video" />
+        </FrameLayout>
+
         <TextView
             android:id="@+id/messageText"
         android:autoLink="web"

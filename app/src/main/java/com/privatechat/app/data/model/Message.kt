@@ -24,15 +24,26 @@ data class Message(
     // Messenger-style reactions: uid -> emoji. A user can only have one
     // active reaction per message; setting a new one overwrites theirs,
     // and repository.setReaction(key, null) clears it.
-    val reactions: Map<String, String>? = null
+    val reactions: Map<String, String>? = null,
+    // WhatsApp-style image/video messages: text holds the Cloudinary
+    // URL behind an "__image__"/"__video__" prefix (same pattern as
+    // "__voice__"/"__gif__" above), and caption is the optional text
+    // the sender attached in the preview screen. Purely additive — a
+    // node written before this feature existed simply has caption ==
+    // null, which Firebase's reflection-based deserialization already
+    // handles for any field it doesn't find.
+    val caption: String? = null
 ) {
     // No-arg constructor required by Firebase's automatic deserialization.
-    constructor() : this("", "", "", 0L, false, false, false, null, null, null, null, null)
+    constructor() : this("", "", "", 0L, false, false, false, null, null, null, null, null, null)
 
     fun isVoice() = text.startsWith("__voice__")
     fun isGif() = text.startsWith("__gif__")
+    fun isImage() = text.startsWith("__image__")
+    fun isVideo() = text.startsWith("__video__")
     fun voiceUrl() = text.removePrefix("__voice__")
     fun gifUrl() = text.removePrefix("__gif__")
+    fun mediaUrl() = text.removePrefix("__image__").removePrefix("__video__")
     fun hasReply() = !replyTo.isNullOrEmpty()
 
     // Compact "❤️2 😂1" style summary, most-used emoji first.
