@@ -52,6 +52,13 @@ class CallSignalingRepository(private val currentUser: String) {
     var onRemoteCandidate: ((IceCandidateData) -> Unit)? = null
 
     fun startCall(callee: String) {
+        // Defensive cleanup: if a previous call ended abnormally
+        // (app killed mid-call, etc.) without endCall() running, stale
+        // candidates could still be sitting here — attachRemoteCandidateListener
+        // fires onChildAdded for every existing child immediately on
+        // attach, so leftover ones would otherwise get fed into a
+        // brand new call's WebRtcClient as if they were current.
+        candidatesRef.removeValue()
         sessionRef.setValue(
             mapOf(
                 "caller" to currentUser,

@@ -1,6 +1,7 @@
 package com.privatechat.app.call
 
 import android.content.Context
+import android.media.AudioManager
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
 import org.webrtc.DataChannel
@@ -40,6 +41,11 @@ class WebRtcClient(
 
     private val eglBase: EglBase = EglBase.create()
 
+    private val appContext = context.applicationContext
+    private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private var previousAudioMode = AudioManager.MODE_NORMAL
+    private var audioSessionActive = false
+
     private val peerConnectionFactory: PeerConnectionFactory
     private var peerConnection: PeerConnection? = null
     private var localAudioTrack: AudioTrack? = null
@@ -66,6 +72,23 @@ class WebRtcClient(
     }
 
     fun start() {
+        // Route audio for a real-time call: MODE_IN_COMMUNICATION plus
+        // requesting audio focus is what actually makes the negotiated
+        // remote audio track reach the earpiece/speaker at a normal
+        // volume — without this step the connection can succeed while
+        // the call stays completely silent, since Android otherwise
+        // has no reason to route a WebRTC track's audio anywhere
+        // sensible. isSpeakerphoneOn defaults to false (earpiece);
+        // CallActivity's speaker toggle flips it from there.
+        previousAudioMode = audioManager.mode
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isSpeakerphoneOn = false
+        @Suppress("DEPRECATION")
+        audioManager.requestAudioFocus(
+            null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN
+        )
+        audioSessionActive = true
+
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
         }
@@ -128,6 +151,18 @@ class WebRtcClient(
         peerConnection?.dispose()
         peerConnectionFactory.dispose()
         eglBase.release()
+        // Must restore the system audio mode/focus exactly once per
+        // start() — otherwise every other app's audio stays routed
+        // for a phone call even after this one has ended. Guarded so
+        // a defensive double-close() (CallActivity calls this from
+        // both finishCall() and onDestroy()) can't restore twice.
+        if (audioSessionActive) {
+            audioManager.mode = previousAudioMode
+            audioManager.isSpeakerphoneOn = false
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(null)
+            audioSessionActive = false
+        }
     }
 
     private val pcObserver = object : PeerConnection.Observer {
