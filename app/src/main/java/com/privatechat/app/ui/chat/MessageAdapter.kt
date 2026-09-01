@@ -21,6 +21,8 @@ import com.privatechat.app.data.model.Message
 import com.privatechat.app.databinding.ItemMessageIncomingBinding
 import com.privatechat.app.databinding.ItemMessageOutgoingBinding
 import com.privatechat.app.databinding.ItemMessageSystemBinding
+import com.privatechat.app.link.LinkPreviewDetector
+import com.privatechat.app.link.LinkPreviewFetcher
 import com.privatechat.app.media.CloudinaryUploader
 import com.privatechat.app.utils.PresenceFormatter
 import com.privatechat.app.voice.VoicePlaybackController
@@ -338,11 +340,17 @@ class MessageAdapter(private val currentUser: String) :
         }
     }
 
-    // WhatsApp-style image/video bubble. Mirrors bindVoiceMessage's shape:
-    // hides/restores the plain text row, and — unlike voice — leaves the
-    // text row visible (as the caption) when the sender attached one.
-    // Deleted media messages fall back to the ordinary "unsent" text via
-    // displayText(), same as a deleted voice message.
+    // WhatsApp-style image/video bubble — now also covers YouTube
+    // Shorts / Instagram Reel / Facebook video link-preview cards
+    // (see LinkPreviewDetector), since visually they're the same
+    // shape: a borderless, bled-to-the-edges thumbnail with a play
+    // icon and a time/tick chip overlay. Mirrors bindVoiceMessage's
+    // shape: hides/restores the plain text row, and — unlike voice —
+    // leaves the text row visible (as the caption) when the sender
+    // attached one to a real image/video (link previews never have a
+    // caption; the whole message text IS the link). Deleted messages
+    // fall back to the ordinary "unsent" text via displayText(), same
+    // as a deleted voice message.
     //
     // Also does the "no bubble around the photo" look: bleeds the media
     // block past whichever of the bubble's own padded edges have
@@ -353,11 +361,12 @@ class MessageAdapter(private val currentUser: String) :
     // there's no caption, media bleeds to the bottom edge too, so the
     // normal timeRow has nowhere to sit — a small overlay chip on the
     // image itself takes over showing the time (+ tick, outgoing only).
-    private fun bindMediaMessage(
+    private fun bindMediaOrLinkMessage(
         message: Message,
         thumbContainer: View,
         imageView: android.widget.ImageView,
         videoPlayIcon: View,
+        linkBadge: android.widget.ImageView,
         messageTextView: android.widget.TextView,
         timeRow: View,
         timeOverlay: View,
@@ -366,29 +375,67 @@ class MessageAdapter(private val currentUser: String) :
         timeText: CharSequence,
         tickText: CharSequence?
     ) {
-        if ((!message.isImage() && !message.isVideo()) || message.deleted) {
+        val isRealMedia = (message.isImage() || message.isVideo()) && !message.deleted
+        val linkMatch = if (!isRealMedia && !message.deleted) LinkPreviewDetector.detect(message.text) else null
+
+        if (!isRealMedia && linkMatch == null) {
             thumbContainer.visibility = View.GONE
             videoPlayIcon.visibility = View.GONE
+            linkBadge.visibility = View.GONE
             timeOverlay.visibility = View.GONE
             timeRow.visibility = View.VISIBLE
             return
         }
+
         thumbContainer.visibility = View.VISIBLE
-        val url = message.mediaUrl()
-        val isVideo = message.isVideo()
-        videoPlayIcon.visibility = if (isVideo) View.VISIBLE else View.GONE
+        // Tag guards the async link-thumbnail fetch below against a
+        // RecyclerView recycle: if this holder gets rebound to a
+        // different message before the network call returns, the
+        // stale callback's result is simply dropped instead of
+        // painting the wrong thumbnail into a reused view.
+        val bindTag = message.key.ifEmpty { message.text }
+        thumbContainer.tag = bindTag
 
-        val thumbUrl = if (isVideo) CloudinaryUploader.videoThumbnailUrl(url) else url
-        Glide.with(imageView).load(thumbUrl).centerCrop().into(imageView)
+        val hasCaption: Boolean
+        if (isRealMedia) {
+            val url = message.mediaUrl()
+            val isVideo = message.isVideo()
+            videoPlayIcon.visibility = if (isVideo) View.VISIBLE else View.GONE
+            linkBadge.visibility = View.GONE
 
-        // Caption row: reuse the normal text row, hidden when there
-        // isn't one so the bubble is just the media with no empty gap.
-        val hasCaption = !message.caption.isNullOrBlank()
-        if (hasCaption) {
-            messageTextView.visibility = View.VISIBLE
-            messageTextView.text = message.caption
+            val thumbUrl = if (isVideo) CloudinaryUploader.videoThumbnailUrl(url) else url
+            Glide.with(imageView).load(thumbUrl).centerCrop().into(imageView)
+
+            hasCaption = !message.caption.isNullOrBlank()
+            if (hasCaption) {
+                messageTextView.visibility = View.VISIBLE
+                messageTextView.text = message.caption
+            } else {
+                messageTextView.visibility = View.GONE
+            }
         } else {
+            val match = linkMatch!!
+            hasCaption = false
             messageTextView.visibility = View.GONE
+            videoPlayIcon.visibility = View.VISIBLE
+            linkBadge.visibility = View.VISIBLE
+            linkBadge.setImageResource(
+                when (match.platform) {
+                    LinkPreviewDetector.Platform.YOUTUBE -> com.privatechat.app.R.drawable.ic_badge_youtube
+                    LinkPreviewDetector.Platform.INSTAGRAM -> com.privatechat.app.R.drawable.ic_badge_instagram
+                    LinkPreviewDetector.Platform.FACEBOOK -> com.privatechat.app.R.drawable.ic_badge_facebook
+                }
+            )
+            // Neutral placeholder immediately (no network wait, no
+            // flash of emptiness), then upgrade to a real thumbnail
+            // if the fetch succeeds — see LinkPreviewFetcher's own
+            // comment on why this is a best-effort progressive
+            // enhancement, not something the UI blocks on.
+            imageView.setImageDrawable(null)
+            LinkPreviewFetcher.fetchThumbnail(match) { thumbnailUrl ->
+                if (thumbContainer.tag != bindTag || thumbnailUrl == null) return@fetchThumbnail
+                Glide.with(imageView).load(thumbnailUrl).centerCrop().into(imageView)
+            }
         }
 
         val density = thumbContainer.resources.displayMetrics.density
@@ -429,11 +476,12 @@ class MessageAdapter(private val currentUser: String) :
                 binding.voiceDuration,
                 binding.messageText
             )
-            bindMediaMessage(
+            bindMediaOrLinkMessage(
                 message,
                 binding.mediaThumbContainer,
                 binding.mediaImage,
                 binding.videoPlayIcon,
+                binding.linkPreviewBadge,
                 binding.messageText,
                 binding.timeRow,
                 binding.mediaTimeOverlay,
@@ -471,11 +519,12 @@ class MessageAdapter(private val currentUser: String) :
             binding.voiceWaveform.unplayedColor = itemView.context.resources.getColor(
                 com.privatechat.app.R.color.popupBorder, itemView.context.theme
             )
-            bindMediaMessage(
+            bindMediaOrLinkMessage(
                 message,
                 binding.mediaThumbContainer,
                 binding.mediaImage,
                 binding.videoPlayIcon,
+                binding.linkPreviewBadge,
                 binding.messageText,
                 binding.messageTime,
                 binding.mediaTimeOverlay,
@@ -523,7 +572,13 @@ class MessageAdapter(private val currentUser: String) :
             message.isGif() -> "🎞️ GIF"
             message.isImage() -> if (!message.caption.isNullOrBlank()) "📷 ${message.caption}" else "📷 Photo"
             message.isVideo() -> if (!message.caption.isNullOrBlank()) "🎥 ${message.caption}" else "🎥 Video"
-            else -> message.text
+            else -> LinkPreviewDetector.detect(message.text)?.let {
+                when (it.platform) {
+                    LinkPreviewDetector.Platform.YOUTUBE -> "▶️ YouTube Short"
+                    LinkPreviewDetector.Platform.INSTAGRAM -> "📸 Instagram Reel"
+                    LinkPreviewDetector.Platform.FACEBOOK -> "🎬 Facebook video"
+                }
+            } ?: message.text
         }
 
         val DIFF_CALLBACK = object : DiffUtil.ItemCallback<Message>() {
