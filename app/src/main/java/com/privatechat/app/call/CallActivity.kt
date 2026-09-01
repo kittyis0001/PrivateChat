@@ -101,7 +101,12 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         signaling.onSessionChanged = { session -> runOnUiThread { handleSessionChange(session) } }
         signaling.onRemoteCandidate = { candidate ->
             runOnUiThread {
-                webRtcClient?.addRemoteIceCandidate(candidate.sdpMid, candidate.sdpMLineIndex, candidate.candidate)
+                val client = webRtcClient
+                if (client != null) {
+                    client.addRemoteIceCandidate(candidate.sdpMid, candidate.sdpMLineIndex, candidate.candidate)
+                } else {
+                    pendingRemoteCandidates.add(candidate)
+                }
             }
         }
         signaling.attachSessionListener()
@@ -170,6 +175,7 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         val client = WebRtcClient(applicationContext, this)
         webRtcClient = client
         client.start()
+        flushPendingCandidates()
         client.createOffer { sdp -> signaling.setOffer(sdp) }
     }
 
@@ -189,6 +195,17 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
     }
 
     private var lastKnownOfferSdp: String? = null
+    // ICE candidates can (and often do) arrive from the other side
+    // before this device's own WebRtcClient exists yet — e.g. every
+    // candidate the caller sends while the callee simply hasn't
+    // tapped Accept yet. Without buffering, onRemoteCandidate below
+    // would silently drop them (webRtcClient?.addRemoteIceCandidate
+    // is a no-op on null), and the call gets stuck forever in
+    // "Connecting…" because ICE negotiation never receives enough
+    // candidates to find a working path — this was the main cause of
+    // calls not connecting/no audio. Flushed by flushPendingCandidates()
+    // right after webRtcClient is actually created.
+    private val pendingRemoteCandidates = mutableListOf<IceCandidateData>()
 
     // The caller's offer SDP arrives as a separate, slightly-later
     // Firebase write than the initial "ringing" session (see
@@ -208,11 +225,20 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         val client = WebRtcClient(applicationContext, this)
         webRtcClient = client
         client.start()
+        flushPendingCandidates()
         client.setRemoteOffer(offerSdp)
         client.createAnswer { sdp ->
             signaling.setAnswer(sdp)
             signaling.setStatus("accepted")
         }
+    }
+
+    private fun flushPendingCandidates() {
+        val client = webRtcClient ?: return
+        pendingRemoteCandidates.forEach { candidate ->
+            client.addRemoteIceCandidate(candidate.sdpMid, candidate.sdpMLineIndex, candidate.candidate)
+        }
+        pendingRemoteCandidates.clear()
     }
 
     private fun userDeclinedCall() {
@@ -261,7 +287,15 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
     override fun onIceConnectionStateChanged(state: PeerConnection.IceConnectionState) {
         runOnUiThread {
             when (state) {
-                PeerConnection.IceConnectionState.CONNECTED -> renderState(CallState.CONNECTED)
+                // COMPLETED is also a fully-working connection — some
+                // networks/candidate pairs go straight from CHECKING to
+                // COMPLETED without an intermediate CONNECTED event, and
+                // only watching for CONNECTED left the UI stuck showing
+                // "Connecting…" even once audio was already flowing.
+                PeerConnection.IceConnectionState.CONNECTED,
+                PeerConnection.IceConnectionState.COMPLETED -> {
+                    if (this.state != CallState.CONNECTED) renderState(CallState.CONNECTED)
+                }
                 PeerConnection.IceConnectionState.FAILED,
                 PeerConnection.IceConnectionState.DISCONNECTED -> {
                     if (this.state != CallState.ENDED) finishCall()
