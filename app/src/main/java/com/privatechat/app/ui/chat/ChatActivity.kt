@@ -251,14 +251,29 @@ class ChatActivity : AppCompatActivity() {
         // Tapping an image/video bubble opens the full-screen viewer
         // (pinch-zoom for photos via PhotoViewerActivity, play/pause
         // for video via VideoViewerActivity) — WhatsApp behavior.
+        // A YouTube Shorts / Instagram Reel / Facebook link-preview
+        // card opens directly in that app via a plain ACTION_VIEW —
+        // Android's own App Links resolve it straight to the
+        // installed app (no custom deep-link scheme needed), falling
+        // back to a chooser/browser if that app isn't installed.
         // Every other message keeps the existing tap-for-reactions
         // behavior unchanged.
         adapter.onMessageTap = { message, anchor ->
+            val linkPreview = if (!message.deleted && !message.isImage() && !message.isVideo()) {
+                com.privatechat.app.link.LinkPreviewDetector.detect(message.text)
+            } else null
             when {
                 !message.deleted && message.isImage() ->
                     startActivity(PhotoViewerActivity.newIntent(this, message.mediaUrl()))
                 !message.deleted && message.isVideo() ->
                     startActivity(com.privatechat.app.ui.media.VideoViewerActivity.newIntent(this, message.mediaUrl()))
+                linkPreview != null -> {
+                    try {
+                        startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(linkPreview.url)))
+                    } catch (e: android.content.ActivityNotFoundException) {
+                        android.widget.Toast.makeText(this, "Couldn't open this link", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
                 else -> showReactionBar(message, anchor)
             }
         }
