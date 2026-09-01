@@ -33,6 +33,15 @@
          while the app is backgrounded or killed. Normal-protection
          permission, granted automatically; still must be declared. -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- What actually keeps a call (and its audio) alive after leaving
+         the app — CallForegroundService holds the process at
+         foreground-service priority for the duration of an active
+         call, WhatsApp-style. FOREGROUND_SERVICE_MICROPHONE is
+         required alongside the service's own
+         android:foregroundServiceType="microphone" on API 34+, or
+         starting the foreground service throws at runtime. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application android:name=".App"
         
@@ -90,10 +99,23 @@
             </intent-filter>
         </service>
 
+        <!-- Keeps an active call (and its audio) alive after leaving
+             the app — see the service's own doc comment. -->
+        <service
+            android:name=".call.CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
         <!-- Decline action on the incoming-call notification — see the
              receiver's own doc comment. -->
         <receiver
             android:name=".call.CallDeclineReceiver"
+            android:exported="false" />
+
+        <!-- Hang Up action on the ongoing-call notification — see the
+             receiver's own doc comment. -->
+        <receiver
+            android:name=".call.CallHangupReceiver"
             android:exported="false" />
 
         <meta-data

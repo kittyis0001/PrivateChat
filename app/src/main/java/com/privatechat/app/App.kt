@@ -69,10 +69,29 @@ class App : Application() {
                 )
             }
             manager.createNotificationChannel(callChannel)
+
+            // Separate again from the ringing channel above — this one
+            // backs the ongoing-call foreground service's persistent
+            // notification (see CallForegroundService), which updates
+            // roughly once a second while the call is live. LOW
+            // importance + no sound so those updates never re-alert or
+            // buzz; it only needs to sit quietly and stay visible/
+            // tappable, matching WhatsApp's "return to call" bar.
+            val ongoingCallChannel = NotificationChannel(
+                ONGOING_CALL_CHANNEL_ID,
+                "Ongoing call",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Shown while a call is active, so you can return to it"
+                setSound(null, null)
+                enableVibration(false)
+            }
+            manager.createNotificationChannel(ongoingCallChannel)
         }
     }
 
     companion object {
         const val CALL_NOTIFICATION_CHANNEL_ID = "incoming_calls"
+        const val ONGOING_CALL_CHANNEL_ID = "ongoing_call"
     }
 }

@@ -36,6 +36,13 @@ import org.webrtc.PeerConnection
  * notification with Accept/Decline actions and launches this exact
  * screen on tap — the actual signaling/WebRTC connection below is
  * unchanged either way, this only affects how the screen gets opened.
+ *
+ * Once a call is actually underway (dialing out, or accepted
+ * incoming), CallForegroundService keeps it alive and audio working
+ * even after leaving the app — a persistent "ongoing call" notification
+ * (WhatsApp-style) holds the process at foreground-service priority so
+ * the OS won't reclaim it just because nothing is visible, with a tap-
+ * to-return action and its own Hang Up button.
  */
 class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
 
@@ -177,6 +184,7 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         client.start()
         flushPendingCandidates()
         client.createOffer { sdp -> signaling.setOffer(sdp) }
+        startCallForegroundService("Calling…")
     }
 
     // ── Incoming ──────────────────────────────────────────────────
@@ -231,6 +239,21 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
             signaling.setAnswer(sdp)
             signaling.setStatus("accepted")
         }
+        startCallForegroundService("Connecting…")
+    }
+
+    // Once the call is actually underway (dialing out, or accepted
+    // incoming) rather than just ringing — see CallForegroundService's
+    // own comment on why this is what actually keeps the call alive
+    // and audio working after leaving the app, WhatsApp-style.
+    private fun startCallForegroundService(statusText: String) {
+        CallForegroundService.start(
+            applicationContext,
+            callerName = Nicknames.defaultFor(remoteUser),
+            statusText = statusText,
+            remoteUser = remoteUser,
+            isOutgoing = isOutgoing
+        )
     }
 
     private fun flushPendingCandidates() {
@@ -331,6 +354,7 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
                 binding.callInProgressControls.visibility = android.view.View.VISIBLE
                 binding.callEndButton.visibility = android.view.View.VISIBLE
                 startDurationTimer()
+                startCallForegroundService("Ongoing call")
             }
             CallState.ENDED -> {
                 binding.callStatus.text = "Call ended"
@@ -398,6 +422,7 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         webRtcClient?.close()
         webRtcClient = null
         signaling.detachAll(remoteUser)
+        CallForegroundService.stop(applicationContext)
         finish()
     }
 
@@ -407,6 +432,11 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         stopDurationTimer()
         webRtcClient?.close()
         signaling.detachAll(remoteUser)
+        // Defensive — normally already stopped by finishCall(), but if
+        // this Activity got torn down some other way (e.g. system-
+        // killed and recreated), make sure a stale ongoing-call
+        // notification/foreground service can never outlive the call.
+        CallForegroundService.stop(applicationContext)
     }
 
     override fun onStart() {
