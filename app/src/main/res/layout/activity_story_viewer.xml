@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <FrameLayout
+        android:id="@+id/storyMediaWrap"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/storyImg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitCenter"
+            android:visibility="gone"
+            android:contentDescription="Story" />
+
+        <VideoView
+            android:id="@+id/storyVid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <!-- Text/sticker/draw overlay layer for video stories lands
+             here in the editor PR — image edits are baked into the
+             uploaded image itself so they need nothing at view time. -->
+
+        <TextView
+            android:id="@+id/storyCapOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_marginBottom="70dp"
+            android:gravity="center"
+            android:paddingHorizontal="24dp"
+            android:textColor="@android:color/white"
+            android:textSize="15sp"
+            android:shadowColor="#CC000000"
+            android:shadowRadius="8"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- Progress bars -->
+    <LinearLayout
+        android:id="@+id/storyProgressBars"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="10dp" />
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp">
+
+        <ImageView
+            android:id="@+id/storyViewerAvatar"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:background="@drawable/bg_media_thumb_placeholder"
+            android:contentDescription="Poster" />
+
+        <TextView
+            android:id="@+id/storyViewerName"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:textColor="@android:color/white"
+            android:textStyle="bold"
+            android:textSize="14sp"
+            android:shadowColor="#B3000000"
+            android:shadowRadius="6" />
+
+        <TextView
+            android:id="@+id/storyViewerTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp" />
+
+        <ImageButton
+            android:id="@+id/storyDeleteBtn"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_menu_trash"
+            android:tint="@android:color/white"
+            android:visibility="gone"
+            android:contentDescription="Delete story" />
+
+        <ImageButton
+            android:id="@+id/storyCloseBtn"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:tint="@android:color/white"
+            android:contentDescription="Close" />
+    </LinearLayout>
+
+</FrameLayout>

@@ -84,6 +84,17 @@
             android:theme="@style/Theme.PhotoViewer" />
 
         <activity
+            android:name=".ui.story.StoryUploadActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PhotoViewer"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.story.StoryViewerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PhotoViewer" />
+
+        <activity
             android:name=".call.CallActivity"
             android:exported="false"
             android:theme="@style/Theme.PhotoViewer"

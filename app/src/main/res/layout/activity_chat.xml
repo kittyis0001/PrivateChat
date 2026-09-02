@@ -19,15 +19,31 @@
         android:paddingVertical="10dp"
         android:elevation="2dp">
 
-        <ImageView
-            android:id="@+id/headerAvatar"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="10dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:clickable="true"
-            android:focusable="true"
-            android:contentDescription="Profile photo" />
+        <FrameLayout
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:layout_marginEnd="10dp">
+
+            <!-- Instagram-style story ring around the other user's
+                 avatar — see ChatActivity's story-state wiring and
+                 StoryRingView's own doc comment. Sized 6dp larger than
+                 the avatar itself so the ring stroke shows around it,
+                 same proportion as the reference design. -->
+            <com.privatechat.app.ui.story.StoryRingView
+                android:id="@+id/headerStoryRing"
+                android:layout_width="46dp"
+                android:layout_height="46dp" />
+
+            <ImageView
+                android:id="@+id/headerAvatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="Profile photo" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="0dp"
