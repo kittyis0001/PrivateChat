@@ -38,6 +38,8 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatBinding
     private lateinit var repository: ChatRepository
     private lateinit var notificationRepository: NotificationRepository
+    private lateinit var storyRepository: com.privatechat.app.data.repository.StoryRepository
+    private var storyGroups: List<com.privatechat.app.data.model.StoryGroup> = emptyList()
     private lateinit var adapter: MessageAdapter
     // Voice calls — independent of ChatRepository since a call needs
     // to ring whenever this device's process is alive, not tied to
@@ -294,10 +296,21 @@ class ChatActivity : AppCompatActivity() {
         }
         refreshHeaderAvatar()
         binding.headerAvatar.setOnClickListener {
+            val otherGroup = storyGroups.find { it.userId == otherUser }
+            if (otherGroup != null) {
+                startActivity(com.privatechat.app.ui.story.StoryViewerActivity.newIntent(this, otherUser))
+                return@setOnClickListener
+            }
             val url = photos[otherUser]
             if (!url.isNullOrBlank()) {
                 startActivity(PhotoViewerActivity.newIntent(this, url))
             }
+        }
+
+        storyRepository = com.privatechat.app.data.repository.StoryRepository(currentUser)
+        storyRepository.observeStories { groups ->
+            storyGroups = groups
+            updateHeaderStoryRing(otherUser)
         }
 
         repository = ChatRepository(currentUser, otherUser)
@@ -695,6 +708,21 @@ adapter.submitList(messages.toMutableList()) {
             imageView.setImageBitmap(
                 NotificationAvatarFactory.create(resources.displayMetrics.density, initial, color)
             )
+        }
+    }
+
+    // Colored ring = other user has an active story I haven't fully
+    // watched yet, grey = I've watched all of it, no ring = no active
+    // story at all — same rule as the reference's updateHeaderRing(),
+    // using StoryViewTracker as the local "have I watched this"
+    // source of truth rather than a Firebase round trip.
+    private fun updateHeaderStoryRing(otherUser: String) {
+        val otherGroup = storyGroups.find { it.userId == otherUser }
+        binding.headerStoryRing.state = when {
+            otherGroup == null -> com.privatechat.app.ui.story.StoryRingView.RingState.NONE
+            otherGroup.stories.all { com.privatechat.app.data.StoryViewTracker.hasViewed(it.key) } ->
+                com.privatechat.app.ui.story.StoryRingView.RingState.VIEWED
+            else -> com.privatechat.app.ui.story.StoryRingView.RingState.ACTIVE
         }
     }
 
@@ -1245,23 +1273,49 @@ adapter.submitList(messages.toMutableList()) {
         }
 
         // "ONLY ADD THIS SECTION" — top profile row: own avatar with a
-        // small "+" badge (opens Change DP), own nickname, and an
-        // "Upload Story" subtitle line matching the reference image.
-        // Nothing below this point in the menu (existing items,
-        // spacing, colors, radius, animation) was touched.
+        // premium Instagram-style story ring + "+" badge (opens story
+        // upload — Change DP has its own separate row further down in
+        // this menu, so repurposing this badge for stories the way the
+        // reference design does doesn't lose that entry point), own
+        // nickname, and an "Upload Story" line that opens the same
+        // upload flow. Nothing below this point in the menu (existing
+        // items, spacing, colors, radius, animation) was touched.
         val currentUserForProfile = Session.currentUser()
         if (currentUserForProfile != null) {
+            val myStoryGroup = storyGroups.find { it.userId == currentUserForProfile }
+            val hasStory = myStoryGroup != null
+
             val avatarSize = dp(52)
+            val ringSize = dp(58)
             val avatarFrame = FrameLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(avatarSize, avatarSize)
+                layoutParams = LinearLayout.LayoutParams(ringSize, ringSize)
             }
+            val ringView = com.privatechat.app.ui.story.StoryRingView(this).apply {
+                layoutParams = FrameLayout.LayoutParams(ringSize, ringSize)
+                // Own story ring is always the colored "active" state
+                // when present — same as the reference's
+                // applyRing(avWrap, hasStory, false): "viewed" isn't a
+                // concept that applies to your own story.
+                state = if (hasStory) {
+                    com.privatechat.app.ui.story.StoryRingView.RingState.ACTIVE
+                } else {
+                    com.privatechat.app.ui.story.StoryRingView.RingState.NONE
+                }
+            }
+            avatarFrame.addView(ringView)
             val avatarImage = ImageView(this).apply {
-                layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize)
+                layoutParams = FrameLayout.LayoutParams(avatarSize, avatarSize).apply {
+                    gravity = android.view.Gravity.CENTER
+                }
                 isClickable = true
                 setOnClickListener {
+                    dismissOverlays()
+                    if (hasStory) {
+                        startActivity(com.privatechat.app.ui.story.StoryViewerActivity.newIntent(this@ChatActivity, currentUserForProfile))
+                        return@setOnClickListener
+                    }
                     val url = photos[currentUserForProfile]
                     if (!url.isNullOrBlank()) {
-                        dismissOverlays()
                         startActivity(PhotoViewerActivity.newIntent(this@ChatActivity, url))
                     }
                 }
@@ -1279,10 +1333,15 @@ adapter.submitList(messages.toMutableList()) {
                 layoutParams = FrameLayout.LayoutParams(plusBadgeSize, plusBadgeSize).apply {
                     gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
                 }
+                // Instagram behavior: the "+" only invites starting a
+                // story when there isn't one yet — once posted, the
+                // colored ring itself is the indicator and the badge
+                // gets out of the way.
+                visibility = if (hasStory) android.view.View.GONE else android.view.View.VISIBLE
                 isClickable = true
                 setOnClickListener {
                     dismissOverlays()
-                    requestChangeDp()
+                    startActivity(com.privatechat.app.ui.story.StoryUploadActivity.newIntent(this@ChatActivity))
                 }
             }
             avatarFrame.addView(plusBadge)
@@ -1314,6 +1373,11 @@ adapter.submitList(messages.toMutableList()) {
                     textSize = 12f
                     setTextColor(resources.getColor(com.privatechat.app.R.color.textSecondary, theme))
                     setPadding(0, dp(2), 0, 0)
+                    isClickable = true
+                    setOnClickListener {
+                        dismissOverlays()
+                        startActivity(com.privatechat.app.ui.story.StoryUploadActivity.newIntent(this@ChatActivity))
+                    }
                 })
             }
 
@@ -1845,5 +1909,6 @@ adapter.submitList(messages.toMutableList()) {
         VoicePlaybackController.stop()
         repository.detachAll()
         callSignaling?.detachAll(null)
+        storyRepository.stopObserving()
     }
 }

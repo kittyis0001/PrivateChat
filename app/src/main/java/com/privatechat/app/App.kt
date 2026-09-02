@@ -7,11 +7,13 @@ import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
 import com.google.firebase.database.FirebaseDatabase
 import com.privatechat.app.data.Session
+import com.privatechat.app.data.StoryViewTracker
 
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
         Session.init(this)
+        StoryViewTracker.init(this)
         // Cache data feature: Firebase Realtime Database's own offline
         // disk persistence. Cached messages/status/nicknames/etc.
         // survive app restarts, the app opens with data already on

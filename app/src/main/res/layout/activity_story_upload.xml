@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F2000000">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Add to Your Story"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:layout_marginBottom="18dp" />
+
+        <!-- Preview area: image OR video, rounded corners like the
+             reference's .story-upload-preview, plus a right-side
+             toolbar slot (music button lands here in a later PR). -->
+        <FrameLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <ImageView
+                android:id="@+id/storyPreviewImage"
+                android:layout_width="200dp"
+                android:layout_height="320dp"
+                android:scaleType="centerCrop"
+                android:background="@drawable/bg_story_preview"
+                android:visibility="gone"
+                android:contentDescription="Story preview" />
+
+            <VideoView
+                android:id="@+id/storyPreviewVideo"
+                android:layout_width="200dp"
+                android:layout_height="320dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/storyPickPlaceholder"
+                android:layout_width="200dp"
+                android:layout_height="320dp"
+                android:gravity="center"
+                android:background="@drawable/bg_story_preview"
+                android:text="📷"
+                android:textSize="40sp" />
+        </FrameLayout>
+
+        <EditText
+            android:id="@+id/storyCaptionInput"
+            android:layout_width="230dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:hint="Add a caption…"
+            android:textColorHint="#73FFFFFF"
+            android:textColor="@android:color/white"
+            android:background="@drawable/bg_story_caption_input"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:maxLines="2"
+            android:maxLength="120"
+            android:inputType="textMultiLine|textCapSentences"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/storyPickButton"
+            android:layout_width="230dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="📷  Choose Photo / Video"
+            android:textColor="@android:color/white"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            android:background="@drawable/bg_story_pick_button" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/storyCancelButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="12dp"
+                android:text="Cancel"
+                android:textColor="@android:color/white"
+                android:textAllCaps="false"
+                android:paddingHorizontal="24dp"
+                android:background="@drawable/bg_story_cancel_button" />
+
+            <Button
+                android:id="@+id/storyShareButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Share Story"
+                android:textColor="@android:color/white"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                android:paddingHorizontal="28dp"
+                android:background="@drawable/bg_story_share_button"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Upload progress overlay, same pattern as MediaPreviewActivity's. -->
+    <LinearLayout
+        android:id="@+id/storyUploadOverlay2"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="#99000000"
+        android:visibility="gone"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ProgressBar
+            android:id="@+id/storyUploadSpinner"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="220dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progress="0"
+            android:progressTint="@color/primary" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Uploading…"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/storyUploadClose"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:tint="@android:color/white"
+        android:contentDescription="Cancel" />
+
+</FrameLayout>
