@@ -4,8 +4,9 @@ package com.privatechat.app.data.model
  * A single story segment, stored under stories/{key} in Firebase.
  * "edit" (text/sticker/draw/filter overlay data) is used for video
  * stories only — image edits are baked into the uploaded image
- * itself, so an image story's edit is always null. "music" is added
- * by the music PR that builds on top of this foundation.
+ * itself, so an image story's edit is always null. "music" applies to
+ * both image and video stories equally (it's audio playing over the
+ * story, not a visual overlay baked into anything).
  */
 data class Story(
     var key: String = "",
@@ -15,10 +16,11 @@ data class Story(
     val caption: String? = null,
     val createdAt: Long = 0L,
     val expiresAt: Long = 0L,
-    val edit: StoryEdit? = null
+    val edit: StoryEdit? = null,
+    val music: Song? = null
 ) {
     // No-arg constructor required by Firebase's automatic deserialization.
-    constructor() : this("", "", "", "", null, 0L, 0L, null)
+    constructor() : this("", "", "", "", null, 0L, 0L, null, null)
 
     fun isExpired(now: Long = System.currentTimeMillis()): Boolean = expiresAt in 1 until now
 }

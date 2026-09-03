@@ -64,6 +64,51 @@
             android:shadowColor="#CC000000"
             android:shadowRadius="8"
             android:visibility="gone" />
+
+        <!-- Music sticker pill — shown when the story has a selected
+             song, matching Instagram's own music-sticker look. -->
+        <LinearLayout
+            android:id="@+id/storyMusicBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="120dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/bg_story_toolbar_button"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="7dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🎵"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/storyMusicBadgeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:maxWidth="180dp"
+                android:maxLines="1"
+                android:ellipsize="marquee"
+                android:singleLine="true"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:selected="true"
+                android:textColor="@android:color/white"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Hidden host for StoryMusicPlayer's YouTube WebView during
+             playback — must stay attached to the window (see the
+             player's own comment). -->
+        <FrameLayout
+            android:id="@+id/storyMusicPlaybackContainer"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:layout_gravity="top|start" />
     </FrameLayout>
 
     <!-- Progress bars -->

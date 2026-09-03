@@ -56,6 +56,7 @@ class StoryUploadActivity : AppCompatActivity() {
     private var isUploading = false
 
     private var currentFilter: StoryFilters.Filter = StoryFilters.ALL[0]
+    private var selectedSong: com.privatechat.app.data.model.Song? = null
     private var adjBrightness = 100
     private var adjContrast = 100
     private var adjBlur = 0
@@ -88,6 +89,8 @@ class StoryUploadActivity : AppCompatActivity() {
         binding.storyPickPlaceholder.setOnClickListener { requestPick() }
         binding.storyShareButton.setOnClickListener { shareStory() }
         binding.storyEditToggleBtn.setOnClickListener { toggleEditorPanel() }
+        binding.storyMusicBtn.setOnClickListener { openMusicPicker() }
+        binding.storyRemoveMusicBtn.setOnClickListener { clearSelectedMusic() }
 
         setupToolRow()
         setupFilterPanel()
@@ -157,6 +160,29 @@ class StoryUploadActivity : AppCompatActivity() {
     }
 
     // ── Editor panel plumbing ─────────────────────────────
+
+    // ── Music ─────────────────────────────
+
+    private fun openMusicPicker() {
+        MusicPickerSheet(
+            activity = this,
+            currentUser = Session.currentUser() ?: return,
+            previewContainer = binding.storyMusicPreviewContainer,
+            getCaption = { binding.storyCaptionInput.text?.toString().orEmpty() },
+            onSongSelected = { song -> setSelectedMusic(song) }
+        ).show()
+    }
+
+    private fun setSelectedMusic(song: com.privatechat.app.data.model.Song) {
+        selectedSong = song
+        binding.storySelectedMusicText.text = "${song.title} · ${song.artist}"
+        binding.storySelectedMusicBadge.visibility = View.VISIBLE
+    }
+
+    private fun clearSelectedMusic() {
+        selectedSong = null
+        binding.storySelectedMusicBadge.visibility = View.GONE
+    }
 
     private fun toggleEditorPanel() {
         if (pickedUri == null) return
@@ -362,7 +388,7 @@ class StoryUploadActivity : AppCompatActivity() {
     }
 
     private fun postToFirebase(currentUser: String, type: String, mediaUrl: String, caption: String?, edit: StoryEdit?) {
-        StoryRepository(currentUser).createStory(type, mediaUrl, caption, edit) { success ->
+        StoryRepository(currentUser).createStory(type, mediaUrl, caption, edit, selectedSong) { success ->
             if (success) {
                 setResult(RESULT_OK)
                 finish()
@@ -473,6 +499,7 @@ class StoryUploadActivity : AppCompatActivity() {
         if (binding.storyPreviewVideo.visibility == View.VISIBLE) {
             binding.storyPreviewVideo.stopPlayback()
         }
+        StoryMusicPlayer.stop(binding.storyMusicPreviewContainer)
     }
 
     companion object {

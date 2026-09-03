@@ -51,6 +51,7 @@ In the new service's **Environment** tab, add:
 | `PRIVATE_KEY` | `private_key` from the service account JSON, **including** the `\n` sequences, wrapped in quotes |
 | `API_SECRET` | Any long random string — e.g. run `openssl rand -hex 32` locally and paste the result |
 | `PORT` | `10000` (Render also sets this automatically; harmless either way) |
+| `YOUTUBE_API_KEY` | Optional — powers the story music feature's search/trending/recommend. Get one from Google Cloud Console: enable the "YouTube Data API v3" on a project, then create an API key under Credentials. Without this set, those three endpoints just return an empty song list rather than erroring — everything else works fine either way. |
 
 See `.env.example` for the exact shape expected.
 
@@ -103,6 +104,30 @@ requests/minute per IP.
 
 No auth required. Used for Render's own health checks and for
 confirming the service is reachable.
+
+### `GET /api/music/search?q=<query>`
+
+Headers: `X-Api-Secret: <API_SECRET>`
+
+Returns `{ "songs": [...] }` — each song shaped
+`{ videoId, jamendoId, title, artist, thumbnail, audioUrl, source }`.
+Empty list if `YOUTUBE_API_KEY` isn't configured.
+
+### `GET /api/music/trending`
+
+Same response shape as search — YouTube's current most-popular music videos.
+
+### `POST /api/music/recommend`
+
+Headers: `X-Api-Secret: <API_SECRET>`, `Content-Type: application/json`
+
+Body: `{ "caption": "optional story caption text" }`
+
+Returns `{ "songs": [...], "mood": "Chill", "vibe": "relaxed" }` — a
+few keywords in the caption are matched to a mood (falls back to a
+generic one), then that mood is searched on YouTube. Simpler than the
+reference web app's Gemini-based mood analysis, since no AI API key is
+configured here — see `services/music.js`'s own comment.
 
 ## Local testing
 
