@@ -120,6 +120,10 @@ class StoryViewerActivity : AppCompatActivity() {
         com.privatechat.app.data.StoryViewTracker.markViewed(story.key)
 
         binding.storyVid.stopPlayback()
+        binding.storyViewerOverlayContainer.removeAllViews()
+        binding.storyViewerDrawView.clear()
+        binding.storyFilterScrim.visibility = View.GONE
+
         if (story.type == "video") {
             binding.storyImg.visibility = View.GONE
             binding.storyVid.visibility = View.VISIBLE
@@ -131,11 +135,58 @@ class StoryViewerActivity : AppCompatActivity() {
             }
             binding.storyVid.setOnCompletionListener { advance() }
             binding.storyVid.setOnErrorListener { _, _, _ -> advance(); true }
+
+            // Video edits (filter/adjust/draw/text/stickers) are stored
+            // as overlay data rather than baked in — see
+            // StoryUploadActivity's own comment on why. The draw/text/
+            // sticker overlays render pixel-exact; the filter/adjust
+            // look is a best-effort color-scrim approximation, since a
+            // VideoView's raw Surface has no color-matrix hook the way
+            // a plain ImageView does.
+            story.edit?.let { edit ->
+                if (edit.drawStrokes.isNotEmpty()) binding.storyViewerDrawView.loadStrokes(edit.drawStrokes)
+                if (edit.texts.isNotEmpty() || edit.stickers.isNotEmpty()) {
+                    binding.storyViewerOverlayContainer.loadFromEdit(edit.texts, edit.stickers)
+                }
+                applyFilterScrim(edit)
+            }
         } else {
             binding.storyVid.visibility = View.GONE
             binding.storyImg.visibility = View.VISIBLE
             Glide.with(this).load(story.mediaUrl).into(binding.storyImg)
             segments[storyIndex].start(IMAGE_DURATION_MS) { advance() }
+        }
+    }
+
+    /** Best-effort approximation of a video story's saved filter/adjust
+     * — a flat color scrim over the video, not a pixel-accurate
+     * color-matrix (see the call site's comment for why that isn't
+     * possible on a raw VideoView surface). */
+    private fun applyFilterScrim(edit: com.privatechat.app.data.model.StoryEdit) {
+        val filter = StoryFilters.byId(edit.filter)
+        val brightnessDelta = filter.brightness * (edit.brightness / 100f) - 1f
+        if (brightnessDelta < -0.05f) {
+            val alpha = ((-brightnessDelta) * 150).toInt().coerceIn(0, 130)
+            binding.storyFilterScrim.setBackgroundColor(android.graphics.Color.argb(alpha, 0, 0, 0))
+            binding.storyFilterScrim.visibility = View.VISIBLE
+            return
+        }
+        if (brightnessDelta > 0.05f) {
+            val alpha = (brightnessDelta * 150).toInt().coerceIn(0, 100)
+            binding.storyFilterScrim.setBackgroundColor(android.graphics.Color.argb(alpha, 255, 255, 255))
+            binding.storyFilterScrim.visibility = View.VISIBLE
+            return
+        }
+        val tint: Int? = when {
+            filter.grayscale > 0.5f -> android.graphics.Color.argb(46, 128, 128, 128)
+            filter.sepia > 0.15f -> android.graphics.Color.argb(36, 139, 90, 43)
+            filter.hueRotateDeg < -5f -> android.graphics.Color.argb(20, 90, 200, 250)
+            filter.saturation > 1.2f -> android.graphics.Color.argb(15, 255, 149, 0)
+            else -> null
+        }
+        if (tint != null) {
+            binding.storyFilterScrim.setBackgroundColor(tint)
+            binding.storyFilterScrim.visibility = View.VISIBLE
         }
     }
 

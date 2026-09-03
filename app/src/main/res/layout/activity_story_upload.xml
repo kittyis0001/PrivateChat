@@ -5,6 +5,7 @@
     android:background="#F2000000">
 
     <LinearLayout
+        android:id="@+id/storyRootColumn"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
@@ -12,6 +13,7 @@
         android:padding="20dp">
 
         <TextView
+            android:id="@+id/storyHeaderLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Add to Your Story"
@@ -19,17 +21,18 @@
             android:textSize="18sp"
             android:layout_marginBottom="18dp" />
 
-        <!-- Preview area: image OR video, rounded corners like the
-             reference's .story-upload-preview, plus a right-side
-             toolbar slot (music button lands here in a later PR). -->
+        <!-- Preview + edit layers: base media, draw layer, draggable
+             text/sticker layer, then the Edit toggle + right-side
+             toolbar (music button lands here in the next PR). -->
         <FrameLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
+            android:id="@+id/storyPreviewWrap"
+            android:layout_width="220dp"
+            android:layout_height="360dp">
 
             <ImageView
                 android:id="@+id/storyPreviewImage"
-                android:layout_width="200dp"
-                android:layout_height="320dp"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
                 android:scaleType="centerCrop"
                 android:background="@drawable/bg_story_preview"
                 android:visibility="gone"
@@ -37,18 +40,49 @@
 
             <VideoView
                 android:id="@+id/storyPreviewVideo"
-                android:layout_width="200dp"
-                android:layout_height="320dp"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
                 android:visibility="gone" />
+
+            <com.privatechat.app.ui.story.StoryDrawView
+                android:id="@+id/storyDrawView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <com.privatechat.app.ui.story.StoryOverlayContainer
+                android:id="@+id/storyOverlayContainer"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
 
             <TextView
                 android:id="@+id/storyPickPlaceholder"
-                android:layout_width="200dp"
-                android:layout_height="320dp"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
                 android:gravity="center"
                 android:background="@drawable/bg_story_preview"
                 android:text="📷"
                 android:textSize="40sp" />
+
+            <LinearLayout
+                android:id="@+id/storyRightToolbar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_margin="8dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <ImageButton
+                    android:id="@+id/storyEditToggleBtn"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:background="@drawable/bg_story_toolbar_button"
+                    android:src="@drawable/ic_menu_edit"
+                    android:tint="@android:color/white"
+                    android:contentDescription="Edit" />
+                <!-- Music button (🎵) slots in here as a sibling in the
+                     music PR. -->
+            </LinearLayout>
         </FrameLayout>
 
         <EditText
@@ -107,6 +141,311 @@
                 android:background="@drawable/bg_story_share_button"
                 android:visibility="gone" />
         </LinearLayout>
+    </LinearLayout>
+
+    <!-- Editor bottom panel — Filter/Text/Sticker/Draw/Adjust, same
+         5 tools as story-editor.js's #storyEditorPanel. -->
+    <LinearLayout
+        android:id="@+id/storyEditorPanel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:background="#EB000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/storyToolRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:weightSum="5"
+            android:paddingTop="10dp"
+            android:paddingBottom="6dp" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="120dp"
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="14dp">
+
+            <!-- Filter panel -->
+            <HorizontalScrollView
+                android:id="@+id/storyPanelFilter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none">
+                <LinearLayout
+                    android:id="@+id/storyFilterList"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <!-- Text panel -->
+            <LinearLayout
+                android:id="@+id/storyPanelText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <EditText
+                        android:id="@+id/storyTextInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="Type here…"
+                        android:maxLength="60"
+                        android:textColor="@android:color/white"
+                        android:textColorHint="#80FFFFFF"
+                        android:background="@drawable/bg_story_caption_input"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="8dp" />
+                    <Button
+                        android:id="@+id/storyTextAddBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="Add"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:background="@drawable/bg_story_share_button" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <Spinner
+                        android:id="@+id/storyFontSpinner"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+                    <SeekBar
+                        android:id="@+id/storyTextSizeSeek"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:min="14"
+                        android:max="60"
+                        android:progress="24" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Color"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="11sp" />
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none">
+                    <LinearLayout
+                        android:id="@+id/storyTextColorRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Background"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="11sp" />
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none">
+                    <LinearLayout
+                        android:id="@+id/storyTextBgRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Animation"
+                        android:textColor="#B3FFFFFF"
+                        android:textSize="11sp" />
+                    <Spinner
+                        android:id="@+id/storyAnimSpinner"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Sticker panel -->
+            <HorizontalScrollView
+                android:id="@+id/storyPanelSticker"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:scrollbars="none"
+                android:visibility="gone">
+                <LinearLayout
+                    android:id="@+id/storyStickerRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+
+            <!-- Draw panel -->
+            <LinearLayout
+                android:id="@+id/storyPanelDraw"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Color"
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="11sp" />
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none">
+                    <LinearLayout
+                        android:id="@+id/storyDrawColorRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <SeekBar
+                        android:id="@+id/storyDrawSizeSeek"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:min="2"
+                        android:max="24"
+                        android:progress="4" />
+                    <Button
+                        android:id="@+id/storyDrawUndoBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Undo"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:background="@drawable/bg_story_cancel_button" />
+                    <Button
+                        android:id="@+id/storyDrawClearBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="Clear"
+                        android:textAllCaps="false"
+                        android:textColor="@android:color/white"
+                        android:background="@drawable/bg_story_cancel_button" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Adjust panel -->
+            <LinearLayout
+                android:id="@+id/storyPanelAdjust"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="90dp"
+                        android:layout_height="wrap_content"
+                        android:text="☀️ Brightness"
+                        android:textColor="@android:color/white"
+                        android:textSize="12sp" />
+                    <SeekBar
+                        android:id="@+id/storyAdjBrightnessSeek"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:min="50"
+                        android:max="150"
+                        android:progress="100" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="90dp"
+                        android:layout_height="wrap_content"
+                        android:text="◑ Contrast"
+                        android:textColor="@android:color/white"
+                        android:textSize="12sp" />
+                    <SeekBar
+                        android:id="@+id/storyAdjContrastSeek"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:min="50"
+                        android:max="150"
+                        android:progress="100" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="90dp"
+                        android:layout_height="wrap_content"
+                        android:text="🌫 Blur"
+                        android:textColor="@android:color/white"
+                        android:textSize="12sp" />
+                    <SeekBar
+                        android:id="@+id/storyAdjBlurSeek"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:min="0"
+                        android:max="10"
+                        android:progress="0" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 
     <!-- Upload progress overlay, same pattern as MediaPreviewActivity's. -->

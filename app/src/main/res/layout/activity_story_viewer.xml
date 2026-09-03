@@ -24,6 +24,29 @@
             android:layout_gravity="center"
             android:visibility="gone" />
 
+        <!-- Best-effort filter/adjust approximation for a video
+             story's saved edit — a plain color scrim, not a pixel-
+             accurate color-matrix (VideoView is a raw Surface with no
+             color-filter hook). See StoryViewerActivity's own comment. -->
+        <View
+            android:id="@+id/storyFilterScrim"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+        <!-- Draw + text/sticker overlay for a video story's saved edit
+             — image stories need neither, since those are already
+             flattened into the uploaded image itself. -->
+        <com.privatechat.app.ui.story.StoryDrawView
+            android:id="@+id/storyViewerDrawView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <com.privatechat.app.ui.story.StoryOverlayContainer
+            android:id="@+id/storyViewerOverlayContainer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
         <!-- Text/sticker/draw overlay layer for video stories lands
              here in the editor PR — image edits are baked into the
              uploaded image itself so they need nothing at view time. -->
