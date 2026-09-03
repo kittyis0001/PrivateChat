@@ -38,6 +38,7 @@ class StoryRepository(private val currentUser: String) {
         type: String,
         mediaUrl: String,
         caption: String?,
+        edit: com.privatechat.app.data.model.StoryEdit?,
         onComplete: (success: Boolean) -> Unit
     ) {
         val ref = storiesRef.push()
@@ -50,6 +51,11 @@ class StoryRepository(private val currentUser: String) {
             "expiresAt" to (now + STORY_LIFETIME_MS)
         )
         if (!caption.isNullOrBlank()) data["caption"] = caption
+        // Firebase's setValue() serializes nested Kotlin data classes
+        // (and lists of them) via reflection on their public getters,
+        // same as every other complex field this app already writes
+        // this way — no manual Map<String,Any> conversion needed.
+        if (edit != null) data["edit"] = edit
         ref.setValue(data)
             .addOnSuccessListener { onComplete(true) }
             .addOnFailureListener { onComplete(false) }

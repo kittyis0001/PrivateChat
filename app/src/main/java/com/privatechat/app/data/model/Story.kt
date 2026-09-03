@@ -2,10 +2,10 @@ package com.privatechat.app.data.model
 
 /**
  * A single story segment, stored under stories/{key} in Firebase.
- * "edit" (text/sticker/draw/filter overlay data, video stories only —
- * image edits are baked into the uploaded image itself) and "music"
- * are added by the editor/music PRs that build on top of this
- * foundation; both are optional and null until those land.
+ * "edit" (text/sticker/draw/filter overlay data) is used for video
+ * stories only — image edits are baked into the uploaded image
+ * itself, so an image story's edit is always null. "music" is added
+ * by the music PR that builds on top of this foundation.
  */
 data class Story(
     var key: String = "",
@@ -14,10 +14,11 @@ data class Story(
     val mediaUrl: String = "",
     val caption: String? = null,
     val createdAt: Long = 0L,
-    val expiresAt: Long = 0L
+    val expiresAt: Long = 0L,
+    val edit: StoryEdit? = null
 ) {
     // No-arg constructor required by Firebase's automatic deserialization.
-    constructor() : this("", "", "", "", null, 0L, 0L)
+    constructor() : this("", "", "", "", null, 0L, 0L, null)
 
     fun isExpired(now: Long = System.currentTimeMillis()): Boolean = expiresAt in 1 until now
 }
