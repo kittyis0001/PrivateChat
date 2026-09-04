@@ -120,6 +120,11 @@ class StoryViewerActivity : AppCompatActivity() {
         if (music != null) {
             binding.storyMusicBadge.visibility = View.VISIBLE
             binding.storyMusicBadgeText.text = "${music.title} · ${music.artist}"
+            // Marquee only actually scrolls once the TextView is
+            // "selected" — set here in code rather than
+            // android:selected="true" in XML, which fails AAPT2
+            // resource linking in some toolchain setups.
+            binding.storyMusicBadgeText.isSelected = true
             StoryMusicPlayer.play(binding.storyMusicPlaybackContainer, music)
         } else {
             binding.storyMusicBadge.visibility = View.GONE

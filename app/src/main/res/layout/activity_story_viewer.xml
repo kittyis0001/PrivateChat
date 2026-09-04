@@ -96,7 +96,6 @@
                 android:ellipsize="marquee"
                 android:singleLine="true"
                 android:marqueeRepeatLimit="marquee_forever"
-                android:selected="true"
                 android:textColor="@android:color/white"
                 android:textSize="12sp" />
         </LinearLayout>
