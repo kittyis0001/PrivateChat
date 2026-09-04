@@ -23,9 +23,12 @@ import kotlinx.coroutines.launch
 /**
  * Same-to-same UX as the reference's #musicPicker bottom sheet: a
  * search box, For You / Trending / Saved tabs, and a scrollable list
- * of song cards. Tapping a card's thumbnail previews it in place
- * (toggle play/pause); tapping the "+" selects it for the story and
- * closes the sheet; "🔖" saves it for later.
+ * of song cards. Tapping a card's thumbnail (or its info) previews it
+ * in place — instant play, tap again to stop — with the row
+ * highlighted while it's the one playing, so it's always clear which
+ * song is currently "live" before committing to it. Tapping "+"
+ * selects it for the story and closes the sheet; the save icon saves
+ * it for later.
  */
 class MusicPickerSheet(
     private val activity: AppCompatActivity,
@@ -40,6 +43,11 @@ class MusicPickerSheet(
     private var searchDebounce: Runnable? = null
     private var activeTab = "foryou"
     private var previewingId: String? = null
+    // Playback ownership hands off to the caller once a song is
+    // actually selected — see the "+" tap handler and show()'s dismiss
+    // listener below for why this matters.
+    private var songWasSelected = false
+    private val rowsById = mutableMapOf<String, LinearLayout>()
 
     private lateinit var listContainer: LinearLayout
     private lateinit var loadingView: ProgressBar
@@ -50,7 +58,13 @@ class MusicPickerSheet(
     fun show() {
         val root = buildRoot()
         dialog.setContentView(root)
-        dialog.setOnDismissListener { StoryMusicPlayer.stop(previewContainer) }
+        dialog.setOnDismissListener {
+            // Closed without picking anything (X, back, outside tap) —
+            // stop whatever was just previewing. Closed BY picking a
+            // song — playback ownership already passed to the caller
+            // (see the "+" handler), so leave it running.
+            if (!songWasSelected) StoryMusicPlayer.stop(previewContainer)
+        }
         dialog.show()
         loadTab("foryou")
     }
@@ -168,12 +182,13 @@ class MusicPickerSheet(
         activeTab = id
         applyTabStyles()
         StoryMusicPlayer.stop(previewContainer)
-        previewingId = null
+        highlightRow(null)
         loadTab(id)
     }
 
     private fun loadTab(tab: String, query: String = "") {
         listContainer.removeAllViews()
+        rowsById.clear()
         vibeBadge.visibility = View.GONE
         emptyView.visibility = View.GONE
         loadingView.visibility = View.VISIBLE
@@ -219,8 +234,9 @@ class MusicPickerSheet(
         val row = LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(8), 0, dp(8))
+            setPadding(dp(6), dp(8), dp(6), dp(8))
         }
+        rowsById[song.id()] = row
 
         val thumb = ImageView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
@@ -260,15 +276,15 @@ class MusicPickerSheet(
         row.addView(infoCol)
 
         if (tab == "saved") {
-            row.addView(iconButton("－") {
+            row.addView(iconButton(com.privatechat.app.R.drawable.ic_story_remove) {
                 repository.removeSavedSong(song)
                 loadTab("saved")
             })
         } else {
-            row.addView(iconButton("🔖") { repository.saveSong(song) { } })
+            row.addView(saveButton(song))
         }
-        row.addView(iconButton("＋") {
-            StoryMusicPlayer.stop(previewContainer)
+        row.addView(iconButton(com.privatechat.app.R.drawable.ic_story_add) {
+            songWasSelected = true
             onSongSelected(song)
             dialog.dismiss()
         })
@@ -276,11 +292,38 @@ class MusicPickerSheet(
         return row
     }
 
-    private fun iconButton(label: String, onClick: () -> Unit): View = TextView(activity).apply {
-        text = label
-        textSize = 18f
-        gravity = Gravity.CENTER
-        setPadding(dp(10), dp(6), dp(10), dp(6))
+    /** Instagram-style bookmark that swaps between outline (not saved)
+     * and filled (saved), matching its actual current state, and
+     * toggles on tap instead of only ever saving. */
+    private fun saveButton(song: Song): View {
+        val button = ImageView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            setImageResource(com.privatechat.app.R.drawable.ic_story_save_outline)
+        }
+        var saved = false
+        repository.isSaved(song) { isSaved ->
+            saved = isSaved
+            button.setImageResource(
+                if (isSaved) com.privatechat.app.R.drawable.ic_story_save_filled
+                else com.privatechat.app.R.drawable.ic_story_save_outline
+            )
+        }
+        button.setOnClickListener {
+            saved = !saved
+            button.setImageResource(
+                if (saved) com.privatechat.app.R.drawable.ic_story_save_filled
+                else com.privatechat.app.R.drawable.ic_story_save_outline
+            )
+            if (saved) repository.saveSong(song) { } else repository.removeSavedSong(song)
+        }
+        return button
+    }
+
+    private fun iconButton(iconRes: Int, onClick: () -> Unit): View = ImageView(activity).apply {
+        layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+        setPadding(dp(7), dp(7), dp(7), dp(7))
+        setImageResource(iconRes)
         setOnClickListener { onClick() }
     }
 
@@ -288,10 +331,20 @@ class MusicPickerSheet(
         val id = song.id()
         if (previewingId == id) {
             StoryMusicPlayer.stop(previewContainer)
-            previewingId = null
+            highlightRow(null)
         } else {
             StoryMusicPlayer.play(previewContainer, song)
-            previewingId = id
+            highlightRow(id)
+        }
+    }
+
+    /** Tints the currently-previewing row so it's obvious which song
+     * is "live" while browsing — clears any previous highlight first. */
+    private fun highlightRow(id: String?) {
+        previewingId?.let { rowsById[it]?.setBackgroundColor(Color.TRANSPARENT) }
+        previewingId = id
+        if (id != null) {
+            rowsById[id]?.setBackgroundColor(Color.parseColor("#332F6FED"))
         }
     }
 

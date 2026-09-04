@@ -51,7 +51,8 @@ In the new service's **Environment** tab, add:
 | `PRIVATE_KEY` | `private_key` from the service account JSON, **including** the `\n` sequences, wrapped in quotes |
 | `API_SECRET` | Any long random string — e.g. run `openssl rand -hex 32` locally and paste the result |
 | `PORT` | `10000` (Render also sets this automatically; harmless either way) |
-| `YOUTUBE_API_KEY` | Optional — powers the story music feature's search/trending/recommend. Get one from Google Cloud Console: enable the "YouTube Data API v3" on a project, then create an API key under Credentials. Without this set, those three endpoints just return an empty song list rather than erroring — everything else works fine either way. |
+| `YOUTUBE_API_KEY` | Optional — powers YouTube results in the story music feature's search/trending/recommend. Get one from Google Cloud Console: enable the "YouTube Data API v3" on a project, then create an API key under Credentials. |
+| `JAMENDO_CLIENT_ID` | Optional — powers Jamendo results in the same feature. Unlike YouTube's key, this is free and issued instantly with no approval wait: sign up at [devportal.jamendo.com](https://devportal.jamendo.com), create an app, the Client ID is shown right away. Jamendo tracks stream directly with no extra lookup, so this is the more reliable source to set up first. Neither key is required — set either or both; with neither set, search/trending/recommend just return an empty song list rather than erroring. |
 
 See `.env.example` for the exact shape expected.
 

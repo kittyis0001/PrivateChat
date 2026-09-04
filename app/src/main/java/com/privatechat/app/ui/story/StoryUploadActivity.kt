@@ -177,11 +177,20 @@ class StoryUploadActivity : AppCompatActivity() {
         selectedSong = song
         binding.storySelectedMusicText.text = "${song.title} · ${song.artist}"
         binding.storySelectedMusicBadge.visibility = View.VISIBLE
+        // Keep it playing here in the compose screen — the picker
+        // handed playback ownership off rather than stopping it (see
+        // MusicPickerSheet's dismiss listener), and this call is also
+        // what starts it fresh if the picker was closed via search/
+        // trending/saved without ever having previewed this exact
+        // song. Either way: hearing it play right after picking is
+        // the actual confirmation of "this is what my story will use."
+        StoryMusicPlayer.play(binding.storyMusicPreviewContainer, song)
     }
 
     private fun clearSelectedMusic() {
         selectedSong = null
         binding.storySelectedMusicBadge.visibility = View.GONE
+        StoryMusicPlayer.stop(binding.storyMusicPreviewContainer)
     }
 
     private fun toggleEditorPanel() {

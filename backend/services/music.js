@@ -1,22 +1,30 @@
 // Music search/trending/recommend for the story music feature.
 //
-// Uses the YouTube Data API v3 (set YOUTUBE_API_KEY in the environment
-// once you have one — see backend/README.md). Node 18+'s built-in
-// fetch is used directly, no extra HTTP client dependency needed.
+// Two independent sources, combined:
+//   - YouTube Data API v3 — set YOUTUBE_API_KEY once you have one.
+//   - Jamendo API v3.0 — set JAMENDO_CLIENT_ID. Unlike YouTube's key,
+//     Jamendo's is free and issued instantly, no approval wait: sign
+//     up at https://devportal.jamendo.com, create an app, and the
+//     Client ID is right there. This is the source the reference
+//     screenshots' "For You"/"Trending" results actually came from —
+//     Jamendo tracks stream directly (real audioUrl, no extra
+//     lookup), so it's also the more reliable source for playback.
 //
-// If YOUTUBE_API_KEY isn't set, every function here returns an empty
-// song list rather than throwing — the Android app's music picker
-// already shows a clean "no songs found" state for that, so a missing
-// key degrades gracefully instead of breaking the story feature.
+// Node 18+'s built-in fetch is used directly, no extra HTTP client
+// dependency needed. Each source degrades independently: if only one
+// key is set, you still get that source's results instead of an
+// empty list; if neither is set, every function returns an empty
+// list rather than throwing.
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
+const JAMENDO_API_BASE = "https://api.jamendo.com/v3.0";
 
 // Curated mood -> search-query mapping for the "For You" tab. The
 // reference web app calls Gemini to analyze the caption/image and
 // infer a mood; this backend doesn't have an AI text/image analysis
 // key configured, so this is a deliberately simpler, honest
 // substitute: match a few keywords in the caption to a mood, or fall
-// back to a default, then search YouTube for that mood directly.
+// back to a default, then search for that mood directly.
 const MOOD_KEYWORDS = [
   { mood: "Romantic", vibe: "love songs", match: ["love", "miss you", "heart", "baby", "❤️", "😍"], query: "romantic love songs" },
   { mood: "Happy", vibe: "feel-good", match: ["happy", "fun", "party", "celebrat", "🎉", "😂", "😄"], query: "happy feel good songs" },
@@ -25,8 +33,12 @@ const MOOD_KEYWORDS = [
   { mood: "Chill", vibe: "relaxed", match: ["chill", "relax", "calm", "sleep", "🌙", "☕"], query: "chill lofi songs" },
 ];
 
-function isConfigured() {
+function youtubeConfigured() {
   return Boolean(process.env.YOUTUBE_API_KEY);
+}
+
+function jamendoConfigured() {
+  return Boolean(process.env.JAMENDO_CLIENT_ID);
 }
 
 function normalizeYouTubeItem(item) {
@@ -44,8 +56,21 @@ function normalizeYouTubeItem(item) {
   };
 }
 
-async function searchYouTube(query, maxResults = 20) {
-  if (!isConfigured()) return [];
+function normalizeJamendoItem(track) {
+  if (!track?.id || !track?.audio) return null;
+  return {
+    videoId: null,
+    jamendoId: String(track.id),
+    title: track.name || "Untitled",
+    artist: track.artist_name || "",
+    thumbnail: track.image || track.album_image || "",
+    audioUrl: track.audio,
+    source: "jamendo",
+  };
+}
+
+async function searchYouTube(query, maxResults = 15) {
+  if (!youtubeConfigured()) return [];
   const url = new URL(`${YOUTUBE_API_BASE}/search`);
   url.searchParams.set("part", "snippet");
   url.searchParams.set("type", "video");
@@ -63,8 +88,8 @@ async function searchYouTube(query, maxResults = 20) {
   return (data.items || []).map(normalizeYouTubeItem).filter(Boolean);
 }
 
-async function trendingYouTube(maxResults = 20) {
-  if (!isConfigured()) return [];
+async function trendingYouTube(maxResults = 15) {
+  if (!youtubeConfigured()) return [];
   const url = new URL(`${YOUTUBE_API_BASE}/videos`);
   url.searchParams.set("part", "snippet");
   url.searchParams.set("chart", "mostPopular");
@@ -81,6 +106,54 @@ async function trendingYouTube(maxResults = 20) {
   return (data.items || []).map(normalizeYouTubeItem).filter(Boolean);
 }
 
+async function searchJamendo(query, maxResults = 15) {
+  if (!jamendoConfigured()) return [];
+  const url = new URL(`${JAMENDO_API_BASE}/tracks`);
+  url.searchParams.set("client_id", process.env.JAMENDO_CLIENT_ID);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", String(maxResults));
+  url.searchParams.set("search", query);
+  url.searchParams.set("audioformat", "mp32");
+
+  const res = await fetch(url.toString());
+  if (!res.ok) {
+    console.error(`[music] Jamendo search failed: ${res.status}`);
+    return [];
+  }
+  const data = await res.json();
+  return (data.results || []).map(normalizeJamendoItem).filter(Boolean);
+}
+
+async function trendingJamendo(maxResults = 15) {
+  if (!jamendoConfigured()) return [];
+  // Jamendo's own "popular this month" ordering — a genuine
+  // international trending list, not scoped to any one region.
+  const url = new URL(`${JAMENDO_API_BASE}/tracks`);
+  url.searchParams.set("client_id", process.env.JAMENDO_CLIENT_ID);
+  url.searchParams.set("format", "json");
+  url.searchParams.set("limit", String(maxResults));
+  url.searchParams.set("order", "popularity_month");
+  url.searchParams.set("audioformat", "mp32");
+
+  const res = await fetch(url.toString());
+  if (!res.ok) {
+    console.error(`[music] Jamendo trending failed: ${res.status}`);
+    return [];
+  }
+  const data = await res.json();
+  return (data.results || []).map(normalizeJamendoItem).filter(Boolean);
+}
+
+async function search(query) {
+  const [youtube, jamendo] = await Promise.all([searchYouTube(query), searchJamendo(query)]);
+  return [...jamendo, ...youtube];
+}
+
+async function trending() {
+  const [youtube, jamendo] = await Promise.all([trendingYouTube(), trendingJamendo()]);
+  return [...jamendo, ...youtube];
+}
+
 function detectMood(caption) {
   const text = (caption || "").toLowerCase();
   for (const entry of MOOD_KEYWORDS) {
@@ -91,8 +164,13 @@ function detectMood(caption) {
 
 async function recommendByCaption(caption) {
   const moodEntry = detectMood(caption);
-  const songs = await searchYouTube(moodEntry.query, 15);
+  const songs = await search(moodEntry.query);
   return { songs, mood: moodEntry.mood, vibe: moodEntry.vibe };
 }
 
-module.exports = { isConfigured, searchYouTube, trendingYouTube, recommendByCaption };
+module.exports = {
+  isConfigured: () => youtubeConfigured() || jamendoConfigured(),
+  search,
+  trending,
+  recommendByCaption,
+};

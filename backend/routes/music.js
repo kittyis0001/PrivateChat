@@ -1,5 +1,5 @@
 const express = require("express");
-const { searchYouTube, trendingYouTube, recommendByCaption } = require("../services/music");
+const { search, trending, recommendByCaption } = require("../services/music");
 
 const router = express.Router();
 
@@ -16,7 +16,7 @@ router.get("/music/search", async (req, res) => {
     return res.status(400).json({ error: "invalid_query" });
   }
   try {
-    const songs = await searchYouTube(q.trim());
+    const songs = await search(q.trim());
     return res.status(200).json({ songs });
   } catch (err) {
     console.error("[music/search] failed:", err.message);
@@ -26,7 +26,7 @@ router.get("/music/search", async (req, res) => {
 
 router.get("/music/trending", async (_req, res) => {
   try {
-    const songs = await trendingYouTube();
+    const songs = await trending();
     return res.status(200).json({ songs });
   } catch (err) {
     console.error("[music/trending] failed:", err.message);

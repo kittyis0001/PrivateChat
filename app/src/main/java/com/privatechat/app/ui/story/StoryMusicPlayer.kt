@@ -44,6 +44,7 @@ object StoryMusicPlayer {
         val wv = WebView(context).apply {
             settings.javaScriptEnabled = true
             settings.mediaPlaybackRequiresUserGesture = false
+            settings.domStorageEnabled = true
         }
         webView = wv
         container.removeAllViews()
