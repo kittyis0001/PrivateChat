@@ -80,9 +80,70 @@
                     android:src="@drawable/ic_menu_edit"
                     android:tint="@android:color/white"
                     android:contentDescription="Edit" />
-                <!-- Music button (🎵) slots in here as a sibling in the
-                     music PR. -->
+
+                <TextView
+                    android:id="@+id/storyMusicBtn"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:background="@drawable/bg_story_toolbar_button"
+                    android:text="🎵"
+                    android:textSize="16sp"
+                    android:contentDescription="Add music" />
             </LinearLayout>
+
+            <!-- Selected-song badge, WhatsApp/Instagram-style pill —
+                 shown once a song is picked, tap the ✕ to remove. -->
+            <LinearLayout
+                android:id="@+id/storySelectedMusicBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_margin="8dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/bg_story_toolbar_button"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="6dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎵"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/storySelectedMusicText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:maxWidth="130dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/storyRemoveMusicBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="✕"
+                    android:textColor="@android:color/white"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- Hidden host for StoryMusicPlayer's YouTube WebView
+                 during in-picker preview — must stay attached to the
+                 window to keep playing reliably (see the player's own
+                 comment), so 1dp rather than not-added-at-all. -->
+            <FrameLayout
+                android:id="@+id/storyMusicPreviewContainer"
+                android:layout_width="1dp"
+                android:layout_height="1dp"
+                android:layout_gravity="top|start" />
         </FrameLayout>
 
         <EditText

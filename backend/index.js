@@ -7,6 +7,7 @@ const helmet = require("helmet");
 const { requireApiSecret } = require("./middleware/auth");
 const { notifyRateLimiter } = require("./middleware/rateLimit");
 const notifyRoute = require("./routes/notify");
+const musicRoute = require("./routes/music");
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api", requireApiSecret, notifyRateLimiter, notifyRoute);
+app.use("/api", requireApiSecret, notifyRateLimiter, musicRoute);
 
 // Catch-all for anything else, kept generic on purpose.
 app.use((_req, res) => {

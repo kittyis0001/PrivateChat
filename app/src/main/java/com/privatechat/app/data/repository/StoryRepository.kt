@@ -39,6 +39,7 @@ class StoryRepository(private val currentUser: String) {
         mediaUrl: String,
         caption: String?,
         edit: com.privatechat.app.data.model.StoryEdit?,
+        music: com.privatechat.app.data.model.Song?,
         onComplete: (success: Boolean) -> Unit
     ) {
         val ref = storiesRef.push()
@@ -56,6 +57,7 @@ class StoryRepository(private val currentUser: String) {
         // same as every other complex field this app already writes
         // this way — no manual Map<String,Any> conversion needed.
         if (edit != null) data["edit"] = edit
+        if (music != null) data["music"] = music
         ref.setValue(data)
             .addOnSuccessListener { onComplete(true) }
             .addOnFailureListener { onComplete(false) }

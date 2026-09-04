@@ -21,3 +21,18 @@ data class NotifyCallRequest(
     val calleeId: String,
     val callerName: String
 )
+
+// Mirrors backend/routes/music.js's response shapes exactly.
+data class MusicSearchResponse(
+    val songs: List<com.privatechat.app.data.model.Song> = emptyList()
+)
+
+data class MusicRecommendRequest(
+    val caption: String
+)
+
+data class MusicRecommendResponse(
+    val songs: List<com.privatechat.app.data.model.Song> = emptyList(),
+    val mood: String? = null,
+    val vibe: String? = null
+)

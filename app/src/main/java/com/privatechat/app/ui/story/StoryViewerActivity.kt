@@ -116,6 +116,16 @@ class StoryViewerActivity : AppCompatActivity() {
             binding.storyCapOverlay.visibility = View.GONE
         }
 
+        val music = story.music
+        if (music != null) {
+            binding.storyMusicBadge.visibility = View.VISIBLE
+            binding.storyMusicBadgeText.text = "${music.title} · ${music.artist}"
+            StoryMusicPlayer.play(binding.storyMusicPlaybackContainer, music)
+        } else {
+            binding.storyMusicBadge.visibility = View.GONE
+            StoryMusicPlayer.stop(binding.storyMusicPlaybackContainer)
+        }
+
         repository.markViewed(story.key)
         com.privatechat.app.data.StoryViewTracker.markViewed(story.key)
 
@@ -262,6 +272,7 @@ class StoryViewerActivity : AppCompatActivity() {
         if (binding.storyVid.visibility == View.VISIBLE && binding.storyVid.isPlaying) {
             binding.storyVid.pause()
         }
+        StoryMusicPlayer.pause()
     }
 
     private fun resume() {
@@ -270,6 +281,7 @@ class StoryViewerActivity : AppCompatActivity() {
         if (binding.storyVid.visibility == View.VISIBLE && !binding.storyVid.isPlaying) {
             binding.storyVid.start()
         }
+        StoryMusicPlayer.resume()
     }
 
     // ── Delete (own stories only) ─────────────────────────────
@@ -332,6 +344,7 @@ class StoryViewerActivity : AppCompatActivity() {
         super.onDestroy()
         holdRunnable?.let { handler.removeCallbacks(it) }
         binding.storyVid.stopPlayback()
+        StoryMusicPlayer.stop(binding.storyMusicPlaybackContainer)
     }
 
     companion object {
