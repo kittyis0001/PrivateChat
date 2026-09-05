@@ -141,8 +141,8 @@
                  comment), so 1dp rather than not-added-at-all. -->
             <FrameLayout
                 android:id="@+id/storyMusicPreviewContainer"
-                android:layout_width="4dp"
-                android:layout_height="4dp"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
                 android:layout_gravity="top|start" />
         </FrameLayout>
 
