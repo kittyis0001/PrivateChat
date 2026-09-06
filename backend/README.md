@@ -126,9 +126,35 @@ Body: `{ "caption": "optional story caption text" }`
 
 Returns `{ "songs": [...], "mood": "Chill", "vibe": "relaxed" }` — a
 few keywords in the caption are matched to a mood (falls back to a
-generic one), then that mood is searched on YouTube. Simpler than the
-reference web app's Gemini-based mood analysis, since no AI API key is
+generic one), then that mood is searched. Simpler than the reference
+web app's Gemini-based mood analysis, since no AI API key is
 configured here — see `services/music.js`'s own comment.
+
+### `GET /api/music/youtube-audio?videoId=<id>`
+
+Headers: `X-Api-Secret: <API_SECRET>`
+
+Returns `{ "audioUrl": "..." }` (or `{ "audioUrl": null }` if it
+couldn't be resolved). Resolves a YouTube video to a direct,
+streamable audio URL using `@distube/ytdl-core`, so the Android app
+can play a YouTube song through a plain audio player exactly like a
+Jamendo one — a hidden WebView running the actual YouTube embed turned
+out to be too unreliable for silent background autoplay in practice.
+
+**Worth knowing, not just a one-time setup step:** this extracts a
+direct stream URL rather than using YouTube's official playback embed
+— a well-established pattern for personal/hobby projects, but not
+something YouTube's terms officially sanction, and YouTube
+periodically changes its systems specifically to break this kind of
+extraction. If this endpoint starts failing, try `npm update
+@distube/ytdl-core` in `backend/` first — it's a fork maintained
+specifically to keep up with those changes. Some videos (age-
+restricted, region-locked, etc.) may still fail to resolve even with
+an up-to-date library. Jamendo has none of these caveats, since it's a
+public API meant for exactly this kind of direct playback.
+
+This is also why `engines.node` bumped to `>=20.18.1` — required by
+`@distube/ytdl-core`.
 
 ## Local testing
 

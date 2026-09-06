@@ -36,4 +36,10 @@ interface NotifyApi {
         @Header("X-Api-Secret") apiSecret: String,
         @Body body: MusicRecommendRequest
     ): Response<MusicRecommendResponse>
+
+    @GET("api/music/youtube-audio")
+    suspend fun resolveYoutubeAudio(
+        @Header("X-Api-Secret") apiSecret: String,
+        @Query("videoId") videoId: String
+    ): Response<YoutubeAudioResponse>
 }
