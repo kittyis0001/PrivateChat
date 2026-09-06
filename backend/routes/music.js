@@ -1,5 +1,5 @@
 const express = require("express");
-const { search, trending, recommendByCaption } = require("../services/music");
+const { search, trending, recommendByCaption, resolveYoutubeAudioUrl } = require("../services/music");
 
 const router = express.Router();
 
@@ -49,6 +49,28 @@ router.post("/music/recommend", async (req, res) => {
   } catch (err) {
     console.error("[music/recommend] failed:", err.message);
     return res.status(502).json({ error: "recommend_failed" });
+  }
+});
+
+// Basic YouTube video ID shape check (11 chars, URL-safe base64-ish
+// alphabet) — cheap guard against obviously-invalid input before
+// spending a request on ytdl-core.
+const VIDEO_ID_PATTERN = /^[\w-]{6,15}$/;
+
+router.get("/music/youtube-audio", async (req, res) => {
+  const videoId = req.query.videoId;
+  if (typeof videoId !== "string" || !VIDEO_ID_PATTERN.test(videoId)) {
+    return res.status(400).json({ error: "invalid_video_id" });
+  }
+  try {
+    const audioUrl = await resolveYoutubeAudioUrl(videoId);
+    if (!audioUrl) {
+      return res.status(200).json({ audioUrl: null });
+    }
+    return res.status(200).json({ audioUrl });
+  } catch (err) {
+    console.error("[music/youtube-audio] failed:", err.message);
+    return res.status(502).json({ error: "resolve_failed" });
   }
 });
 

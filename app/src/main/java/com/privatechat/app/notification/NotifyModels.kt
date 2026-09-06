@@ -36,3 +36,8 @@ data class MusicRecommendResponse(
     val mood: String? = null,
     val vibe: String? = null
 )
+
+// Mirrors backend/routes/music.js's /music/youtube-audio response.
+data class YoutubeAudioResponse(
+    val audioUrl: String? = null
+)

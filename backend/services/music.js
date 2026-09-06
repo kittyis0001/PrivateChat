@@ -18,6 +18,7 @@
 
 const YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3";
 const JAMENDO_API_BASE = "https://api.jamendo.com/v3.0";
+const ytdl = require("@distube/ytdl-core");
 
 // Curated mood -> search-query mapping for the "For You" tab. The
 // reference web app calls Gemini to analyze the caption/image and
@@ -168,9 +169,44 @@ async function recommendByCaption(caption) {
   return { songs, mood: moodEntry.mood, vibe: moodEntry.vibe };
 }
 
+/**
+ * Resolves a YouTube video ID to a direct, streamable audio URL —
+ * used instead of embedding the actual YouTube player, because a
+ * hidden WebView running the IFrame Player API turned out to be too
+ * unreliable for background/silent autoplay in practice (Android
+ * WebViews apply extra scrutiny to autoplay-with-sound that a real
+ * browser doesn't hit). With a real audio URL, the Android app plays
+ * a YouTube song exactly the same simple, reliable way it already
+ * plays a Jamendo one — a plain MediaPlayer, no embedded page at all.
+ *
+ * Important trade-off to know about, not just a "set once" fix:
+ *   - This extracts a direct stream URL rather than using YouTube's
+ *     official playback embed, which isn't something YouTube's terms
+ *     officially sanction — a well-established pattern for personal/
+ *     hobby projects (this is what the popular open-source ytdl-core
+ *     library and tools like it exist for), but worth knowing.
+ *   - YouTube periodically changes its systems specifically to break
+ *     this kind of extraction, so this can occasionally stop working
+ *     until @distube/ytdl-core (a well-maintained fork with frequent
+ *     updates for exactly this reason) is updated — `npm update
+ *     @distube/ytdl-core` in backend/ if this endpoint starts failing.
+ *   - Some videos (age-restricted, region-locked, etc.) may still fail
+ *     to resolve even with an up-to-date library.
+ * Jamendo has none of these caveats, since it's a real public API
+ * intended for exactly this kind of direct playback.
+ */
+async function resolveYoutubeAudioUrl(videoId) {
+  const info = await ytdl.getInfo(`https://www.youtube.com/watch?v=${videoId}`);
+  const audioFormats = ytdl.filterFormats(info.formats, "audioonly");
+  if (audioFormats.length === 0) return null;
+  const best = audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
+  return best.url;
+}
+
 module.exports = {
   isConfigured: () => youtubeConfigured() || jamendoConfigured(),
   search,
   trending,
   recommendByCaption,
+  resolveYoutubeAudioUrl,
 };

@@ -5,12 +5,13 @@
   "description": "Render-hosted notification API for PrivateChat — validates a request from the Android app, looks up the recipient's FCM token in the existing Firebase Realtime Database, and sends the push via FCM HTTP v1 (through firebase-admin). Runs on Firebase's free Spark plan since it needs zero paid Firebase features — only a service account and Realtime Database read/write.",
   "main": "index.js",
   "engines": {
-    "node": ">=18"
+    "node": ">=20.18.1"
   },
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
