@@ -362,7 +362,11 @@ class ChatActivity : AppCompatActivity() {
                             this@ChatActivity,
                             callerId = session.caller,
                             remotePhotoUrl = photos[session.caller],
-                            launchUi = true
+                            // Only auto-open the call screen while the chat
+                            // is actually visible; otherwise the full-screen
+                            // notification surfaces the call (no background
+                            // activity launch).
+                            launchUi = ChatActivity.isForeground
                         )
                     }
                 }
