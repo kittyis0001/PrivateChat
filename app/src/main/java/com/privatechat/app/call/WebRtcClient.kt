@@ -80,7 +80,13 @@ class WebRtcClient(
             val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
                 sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             }
-            val pc = factory.createPeerConnection(rtcConfig, pcObserver)
+            // createPeerConnection is @Nullable in the SDK — it can return
+            // null on failure; treat that as a call-level error rather
+            // than crashing on the next line.
+            val pc = factory.createPeerConnection(rtcConfig, pcObserver) ?: run {
+                observer.onError("Failed to create PeerConnection")
+                return
+            }
             peerConnection = pc
 
             val audioSource = factory.createAudioSource(MediaConstraints())

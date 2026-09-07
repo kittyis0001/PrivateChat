@@ -673,7 +673,7 @@ object CallManager {
             // notification on its own instead of ringing forever.
             .setTimeoutAfter(RING_TIMEOUT_MS)
             .setContentIntent(fullScreenPendingIntent)
-            .setFullScreenIntent(fullScreenPendingIntent, highPriority = true)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             .addAction(R.drawable.ic_call_end, "Decline", declinePendingIntent)
             .addAction(R.drawable.ic_call_accept, "Accept", acceptPendingIntent)
             .build()
