@@ -94,13 +94,21 @@
             android:exported="false"
             android:theme="@style/Theme.PhotoViewer" />
 
+        <!-- Full-screen call UI. showWhenLocked/turnScreenOn let the
+             incoming-call notification wake the screen and show over the
+             lock screen. launchMode singleTop + configChanges keep a
+             single call screen (no duplicate instances) and prevent a
+             rotation/theme-change recreation from ever tearing down the
+             call screen while a call is live. -->
         <activity
             android:name=".call.CallActivity"
             android:exported="false"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.PhotoViewer"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
-            android:excludeFromRecents="true" />
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|uiMode" />
 
         <service
             android:name=".messaging.ChatFirebaseMessagingService"
@@ -117,16 +125,11 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- Decline action on the incoming-call notification — see the
-             receiver's own doc comment. -->
+        <!-- Decline (incoming-call notification) and Hang up
+             (ongoing-call notification) actions — see the receiver's
+             own doc comment. -->
         <receiver
-            android:name=".call.CallDeclineReceiver"
-            android:exported="false" />
-
-        <!-- Hang Up action on the ongoing-call notification — see the
-             receiver's own doc comment. -->
-        <receiver
-            android:name=".call.CallHangupReceiver"
+            android:name=".call.CallActionReceiver"
             android:exported="false" />
 
         <meta-data
