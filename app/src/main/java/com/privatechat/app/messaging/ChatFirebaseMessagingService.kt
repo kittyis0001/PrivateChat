@@ -10,17 +10,11 @@ import androidx.core.graphics.drawable.IconCompat
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.privatechat.app.App
 import com.privatechat.app.R
-import com.privatechat.app.call.CallActivity
-import com.privatechat.app.call.CallDeclineReceiver
+import com.privatechat.app.call.CallManager
 import com.privatechat.app.data.Session
 import com.privatechat.app.ui.chat.ChatActivity
 import com.privatechat.app.utils.NotificationAvatarFactory
-
-// Shared with CallDeclineReceiver, which needs the same ID to cancel
-// this exact notification when Decline is tapped.
-const val CALL_NOTIFICATION_ID = 1002
 
 /**
  * This is the actual fix for the original architecture problem: the
@@ -116,79 +110,26 @@ class ChatFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     /**
-     * WhatsApp-style incoming-call notification: full-screen intent (so
-     * it wakes the screen and shows over the lock screen even while the
-     * app is backgrounded or fully killed — CallActivity already has
-     * showWhenLocked/turnScreenOn set for exactly this), plus inline
-     * Accept/Decline actions.
+     * Incoming voice call push. The whole incoming-call surface — the
+     * full-screen/heads-up notification, the ringing, the single-call
+     * guard, and the Accept/Decline actions — lives in CallManager so
+     * there is exactly one path and therefore never a duplicate screen
+     * or notification. This method only extracts the caller id and
+     * forwards.
      *
-     * Skipped if CallActivity is already showing — it got here through
-     * its own live Firebase listener (app was in foreground when the
-     * call started) and is already ringing on screen; a second
-     * full-screen notification on top of it would just be a jarring
-     * duplicate, same reasoning as ChatActivity.isForeground above.
+     * launchUi is true only while the chat screen is already visible
+     * (the app is in the user's hands), so the call screen opens
+     * immediately; otherwise the full-screen notification surfaces the
+     * call over the lock screen / from the background.
      */
     private fun handleIncomingCallPush(message: RemoteMessage) {
-        if (CallActivity.isForeground) return
         val callerId = message.data["callerId"] ?: return
-        val callerName = message.data["callerName"] ?: callerId
-
-        val fullScreenIntent = Intent(this, CallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(CallActivity.EXTRA_REMOTE_USER, callerId)
-            putExtra(CallActivity.EXTRA_IS_OUTGOING, false)
-        }
-        val fullScreenPendingIntent = PendingIntent.getActivity(
-            this, 0, fullScreenIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        CallManager.onIncomingCall(
+            this,
+            callerId = callerId,
+            remotePhotoUrl = null,
+            launchUi = ChatActivity.isForeground
         )
-
-        // Accept opens the same CallActivity screen (answering still
-        // needs its WebRTC/mic-permission flow), just with a flag that
-        // skips straight to the accept action instead of waiting for a
-        // second tap once the ringing UI is on screen.
-        val acceptIntent = Intent(this, CallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(CallActivity.EXTRA_REMOTE_USER, callerId)
-            putExtra(CallActivity.EXTRA_IS_OUTGOING, false)
-            putExtra(CallActivity.EXTRA_AUTO_ACCEPT, true)
-        }
-        val acceptPendingIntent = PendingIntent.getActivity(
-            this, 1, acceptIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val declineIntent = Intent(this, CallDeclineReceiver::class.java).apply {
-            action = CallDeclineReceiver.ACTION_DECLINE_CALL
-        }
-        val declinePendingIntent = PendingIntent.getBroadcast(
-            this, 2, declineIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val avatar = NotificationAvatarFactory.create(
-            resources.displayMetrics.density,
-            callerName.firstOrNull() ?: '?',
-            Color.parseColor("#B09EF5")
-        )
-
-        val notification = NotificationCompat.Builder(this, App.CALL_NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setColor(Color.parseColor("#7ec8f7"))
-            .setLargeIcon(avatar)
-            .setContentTitle(callerName)
-            .setContentText("Incoming voice call…")
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setAutoCancel(false)
-            .setOngoing(true)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setContentIntent(fullScreenPendingIntent)
-            .addAction(R.drawable.ic_call_end, "Decline", declinePendingIntent)
-            .addAction(R.drawable.ic_call, "Accept", acceptPendingIntent)
-            .build()
-
-        NotificationManagerCompat.from(this).notify(CALL_NOTIFICATION_ID, notification)
     }
 
     companion object {

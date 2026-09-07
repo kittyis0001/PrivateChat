@@ -1,452 +1,307 @@
 package com.privatechat.app.call
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.media.AudioManager
-import android.media.RingtoneManager
+import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.CircleCrop
+import com.privatechat.app.R
 import com.privatechat.app.data.Nicknames
-import com.privatechat.app.data.Session
 import com.privatechat.app.databinding.ActivityCallBinding
 import com.privatechat.app.utils.NotificationAvatarFactory
-import org.webrtc.IceCandidate
-import org.webrtc.PeerConnection
+import java.util.Locale
 
 /**
- * "Professional, premium, bug-free, instant voice call feature" — the
- * one honest caveat that comes with that: this signals entirely
- * through the existing Firebase Realtime Database and connects
- * peer-to-peer over WebRTC with Google's free public STUN servers.
- * That combination genuinely works well on favorable networks (same
- * wifi, most home broadband) but isn't guaranteed to punch through
- * arbitrary mobile-carrier NAT without a TURN relay — see
- * WebRtcClient's own comment for where to add one once you have it.
+ * Full-screen, WhatsApp-style voice call UI. This Activity is only a
+ * renderer: it binds to [CallManager.snapshot] (process scope) and
+ * forwards every user action (accept / decline / end / mute / speaker)
+ * into CallManager, so rotating the device, pressing Home, locking the
+ * screen, or the OS destroying/recreating this screen never affects the
+ * actual call — the call keeps running in CallManager + the foreground
+ * service, and this screen just re-attaches to it.
  *
- * Incoming calls DO ring even while the app is backgrounded or fully
- * killed: starting a call also sends a data-only FCM push (see
- * NotificationRepository.notifyIncomingCall / ChatFirebaseMessagingService
- * .handleIncomingCallPush), which shows a full-screen incoming-call
- * notification with Accept/Decline actions and launches this exact
- * screen on tap — the actual signaling/WebRTC connection below is
- * unchanged either way, this only affects how the screen gets opened.
- *
- * Once a call is actually underway (dialing out, or accepted
- * incoming), CallForegroundService keeps it alive and audio working
- * even after leaving the app — a persistent "ongoing call" notification
- * (WhatsApp-style) holds the process at foreground-service priority so
- * the OS won't reclaim it just because nothing is visible, with a tap-
- * to-return action and its own Hang Up button.
+ * It also owns the one thing only a visible Activity can do: request
+ * RECORD_AUDIO (for outgoing dialing and for accepting an incoming
+ * call, including when Accept was tapped on the notification).
  */
-class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
+class CallActivity : AppCompatActivity(), CallManager.Listener {
 
     private lateinit var binding: ActivityCallBinding
-    private lateinit var signaling: CallSignalingRepository
-    private var webRtcClient: WebRtcClient? = null
 
-    private lateinit var currentUser: String
-    private lateinit var remoteUser: String
+    private var remoteUser = ""
     private var isOutgoing = false
-    private var remotePhotoUrl: String? = null
+    private var photoUrl: String? = null
     private var autoAccept = false
 
-    private var state = CallState.CONNECTING
-    private var isMuted = false
-    private var isSpeakerOn = false
-    // Set the instant the user taps Accept, independent of whether the
-    // caller's offer SDP has actually arrived via Firebase yet — see
-    // tryAcceptIfReady()'s own comment for why this two-part check
-    // exists instead of accepting directly inline.
-    private var userWantsToAccept = false
-    private var callStartElapsedMs = 0L
-    private var durationHandler: Handler? = null
-    private var durationRunnable: Runnable? = null
-    private var ringtone: android.media.Ringtone? = null
+    private enum class PermissionAction { NONE, START_OUTGOING, ACCEPT }
+    private var pendingPermissionAction = PermissionAction.NONE
+
+    private val timerHandler = Handler(Looper.getMainLooper())
+    private var timerRunnable: Runnable? = null
 
     private val micPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) proceedAfterPermission() else finishCall()
+            if (granted) onMicPermissionGranted() else onMicPermissionDenied()
         }
-
-    private enum class CallState { OUTGOING_RINGING, INCOMING_RINGING, CONNECTING, CONNECTED, ENDED }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityCallBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        val user = Session.currentUser()
-        val other = intent.getStringExtra(EXTRA_REMOTE_USER)
-        if (user == null || other == null) {
+        remoteUser = intent.getStringExtra(EXTRA_REMOTE_USER).orEmpty()
+        isOutgoing = intent.getBooleanExtra(EXTRA_IS_OUTGOING, false)
+        photoUrl = intent.getStringExtra(EXTRA_REMOTE_PHOTO_URL)
+        autoAccept = intent.getBooleanExtra(EXTRA_AUTO_ACCEPT, false)
+
+        if (remoteUser.isEmpty()) {
             finish()
             return
         }
-        currentUser = user
-        remoteUser = other
-        isOutgoing = intent.getBooleanExtra(EXTRA_IS_OUTGOING, false)
-        remotePhotoUrl = intent.getStringExtra(EXTRA_REMOTE_PHOTO_URL)
-        autoAccept = intent.getBooleanExtra(EXTRA_AUTO_ACCEPT, false)
 
-        signaling = CallSignalingRepository(currentUser)
+        wireButtons()
 
-        val displayName = Nicknames.defaultFor(remoteUser)
-        binding.callName.text = displayName
-        loadAvatar(displayName, remotePhotoUrl)
+        if (isOutgoing) {
+            startOutgoingIfPossible()
+        } else {
+            // Incoming: CallManager is normally already INCOMING (from
+            // the FCM push or the live DB watcher), but this screen can
+            // also be re-opened (ongoing-notification tap) while the
+            // call is CONNECTING/ACTIVE/ENDED — only a fully-idle
+            // manager means the call is gone and this launch is stale.
+            val current = CallManager.currentPhase()
+            if (current == CallManager.Phase.IDLE) {
+                finish()
+                return
+            }
+            if (autoAccept && current == CallManager.Phase.INCOMING) {
+                acceptAfterPermission()
+            }
+        }
 
-        binding.callEndButton.setOnClickListener { userEndedCall() }
-        binding.callDeclineButton.setOnClickListener { userDeclinedCall() }
-        binding.callAcceptButton.setOnClickListener { userAcceptedCall() }
-        binding.callMuteButton.setOnClickListener { toggleMute() }
-        binding.callSpeakerButton.setOnClickListener { toggleSpeaker() }
+        CallManager.addListener(this)
+        render(CallManager.snapshot())
+    }
 
-        signaling.onSessionChanged = { session -> runOnUiThread { handleSessionChange(session) } }
-        signaling.onRemoteCandidate = { candidate ->
-            runOnUiThread {
-                val client = webRtcClient
-                if (client != null) {
-                    client.addRemoteIceCandidate(candidate.sdpMid, candidate.sdpMLineIndex, candidate.candidate)
-                } else {
-                    pendingRemoteCandidates.add(candidate)
+    private fun wireButtons() {
+        binding.callEndButton.setOnClickListener { CallManager.endCall(this) }
+        binding.callDeclineButton.setOnClickListener { CallManager.declineCall(this) }
+        binding.callAcceptButton.setOnClickListener { acceptAfterPermission() }
+        binding.callMuteButton.setOnClickListener { CallManager.toggleMute() }
+        binding.callSpeakerButton.setOnClickListener { CallManager.toggleSpeaker() }
+    }
+
+    private fun startOutgoingIfPossible() {
+        if (CallManager.isBusy()) return // returning to an existing call
+        pendingPermissionAction = PermissionAction.START_OUTGOING
+        if (hasMicPermission()) {
+            if (!CallManager.startOutgoingCall(this, remoteUser, photoUrl)) finish()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun acceptAfterPermission() {
+        pendingPermissionAction = PermissionAction.ACCEPT
+        if (hasMicPermission()) {
+            CallManager.acceptCall(this)
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun onMicPermissionGranted() {
+        when (pendingPermissionAction) {
+            PermissionAction.START_OUTGOING -> {
+                if (!CallManager.startOutgoingCall(this, remoteUser, photoUrl)) finish()
+            }
+            PermissionAction.ACCEPT -> CallManager.acceptCall(this)
+            PermissionAction.NONE -> {}
+        }
+        pendingPermissionAction = PermissionAction.NONE
+    }
+
+    private fun onMicPermissionDenied() {
+        when (pendingPermissionAction) {
+            PermissionAction.START_OUTGOING -> finish()
+            PermissionAction.ACCEPT -> {
+                // Can't answer without the mic — decline so the caller
+                // isn't left ringing forever.
+                CallManager.declineCall(this)
+                finish()
+            }
+            PermissionAction.NONE -> finish()
+        }
+        pendingPermissionAction = PermissionAction.NONE
+    }
+
+    private fun hasMicPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
+    // ── Rendering ──────────────────────────────────────────────────
+
+    override fun onCallStateChanged(snapshot: CallManager.CallSnapshot) {
+        runOnUiThread { render(snapshot) }
+    }
+
+    private fun render(s: CallManager.CallSnapshot) {
+        val name = s.remoteName.ifBlank { Nicknames.defaultFor(s.remoteUser) }
+        binding.callName.text = name
+        loadAvatar(name, s.photoUrl)
+
+        binding.callMuteButton.setImageResource(if (s.muted) R.drawable.ic_mic_off else R.drawable.ic_mic)
+        binding.callMuteButton.alpha = if (s.muted) 0.55f else 1f
+        binding.callSpeakerButton.setImageResource(R.drawable.ic_speaker)
+        binding.callSpeakerButton.alpha = if (s.speakerOn) 1f else 0.55f
+
+        when (s.phase) {
+            CallManager.Phase.DIALING -> {
+                binding.callStatus.text = "Calling…"
+                binding.callIncomingControls.visibility = View.GONE
+                binding.callInProgressControls.visibility = View.GONE
+                binding.callEndSection.visibility = View.VISIBLE
+                stopTimer()
+            }
+            CallManager.Phase.INCOMING -> {
+                binding.callStatus.text = "Incoming voice call…"
+                binding.callIncomingControls.visibility = View.VISIBLE
+                binding.callInProgressControls.visibility = View.GONE
+                binding.callEndSection.visibility = View.GONE
+                stopTimer()
+            }
+            CallManager.Phase.CONNECTING -> {
+                binding.callStatus.text = s.statusMessage.ifBlank { "Connecting…" }
+                binding.callIncomingControls.visibility = View.GONE
+                binding.callInProgressControls.visibility = View.GONE
+                binding.callEndSection.visibility = View.VISIBLE
+                stopTimer()
+            }
+            CallManager.Phase.ACTIVE -> {
+                val reconnecting = s.statusMessage.isNotBlank()
+                binding.callStatus.text = if (reconnecting) s.statusMessage else formatElapsed(CallManager.elapsedSeconds())
+                binding.callIncomingControls.visibility = View.GONE
+                binding.callInProgressControls.visibility = View.VISIBLE
+                binding.callEndSection.visibility = View.VISIBLE
+                startTimer()
+            }
+            CallManager.Phase.ENDED -> showEnded(s)
+            CallManager.Phase.IDLE -> finish()
+        }
+    }
+
+    private fun showEnded(s: CallManager.CallSnapshot) {
+        stopTimer()
+        binding.callIncomingControls.visibility = View.GONE
+        binding.callInProgressControls.visibility = View.GONE
+        binding.callEndSection.visibility = View.GONE
+        binding.callStatus.text = when {
+            s.missed -> "Missed call"
+            s.endReason == CallManager.EndReason.DECLINED -> "Call declined"
+            s.endReason == CallManager.EndReason.BUSY -> "Line busy"
+            s.endReason == CallManager.EndReason.NO_ANSWER -> "No answer"
+            s.endReason == CallManager.EndReason.FAILED -> "Call failed"
+            else -> "Call ended"
+        }
+        binding.root.postDelayed({ if (!isFinishing) finish() }, ENDED_FINISH_DELAY_MS)
+    }
+
+    private fun startTimer() {
+        stopTimer()
+        val runnable = object : Runnable {
+            override fun run() {
+                val snap = CallManager.snapshot()
+                if (snap.phase == CallManager.Phase.ACTIVE) {
+                    // Leave "Reconnecting…" untouched while it is shown.
+                    if (snap.statusMessage.isBlank()) {
+                        binding.callStatus.text = formatElapsed(CallManager.elapsedSeconds())
+                    }
+                    timerHandler.postDelayed(this, 1000)
                 }
             }
         }
-        signaling.attachSessionListener()
-        signaling.attachRemoteCandidateListener(remoteUser)
-
-        renderState(if (isOutgoing) CallState.OUTGOING_RINGING else CallState.INCOMING_RINGING)
-
-        if (!isOutgoing) {
-            startRingtone()
-        }
-        // Tapped Accept directly from the incoming-call notification —
-        // skip straight to the accept flow (still goes through the same
-        // mic-permission check userAcceptedCall() always does) instead
-        // of making the user tap Accept a second time once this screen
-        // is on top.
-        if (!isOutgoing && autoAccept) {
-            userAcceptedCall()
-        }
-
-        checkPermissionAndProceed()
+        timerRunnable = runnable
+        timerHandler.post(runnable)
     }
 
-    private fun loadAvatar(displayName: String, photoUrl: String?) {
-        val color = resources.getColor(com.privatechat.app.R.color.primary, theme)
+    private fun stopTimer() {
+        timerRunnable?.let { timerHandler.removeCallbacks(it) }
+        timerRunnable = null
+    }
+
+    private fun formatElapsed(seconds: Long): String {
+        val s = seconds.coerceAtLeast(0)
+        return String.format(Locale.US, "%d:%02d", s / 60, s % 60)
+    }
+
+    private fun loadAvatar(displayName: String, url: String?) {
+        val color = resources.getColor(R.color.primary, theme)
         val fallback = NotificationAvatarFactory.create(
             resources.displayMetrics.density, displayName.firstOrNull() ?: '?', color
         )
-        if (!photoUrl.isNullOrBlank()) {
+        if (!url.isNullOrBlank()) {
             Glide.with(this)
-                .load(photoUrl)
+                .load(url)
                 .transform(CircleCrop())
-                .placeholder(android.graphics.drawable.BitmapDrawable(resources, fallback))
+                .placeholder(BitmapDrawable(resources, fallback))
                 .into(binding.callAvatar)
         } else {
             binding.callAvatar.setImageBitmap(fallback)
         }
     }
 
-    private fun checkPermissionAndProceed() {
-        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
-        if (granted) {
-            proceedAfterPermission()
-        } else if (isOutgoing) {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-        // Incoming side: permission is only actually needed once the
-        // user taps Accept — checked again there — so a missing
-        // permission doesn't block the ringing UI itself from showing.
-    }
+    // ── Lifecycle ──────────────────────────────────────────────────
 
-    private fun proceedAfterPermission() {
-        if (isOutgoing) {
-            startOutgoingCall()
-        } else {
-            userWantsToAccept = true
-            renderState(CallState.CONNECTING)
-            tryAcceptIfReady()
-        }
-    }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        remoteUser = intent.getStringExtra(EXTRA_REMOTE_USER).orEmpty()
+        isOutgoing = intent.getBooleanExtra(EXTRA_IS_OUTGOING, false)
+        photoUrl = intent.getStringExtra(EXTRA_REMOTE_PHOTO_URL)
+        autoAccept = intent.getBooleanExtra(EXTRA_AUTO_ACCEPT, false)
 
-    // ── Outgoing ──────────────────────────────────────────────────
-
-    private fun startOutgoingCall() {
-        signaling.startCall(remoteUser)
-        val client = WebRtcClient(applicationContext, this)
-        webRtcClient = client
-        client.start()
-        flushPendingCandidates()
-        client.createOffer { sdp -> signaling.setOffer(sdp) }
-        startCallForegroundService("Calling…")
-    }
-
-    // ── Incoming ──────────────────────────────────────────────────
-
-    private fun userAcceptedCall() {
-        stopRingtone()
-        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
-        if (!granted) {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        val s = CallManager.snapshot()
+        if (isOutgoing && !CallManager.isBusy()) {
+            startOutgoingIfPossible()
             return
         }
-        userWantsToAccept = true
-        renderState(CallState.CONNECTING)
-        tryAcceptIfReady()
-    }
-
-    private var lastKnownOfferSdp: String? = null
-    // ICE candidates can (and often do) arrive from the other side
-    // before this device's own WebRtcClient exists yet — e.g. every
-    // candidate the caller sends while the callee simply hasn't
-    // tapped Accept yet. Without buffering, onRemoteCandidate below
-    // would silently drop them (webRtcClient?.addRemoteIceCandidate
-    // is a no-op on null), and the call gets stuck forever in
-    // "Connecting…" because ICE negotiation never receives enough
-    // candidates to find a working path — this was the main cause of
-    // calls not connecting/no audio. Flushed by flushPendingCandidates()
-    // right after webRtcClient is actually created.
-    private val pendingRemoteCandidates = mutableListOf<IceCandidateData>()
-
-    // The caller's offer SDP arrives as a separate, slightly-later
-    // Firebase write than the initial "ringing" session (see
-    // CallSignalingRepository.startCall/setOffer) — so it's possible
-    // for the user to tap Accept before it's actually landed here.
-    // Called both right after Accept is tapped AND every time the
-    // session updates, so whichever happens second is what actually
-    // starts the answer — instead of a direct call that could
-    // silently no-op if the offer wasn't there yet.
-    private fun tryAcceptIfReady() {
-        if (!userWantsToAccept || webRtcClient != null) return
-        val offer = lastKnownOfferSdp ?: return
-        acceptWithOffer(offer)
-    }
-
-    private fun acceptWithOffer(offerSdp: String) {
-        val client = WebRtcClient(applicationContext, this)
-        webRtcClient = client
-        client.start()
-        flushPendingCandidates()
-        client.setRemoteOffer(offerSdp)
-        client.createAnswer { sdp ->
-            signaling.setAnswer(sdp)
-            signaling.setStatus("accepted")
-        }
-        startCallForegroundService("Connecting…")
-    }
-
-    // Once the call is actually underway (dialing out, or accepted
-    // incoming) rather than just ringing — see CallForegroundService's
-    // own comment on why this is what actually keeps the call alive
-    // and audio working after leaving the app, WhatsApp-style.
-    private fun startCallForegroundService(statusText: String) {
-        CallForegroundService.start(
-            applicationContext,
-            callerName = Nicknames.defaultFor(remoteUser),
-            statusText = statusText,
-            remoteUser = remoteUser,
-            isOutgoing = isOutgoing
-        )
-    }
-
-    private fun flushPendingCandidates() {
-        val client = webRtcClient ?: return
-        pendingRemoteCandidates.forEach { candidate ->
-            client.addRemoteIceCandidate(candidate.sdpMid, candidate.sdpMLineIndex, candidate.candidate)
-        }
-        pendingRemoteCandidates.clear()
-    }
-
-    private fun userDeclinedCall() {
-        stopRingtone()
-        signaling.setStatus("declined")
-        signaling.endCall()
-        finishCall()
-    }
-
-    // ── Shared ────────────────────────────────────────────────────
-
-    private fun userEndedCall() {
-        stopRingtone()
-        signaling.endCall()
-        finishCall()
-    }
-
-    private fun handleSessionChange(session: CallSession?) {
-        if (session == null) {
-            // Other side ended/cleared the call, or it was declined.
-            if (state != CallState.ENDED) finishCall()
+        if (!isOutgoing && autoAccept) {
+            acceptAfterPermission()
             return
         }
-        lastKnownOfferSdp = session.offerSdp
-        tryAcceptIfReady()
-
-        when (session.status) {
-            "declined" -> if (isOutgoing) finishCall()
-            "accepted" -> {
-                if (isOutgoing && session.answerSdp != null && state != CallState.CONNECTED) {
-                    webRtcClient?.setRemoteAnswer(session.answerSdp)
-                    renderState(CallState.CONNECTING)
-                }
-            }
-            "ended" -> finishCall()
+        render(s)
+        if (s.phase == CallManager.Phase.IDLE || s.phase == CallManager.Phase.ENDED) {
+            finish()
         }
-    }
-
-    override fun onLocalIceCandidate(candidate: IceCandidate) {
-        signaling.sendIceCandidate(
-            currentUser,
-            IceCandidateData(candidate.sdpMid ?: "", candidate.sdpMLineIndex, candidate.sdp)
-        )
-    }
-
-    override fun onIceConnectionStateChanged(state: PeerConnection.IceConnectionState) {
-        runOnUiThread {
-            when (state) {
-                // COMPLETED is also a fully-working connection — some
-                // networks/candidate pairs go straight from CHECKING to
-                // COMPLETED without an intermediate CONNECTED event, and
-                // only watching for CONNECTED left the UI stuck showing
-                // "Connecting…" even once audio was already flowing.
-                PeerConnection.IceConnectionState.CONNECTED,
-                PeerConnection.IceConnectionState.COMPLETED -> {
-                    if (this.state != CallState.CONNECTED) renderState(CallState.CONNECTED)
-                }
-                PeerConnection.IceConnectionState.FAILED,
-                PeerConnection.IceConnectionState.DISCONNECTED -> {
-                    if (this.state != CallState.ENDED) finishCall()
-                }
-                else -> {}
-            }
-        }
-    }
-
-    private fun renderState(newState: CallState) {
-        state = newState
-        when (newState) {
-            CallState.OUTGOING_RINGING -> {
-                binding.callStatus.text = "Calling…"
-                binding.callIncomingControls.visibility = android.view.View.GONE
-                binding.callInProgressControls.visibility = android.view.View.GONE
-                binding.callEndButton.visibility = android.view.View.VISIBLE
-            }
-            CallState.INCOMING_RINGING -> {
-                binding.callStatus.text = "Incoming call…"
-                binding.callIncomingControls.visibility = android.view.View.VISIBLE
-                binding.callInProgressControls.visibility = android.view.View.GONE
-                binding.callEndButton.visibility = android.view.View.GONE
-            }
-            CallState.CONNECTING -> {
-                binding.callStatus.text = "Connecting…"
-                binding.callIncomingControls.visibility = android.view.View.GONE
-                binding.callInProgressControls.visibility = android.view.View.GONE
-                binding.callEndButton.visibility = android.view.View.VISIBLE
-            }
-            CallState.CONNECTED -> {
-                binding.callIncomingControls.visibility = android.view.View.GONE
-                binding.callInProgressControls.visibility = android.view.View.VISIBLE
-                binding.callEndButton.visibility = android.view.View.VISIBLE
-                startDurationTimer()
-                startCallForegroundService("Ongoing call")
-            }
-            CallState.ENDED -> {
-                binding.callStatus.text = "Call ended"
-            }
-        }
-    }
-
-    private fun startDurationTimer() {
-        callStartElapsedMs = System.currentTimeMillis()
-        val handler = Handler(Looper.getMainLooper())
-        durationHandler = handler
-        val runnable = object : Runnable {
-            override fun run() {
-                val elapsed = ((System.currentTimeMillis() - callStartElapsedMs) / 1000).toInt()
-                binding.callStatus.text = String.format("%d:%02d", elapsed / 60, elapsed % 60)
-                handler.postDelayed(this, 1000)
-            }
-        }
-        durationRunnable = runnable
-        handler.post(runnable)
-    }
-
-    private fun stopDurationTimer() {
-        durationRunnable?.let { durationHandler?.removeCallbacks(it) }
-        durationRunnable = null
-    }
-
-    private fun toggleMute() {
-        isMuted = !isMuted
-        webRtcClient?.setMuted(isMuted)
-        binding.callMuteButton.setImageResource(
-            if (isMuted) com.privatechat.app.R.drawable.ic_mic_off else com.privatechat.app.R.drawable.ic_mic
-        )
-        binding.callMuteButton.alpha = if (isMuted) 0.5f else 1f
-    }
-
-    private fun toggleSpeaker() {
-        isSpeakerOn = !isSpeakerOn
-        val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
-        audioManager.isSpeakerphoneOn = isSpeakerOn
-        binding.callSpeakerButton.alpha = if (isSpeakerOn) 1f else 0.5f
-    }
-
-    private fun startRingtone() {
-        try {
-            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-            ringtone = RingtoneManager.getRingtone(this, uri)
-            ringtone?.play()
-        } catch (e: Exception) {
-            // No default ringtone available on this device/build —
-            // the visual incoming-call UI still works without sound.
-        }
-    }
-
-    private fun stopRingtone() {
-        ringtone?.stop()
-        ringtone = null
-    }
-
-    private fun finishCall() {
-        if (state == CallState.ENDED) return
-        renderState(CallState.ENDED)
-        stopRingtone()
-        stopDurationTimer()
-        webRtcClient?.close()
-        webRtcClient = null
-        signaling.detachAll(remoteUser)
-        CallForegroundService.stop(applicationContext)
-        finish()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        stopRingtone()
-        stopDurationTimer()
-        webRtcClient?.close()
-        signaling.detachAll(remoteUser)
-        // Defensive — normally already stopped by finishCall(), but if
-        // this Activity got torn down some other way (e.g. system-
-        // killed and recreated), make sure a stale ongoing-call
-        // notification/foreground service can never outlive the call.
-        CallForegroundService.stop(applicationContext)
     }
 
     override fun onStart() {
         super.onStart()
         isForeground = true
+        if (CallManager.currentPhase() == CallManager.Phase.ACTIVE) startTimer()
     }
 
     override fun onStop() {
         super.onStop()
         isForeground = false
+        stopTimer()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopTimer()
+        CallManager.removeListener(this)
+        // Deliberately does NOT end the call — pressing Back / Home
+        // during a call keeps it alive in CallManager + the foreground
+        // service, exactly like WhatsApp.
     }
 
     companion object {
@@ -454,12 +309,9 @@ class CallActivity : AppCompatActivity(), WebRtcClient.Listener {
         const val EXTRA_IS_OUTGOING = "is_outgoing"
         const val EXTRA_REMOTE_PHOTO_URL = "remote_photo_url"
         const val EXTRA_AUTO_ACCEPT = "auto_accept"
+        private const val ENDED_FINISH_DELAY_MS = 900L
 
-        // Read by ChatFirebaseMessagingService to skip showing a
-        // redundant full-screen incoming-call notification when this
-        // screen is already open and ringing (call arrived while the
-        // app was in the foreground, via the live Firebase listener in
-        // ChatActivity) — same pattern as ChatActivity.isForeground.
+        /** Read by the messaging service to suppress a duplicate full-screen notification. */
         @Volatile
         var isForeground = false
     }

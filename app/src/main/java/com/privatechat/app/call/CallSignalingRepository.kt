@@ -5,12 +5,14 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.MutableData
+import com.google.firebase.database.Transaction
 import com.google.firebase.database.ValueEventListener
 
 data class CallSession(
     val caller: String = "",
     val callee: String = "",
-    val status: String = "", // "ringing" | "accepted" | "declined" | "ended"
+    val status: String = "", // "ringing" | "accepted" | "declined" | "busy" | "ended"
     val offerSdp: String? = null,
     val answerSdp: String? = null,
     val startedAt: Long = 0L
@@ -23,25 +25,22 @@ data class IceCandidateData(
 )
 
 /**
- * Signaling only — this never touches audio/video itself, just the
- * SDP offer/answer and ICE candidate exchange needed for two
- * WebRtcClient instances (one per device) to find and connect to each
- * other. One shared calls/session node (not one-per-call-id) since
- * this app only ever has two fixed users and one call can be active
- * at a time, mirroring how vanishMode/nicknames already use a single
- * shared node rather than per-user ones.
+ * Signaling only — never touches audio/video itself, just the SDP
+ * offer/answer + ICE candidate exchange two WebRtcClient instances
+ * need to find and connect to each other. One shared calls/session
+ * node (not one-per-call-id) since this app has exactly two users and
+ * at most one live call at a time.
  *
- * Deliberately does NOT reuse ChatRepository — a call can be signaled
- * (and rung) whenever this device's process is alive, independent of
- * whether ChatActivity itself is currently open, so this gets its own
- * short-lived attach/detach pair instead of piggybacking on
- * ChatRepository's Activity-lifecycle-bound one.
+ * The single-node design makes "prevent two calls at the same time"
+ * enforceable atomically: [startCall] runs a transaction that only
+ * commits if no fresh session already exists, so two devices racing to
+ * dial each other can never both win, and a second dial while a call
+ * is live fails cleanly with a "busy" result instead of clobbering the
+ * active call's session/candidates.
  */
 class CallSignalingRepository(private val currentUser: String) {
 
-    private val db: FirebaseDatabase = FirebaseDatabase.getInstance(
-        "https://private-chat-7a103-default-rtdb.asia-southeast1.firebasedatabase.app"
-    )
+    private val db: FirebaseDatabase = FirebaseDatabase.getInstance(DB_URL)
     private val sessionRef: DatabaseReference = db.getReference("calls/session")
     private val candidatesRef: DatabaseReference = db.getReference("calls/candidates")
 
@@ -51,22 +50,45 @@ class CallSignalingRepository(private val currentUser: String) {
     var onSessionChanged: ((CallSession?) -> Unit)? = null
     var onRemoteCandidate: ((IceCandidateData) -> Unit)? = null
 
-    fun startCall(callee: String) {
-        // Defensive cleanup: if a previous call ended abnormally
-        // (app killed mid-call, etc.) without endCall() running, stale
-        // candidates could still be sitting here — attachRemoteCandidateListener
-        // fires onChildAdded for every existing child immediately on
-        // attach, so leftover ones would otherwise get fed into a
-        // brand new call's WebRtcClient as if they were current.
-        candidatesRef.removeValue()
-        sessionRef.setValue(
-            mapOf(
-                "caller" to currentUser,
-                "callee" to callee,
-                "status" to "ringing",
-                "startedAt" to System.currentTimeMillis()
-            )
-        )
+    /**
+     * Atomically claims the shared session slot for a new outgoing
+     * call. Commits only when no other fresh call session exists (a
+     * stale session older than [STALE_SESSION_MS] — e.g. left behind by
+     * an app killed mid-call — is treated as dead and overwritten).
+     *
+     * @return true when this call won the slot, false when another
+     *         call is already active (busy).
+     */
+    fun startCall(callee: String, onCommitted: (Boolean) -> Unit) {
+        sessionRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(current: MutableData): Transaction.Result {
+                if (current.value != null) {
+                    val startedAt = current.child("startedAt").getValue(Long::class.java) ?: 0L
+                    val age = System.currentTimeMillis() - startedAt
+                    if (age < STALE_SESSION_MS) {
+                        // A fresh session exists -> another call is live.
+                        return Transaction.abort()
+                    }
+                }
+                current.value = mapOf(
+                    "caller" to currentUser,
+                    "callee" to callee,
+                    "status" to "ringing",
+                    "startedAt" to System.currentTimeMillis()
+                )
+                return Transaction.success(current)
+            }
+
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                if (committed) {
+                    // Clear any stale candidates left over from a
+                    // previous (crashed) call before this one starts
+                    // sending its own.
+                    candidatesRef.removeValue()
+                }
+                onCommitted(committed)
+            }
+        })
     }
 
     fun setOffer(sdp: String) {
@@ -81,7 +103,6 @@ class CallSignalingRepository(private val currentUser: String) {
         sessionRef.child("status").setValue(status)
     }
 
-    /** Ends the call and clears the whole session — ready for a fresh call afterward. */
     fun endCall() {
         sessionRef.removeValue()
         candidatesRef.removeValue()
@@ -116,6 +137,7 @@ class CallSignalingRepository(private val currentUser: String) {
                     )
                 )
             }
+
             override fun onCancelled(error: DatabaseError) {}
         }
         sessionListener = listener
@@ -128,10 +150,15 @@ class CallSignalingRepository(private val currentUser: String) {
         val listener = object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val sdpMid = snapshot.child("sdpMid").getValue(String::class.java) ?: return
-                val sdpMLineIndex = snapshot.child("sdpMLineIndex").getValue(Int::class.java) ?: return
+                // Firebase deserializes JSON integral values as Long, so
+                // getValue(Int::class.java) would silently return null and
+                // drop every candidate — which breaks ICE entirely and is
+                // exactly the \"call connects but no audio\" failure mode.
+                val sdpMLineIndex = snapshot.child("sdpMLineIndex").getValue(Long::class.java)?.toInt() ?: return
                 val candidate = snapshot.child("candidate").getValue(String::class.java) ?: return
                 onRemoteCandidate?.invoke(IceCandidateData(sdpMid, sdpMLineIndex, candidate))
             }
+
             override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
             override fun onChildRemoved(snapshot: DataSnapshot) {}
             override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
@@ -148,5 +175,10 @@ class CallSignalingRepository(private val currentUser: String) {
             remoteCandidatesListener?.let { candidatesRef.child(remoteUser).removeEventListener(it) }
         }
         remoteCandidatesListener = null
+    }
+
+    companion object {
+        const val DB_URL = "https://private-chat-7a103-default-rtdb.asia-southeast1.firebasedatabase.app"
+        private const val STALE_SESSION_MS = 90_000L
     }
 }
