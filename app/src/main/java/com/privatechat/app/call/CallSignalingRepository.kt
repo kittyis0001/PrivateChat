@@ -153,7 +153,7 @@ class CallSignalingRepository(private val currentUser: String) {
                 // Firebase deserializes JSON integral values as Long, so
                 // getValue(Int::class.java) would silently return null and
                 // drop every candidate — which breaks ICE entirely and is
-                // exactly the \"call connects but no audio\" failure mode.
+                // exactly the "call connects but no audio" failure mode.
                 val sdpMLineIndex = snapshot.child("sdpMLineIndex").getValue(Long::class.java)?.toInt() ?: return
                 val candidate = snapshot.child("candidate").getValue(String::class.java) ?: return
                 onRemoteCandidate?.invoke(IceCandidateData(sdpMid, sdpMLineIndex, candidate))
