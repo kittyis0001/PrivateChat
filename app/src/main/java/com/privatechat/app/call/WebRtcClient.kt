@@ -214,8 +214,11 @@ class WebRtcClient(
             audioManager.isSpeakerphoneOn = false // default to earpiece
             requestAudioFocus()
             audioSessionActive = true
-        } catch (e: Exception) {
-            observer.onError("Audio routing failed: ${e.message}")
+        } catch (_: Exception) {
+            // Audio routing is a courtesy, not a hard requirement — the
+            // call must survive a failure here (e.g. another app holding
+            // focus, or MODIFY_AUDIO_SETTINGS being denied), not end.
+            audioSessionActive = false
         }
     }
 

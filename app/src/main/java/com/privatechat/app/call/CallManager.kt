@@ -18,6 +18,7 @@ import com.privatechat.app.data.Session
 import com.privatechat.app.utils.NotificationAvatarFactory
 import org.webrtc.IceCandidate
 import org.webrtc.PeerConnection
+import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -82,12 +83,18 @@ object CallManager {
     private var lastSeenOffer: String? = null
     private var lastSeenAnswer: String? = null
     private val pendingCandidates = mutableListOf<IceCandidateData>()
+    // True once the remote SDP (offer for the callee, answer for the
+    // caller) has been applied. Remote ICE candidates must never be fed
+    // to the peer connection before this — WebRTC rejects them, which is
+    // the "call never connects / instant disconnect" failure mode.
+    private var remoteDescriptionReady = false
     private var cleanupDone = false
 
     // Timers / reconnect state.
     private val mainHandler = Handler(Looper.getMainLooper())
     private var dialTimeoutRunnable: Runnable? = null
     private var ringTimeoutRunnable: Runnable? = null
+    private var connectingTimeoutRunnable: Runnable? = null
     private var reconnectRunnable: Runnable? = null
     private var reconnectDeadlineAt = 0L
     private var reconnectPending = false
@@ -140,6 +147,7 @@ object CallManager {
         lastSeenOffer = null
         lastSeenAnswer = null
         pendingCandidates.clear()
+        remoteDescriptionReady = false
         cleanupDone = false
         reconnectPending = false
         phase = Phase.DIALING
@@ -202,6 +210,7 @@ object CallManager {
         lastSeenOffer = null
         lastSeenAnswer = null
         pendingCandidates.clear()
+        remoteDescriptionReady = false
         cleanupDone = false
         reconnectPending = false
         phase = Phase.INCOMING
@@ -226,6 +235,7 @@ object CallManager {
         userWantsToAnswer = true
         phase = Phase.CONNECTING
         statusMessage = "Connecting…"
+        startConnectingTimeout()
         publish()
         answerIfReady(context)
     }
@@ -234,8 +244,14 @@ object CallManager {
     fun declineCall(context: Context) {
         if (phase != Phase.INCOMING) return
         cancelIncomingNotification()
-        signaling?.setStatus("declined")
-        signaling?.endCall()
+        // Write the terminal status first, then remove the session after
+        // a short delay. Removing immediately can race the status write
+        // (Firebase may coalesce both into a single "session gone" event)
+        // and the caller would wrongly show a plain "Call ended" instead
+        // of "Call declined".
+        val sig = signaling
+        sig?.setStatus("declined")
+        mainHandler.postDelayed({ sig?.endCall() }, SESSION_CLEANUP_DELAY_MS)
         finishCall(EndReason.DECLINED, logMissed = false)
     }
 
@@ -247,8 +263,9 @@ object CallManager {
             declineCall(context)
             return
         }
-        signaling?.setStatus("ended")
-        signaling?.endCall()
+        val sig = signaling
+        sig?.setStatus("ended")
+        mainHandler.postDelayed({ sig?.endCall() }, SESSION_CLEANUP_DELAY_MS)
         finishCall(EndReason.LOCAL_HANGUP, logMissed = false)
     }
 
@@ -281,19 +298,29 @@ object CallManager {
 
     // ── Internals ──────────────────────────────────────────────────
 
-    private fun createWebRtcClient() {
-        if (webRtcClient != null) return
+    private fun createWebRtcClient(): WebRtcClient {
+        val existing = webRtcClient
+        if (existing != null) return existing
         val client = WebRtcClient(appContext!!, webrtcListener)
         webRtcClient = client
         client.start()
-        flushPendingCandidates()
+        return client
     }
 
     private fun answerIfReady(context: Context) {
-        if (!userWantsToAnswer || webRtcClient != null) return
+        if (!userWantsToAnswer || webRtcClient != null || cleanupDone) return
         val offer = lastSeenOffer ?: return
         createWebRtcClient()
+        // Order matters: the remote description MUST be set before any
+        // buffered remote ICE candidates are applied. Candidates that
+        // arrived while the callee was still on the incoming screen were
+        // buffered in pendingCandidates; applying them to a peer
+        // connection with no remote description yet makes WebRTC silently
+        // reject them, which broke ICE and produced the "Accept →
+        // instant disconnect / caller stuck on Connecting" bug.
         webRtcClient?.setRemoteOffer(offer)
+        remoteDescriptionReady = true
+        flushPendingCandidates()
         webRtcClient?.createAnswer { sdp ->
             runOnMain {
                 if (cleanupDone) return@runOnMain
@@ -306,6 +333,7 @@ object CallManager {
 
     private fun flushPendingCandidates() {
         val client = webRtcClient ?: return
+        if (!remoteDescriptionReady) return
         pendingCandidates.forEach { c -> client.addRemoteIceCandidate(c.sdpMid, c.sdpMLineIndex, c.candidate) }
         pendingCandidates.clear()
     }
@@ -316,9 +344,13 @@ object CallManager {
         sig.onRemoteCandidate = { candidate ->
             runOnMain {
                 val client = webRtcClient
-                if (client != null) {
+                if (client != null && remoteDescriptionReady) {
                     client.addRemoteIceCandidate(candidate.sdpMid, candidate.sdpMLineIndex, candidate.candidate)
                 } else {
+                    // Buffer until the peer connection exists AND the
+                    // remote description has been applied — a candidate
+                    // applied before either is silently rejected and
+                    // would permanently stall ICE.
                     pendingCandidates.add(candidate)
                 }
             }
@@ -349,9 +381,18 @@ object CallManager {
                 awaitingAnswer = false
                 stopRingback()
                 webRtcClient?.setRemoteAnswer(answer)
+                remoteDescriptionReady = true
+                flushPendingCandidates()
                 if (phase == Phase.DIALING) {
                     phase = Phase.CONNECTING
                     statusMessage = "Connecting…"
+                    // The call is connected at the signaling level the
+                    // moment the answer lands — stop the dial timeout now
+                    // so a slow ICE connection can't wrongly kill an
+                    // otherwise-answered call, and instead guard the
+                    // connecting window with its own (shorter) timeout.
+                    cancelDialTimeout()
+                    startConnectingTimeout()
                     publish()
                 }
             }
@@ -410,7 +451,10 @@ object CallManager {
         val currentUser = Session.currentUser() ?: return
         val repo = CallSignalingRepository(currentUser)
         repo.setStatus("busy")
-        repo.endCall()
+        // Same write-then-remove-after-delay pattern as decline/end, so
+        // the other caller reliably observes "busy" before the session
+        // is torn down.
+        mainHandler.postDelayed({ repo.endCall() }, SESSION_CLEANUP_DELAY_MS)
     }
 
     private fun handleIceState(state: PeerConnection.IceConnectionState) {
@@ -426,6 +470,7 @@ object CallManager {
                     connectedAtMs = System.currentTimeMillis()
                     statusMessage = ""
                     cancelDialTimeout()
+                    cancelConnectingTimeout()
                     updateOngoingNotification("Ongoing call")
                     publish()
                 } else if (phase == Phase.ACTIVE && wasReconnecting) {
@@ -497,8 +542,9 @@ object CallManager {
         dialTimeoutRunnable = Runnable {
             dialTimeoutRunnable = null
             if (phase == Phase.DIALING) {
-                signaling?.setStatus("ended")
-                signaling?.endCall()
+                val sig = signaling
+                sig?.setStatus("ended")
+                mainHandler.postDelayed({ sig?.endCall() }, SESSION_CLEANUP_DELAY_MS)
                 finishCall(EndReason.NO_ANSWER, logMissed = false)
             }
         }
@@ -515,6 +561,12 @@ object CallManager {
         ringTimeoutRunnable = Runnable {
             ringTimeoutRunnable = null
             if (phase == Phase.INCOMING) {
+                // Defensive cleanup for the (rare) case the caller's own
+                // dial timeout never fired (caller app killed mid-ring):
+                // end the session so it can't ring forever.
+                val sig = signaling
+                sig?.setStatus("ended")
+                mainHandler.postDelayed({ sig?.endCall() }, SESSION_CLEANUP_DELAY_MS)
                 finishCall(EndReason.NO_ANSWER, logMissed = true)
             }
         }
@@ -524,6 +576,28 @@ object CallManager {
     private fun cancelRingTimeout() {
         ringTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
         ringTimeoutRunnable = null
+    }
+
+    /**
+     * Bounds the "Connecting…" window on both devices. ICE can take a
+     * couple of seconds, but if it still hasn't connected after this
+     * budget the call fails cleanly instead of hanging forever — the
+     * exact "caller stuck on Connecting" symptom.
+     */
+    private fun startConnectingTimeout() {
+        cancelConnectingTimeout()
+        connectingTimeoutRunnable = Runnable {
+            connectingTimeoutRunnable = null
+            if (phase == Phase.CONNECTING) {
+                finishCall(EndReason.FAILED, logMissed = false)
+            }
+        }
+        mainHandler.postDelayed(connectingTimeoutRunnable!!, CONNECTING_TIMEOUT_MS)
+    }
+
+    private fun cancelConnectingTimeout() {
+        connectingTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        connectingTimeoutRunnable = null
     }
 
     // ── Ringback (outgoing) ────────────────────────────────────────
@@ -552,6 +626,7 @@ object CallManager {
 
         cancelDialTimeout()
         cancelRingTimeout()
+        cancelConnectingTimeout()
         cancelReconnect()
         stopRingback()
         cancelIncomingNotification()
@@ -561,7 +636,12 @@ object CallManager {
         phase = Phase.ENDED
         statusMessage = ""
 
-        if (logMissed) logMissedCall()
+        // Duration for completed calls, plus the WhatsApp-style chat log
+        // entry (Missed / Declined / Busy / No answer / Ended) — logged
+        // exactly once, from the single device that "owns" the outcome,
+        // so the shared two-person chat never gets a duplicate entry.
+        val durationMs = if (connectedAtMs > 0) System.currentTimeMillis() - connectedAtMs else 0L
+        logCallEvent(reason, logMissed, durationMs)
 
         // Release WebRTC + audio off the main thread so the UI never
         // stutters during teardown; the shared factory survives for the
@@ -582,7 +662,23 @@ object CallManager {
         mainHandler.postDelayed({ if (phase == Phase.ENDED) phase = Phase.IDLE }, ENDED_RESET_DELAY_MS)
     }
 
-    private fun logMissedCall() {
+    /**
+     * Writes a single WhatsApp-style call event into the chat as a
+     * centered system message. Ownership rules avoid duplicates on the
+     * shared messages node:
+     *  - Missed call → logged by the callee (the side that missed it).
+     *  - Declined / Busy / No answer / Ended → logged by the caller.
+     */
+    private fun logCallEvent(reason: EndReason, logMissed: Boolean, durationMs: Long) {
+        val text = when {
+            logMissed -> "Missed voice call"
+            reason == EndReason.DECLINED && isOutgoing -> "Call declined"
+            reason == EndReason.BUSY && isOutgoing -> "Line busy"
+            reason == EndReason.NO_ANSWER && isOutgoing -> "No answer"
+            isOutgoing && (reason == EndReason.LOCAL_HANGUP || reason == EndReason.REMOTE_ENDED) ->
+                if (durationMs >= 1000) "Voice call ended · ${formatDuration(durationMs)}" else "Voice call ended"
+            else -> return
+        }
         try {
             FirebaseDatabase.getInstance(CallSignalingRepository.DB_URL)
                 .getReference("messages")
@@ -590,7 +686,7 @@ object CallManager {
                 .setValue(
                     mapOf(
                         "name" to remoteUser,
-                        "text" to "Missed voice call",
+                        "text" to text,
                         "time" to System.currentTimeMillis(),
                         "seen" to true,
                         "type" to "system"
@@ -599,6 +695,13 @@ object CallManager {
         } catch (_: Exception) {
             // Never let call logging take the call screen down.
         }
+    }
+
+    private fun formatDuration(ms: Long): String {
+        val totalSeconds = (ms / 1000).coerceAtLeast(1)
+        val m = totalSeconds / 60
+        val s = totalSeconds % 60
+        return "%d:%02d".format(Locale.US, m, s)
     }
 
     private fun fetchRemotePhoto(userId: String) {
@@ -762,7 +865,15 @@ object CallManager {
         }
 
         override fun onError(message: String) {
-            // Surface nothing here; ICE/network state drives the UI.
+            // A hard WebRTC failure (peer connection failed to create,
+            // offer/answer failed, audio routing failed) must surface as
+            // a clean call failure rather than leaving the UI stuck on
+            // "Connecting…" forever.
+            runOnMain {
+                if (!cleanupDone && (phase == Phase.DIALING || phase == Phase.CONNECTING || phase == Phase.ACTIVE)) {
+                    finishCall(EndReason.FAILED, logMissed = false)
+                }
+            }
         }
     }
 
@@ -772,8 +883,18 @@ object CallManager {
 
     private const val DIAL_TIMEOUT_MS = 45_000L
     private const val RING_TIMEOUT_MS = 60_000L
+    private const val CONNECTING_TIMEOUT_MS = 30_000L
     private const val RECONNECT_ATTEMPT_DELAY_MS = 8_000L
     private const val RECONNECT_BUDGET_MS = 45_000L
     private const val ENDED_RESET_DELAY_MS = 900L
     private const val RINGBACK_VOLUME = 80
+
+    /**
+     * Delay between writing a terminal session status ("ended" /
+     * "declined" / "busy") and removing the session node. Writing then
+     * removing in the same tick lets Firebase coalesce the two into a
+     * single "node deleted" event on the peer, which would drop the
+     * terminal status and misreport e.g. "Call declined" as "Call ended".
+     */
+    private const val SESSION_CLEANUP_DELAY_MS = 600L
 }
