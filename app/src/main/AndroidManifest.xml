@@ -23,25 +23,6 @@
         android:maxSdkVersion="32" />
     <!-- Voice messages -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- Voice calls — same RECORD_AUDIO above covers the mic;
-         MODIFY_AUDIO_SETTINGS is for the in-call speakerphone toggle. -->
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <!-- Lets the incoming-call notification launch CallActivity as a
-         full-screen UI (waking the screen / showing over the lock
-         screen) instead of just sitting in the notification shade —
-         this is what makes a call actually "ring" like a real call
-         while the app is backgrounded or killed. Normal-protection
-         permission, granted automatically; still must be declared. -->
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <!-- What actually keeps a call (and its audio) alive after leaving
-         the app — CallForegroundService holds the process at
-         foreground-service priority for the duration of an active
-         call, WhatsApp-style. FOREGROUND_SERVICE_MICROPHONE is
-         required alongside the service's own
-         android:foregroundServiceType="microphone" on API 34+, or
-         starting the foreground service throws at runtime. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application android:name=".App"
         
@@ -94,22 +75,6 @@
             android:exported="false"
             android:theme="@style/Theme.PhotoViewer" />
 
-        <!-- Full-screen call UI. showWhenLocked/turnScreenOn let the
-             incoming-call notification wake the screen and show over the
-             lock screen. launchMode singleTop + configChanges keep a
-             single call screen (no duplicate instances) and prevent a
-             rotation/theme-change recreation from ever tearing down the
-             call screen while a call is live. -->
-        <activity
-            android:name=".call.CallActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:theme="@style/Theme.PhotoViewer"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true"
-            android:excludeFromRecents="true"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|uiMode" />
-
         <service
             android:name=".messaging.ChatFirebaseMessagingService"
             android:exported="false">
@@ -117,20 +82,6 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-
-        <!-- Keeps an active call (and its audio) alive after leaving
-             the app — see the service's own doc comment. -->
-        <service
-            android:name=".call.CallForegroundService"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
-
-        <!-- Decline (incoming-call notification) and Hang up
-             (ongoing-call notification) actions — see the receiver's
-             own doc comment. -->
-        <receiver
-            android:name=".call.CallActionReceiver"
-            android:exported="false" />
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
