@@ -14,12 +14,6 @@ interface NotifyApi {
         @Body body: NotifyRequest
     ): Response<NotifyResponse>
 
-    @POST("api/notify-call")
-    suspend fun notifyCall(
-        @Header("X-Api-Secret") apiSecret: String,
-        @Body body: NotifyCallRequest
-    ): Response<NotifyResponse>
-
     @GET("api/music/search")
     suspend fun musicSearch(
         @Header("X-Api-Secret") apiSecret: String,

@@ -15,13 +15,6 @@ data class NotifyResponse(
     val error: String? = null
 )
 
-// Mirrors backend/routes/notify.js's /notify-call body exactly.
-data class NotifyCallRequest(
-    val callerId: String,
-    val calleeId: String,
-    val callerName: String
-)
-
 // Mirrors backend/routes/music.js's response shapes exactly.
 data class MusicSearchResponse(
     val songs: List<com.privatechat.app.data.model.Song> = emptyList()

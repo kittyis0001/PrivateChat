@@ -41,14 +41,6 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var storyRepository: com.privatechat.app.data.repository.StoryRepository
     private var storyGroups: List<com.privatechat.app.data.model.StoryGroup> = emptyList()
     private lateinit var adapter: MessageAdapter
-    // Voice calls — independent of ChatRepository since a call needs
-    // to ring whenever this device's process is alive, not tied to
-    // whether the chat screen itself is currently open. This watcher
-    // only forwards a fresh "ringing" session addressed to me into
-    // CallManager (which owns the single-call guard, the full-screen
-    // notification, and the call screen), so it can never double-open
-    // the call screen.
-    private var callSignaling: com.privatechat.app.call.CallSignalingRepository? = null
 
     private val messages = mutableListOf<Message>()
     private var typingHandler: Handler? = null
@@ -224,7 +216,6 @@ class ChatActivity : AppCompatActivity() {
             purgeExpiredMessages()
             restartVanishExpiryChecks()
         }
-        callSignaling?.attachSessionListener()
     }
 
     override fun onStop() {
@@ -321,57 +312,6 @@ class ChatActivity : AppCompatActivity() {
         // every onStart, teardown on every onStop, without manually
         // wiring visibilitychange-equivalent logic per screen.
         lifecycle.addObserver(repository)
-
-        binding.callButton.setOnClickListener {
-            if (com.privatechat.app.call.CallManager.isBusy()) {
-                android.widget.Toast.makeText(
-                    this, "You're already on a call", android.widget.Toast.LENGTH_SHORT
-                ).show()
-                return@setOnClickListener
-            }
-            startActivity(
-                android.content.Intent(this, com.privatechat.app.call.CallActivity::class.java).apply {
-                    putExtra(com.privatechat.app.call.CallActivity.EXTRA_REMOTE_USER, otherUser)
-                    putExtra(com.privatechat.app.call.CallActivity.EXTRA_IS_OUTGOING, true)
-                    putExtra(com.privatechat.app.call.CallActivity.EXTRA_REMOTE_PHOTO_URL, photos[otherUser])
-                }
-            )
-            // Rings the other device even if its app is backgrounded or
-            // fully killed. CallManager/CallSignalingRepository write the
-            // "ringing" session to Firebase (atomically — only one call
-            // can claim it); this is purely the push-notification side of
-            // the same call start.
-            notificationRepository.notifyIncomingCall(
-                callerId = currentUser,
-                calleeId = otherUser,
-                callerName = Nicknames.defaultFor(currentUser)
-            )
-        }
-
-        // Rings this device whenever a new call session appears
-        // addressed to this user — see CallSignalingRepository's own
-        // comment for why this is independent of ChatRepository's
-        // Activity-lifecycle-bound listeners. CallManager dedupes (one
-        // notification + one call screen), so a repeat "ringing" event
-        // for the same call is a harmless no-op.
-        callSignaling = com.privatechat.app.call.CallSignalingRepository(currentUser).apply {
-            onSessionChanged = { session ->
-                runOnUiThread {
-                    if (session != null && session.status == "ringing" && session.callee == currentUser) {
-                        com.privatechat.app.call.CallManager.onIncomingCall(
-                            this@ChatActivity,
-                            callerId = session.caller,
-                            remotePhotoUrl = photos[session.caller],
-                            // Only auto-open the call screen while the chat
-                            // is actually visible; otherwise the full-screen
-                            // notification surfaces the call (no background
-                            // activity launch).
-                            launchUi = ChatActivity.isForeground
-                        )
-                    }
-                }
-            }
-        }
 
         repository.onMessageAdded = { message ->
             runOnUiThread {
@@ -1914,7 +1854,6 @@ adapter.submitList(messages.toMutableList()) {
         voiceRecorder?.cancel()
         VoicePlaybackController.stop()
         repository.detachAll()
-        callSignaling?.detachAll(null)
         storyRepository.stopObserving()
     }
 }

@@ -11,7 +11,6 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.privatechat.app.R
-import com.privatechat.app.call.CallManager
 import com.privatechat.app.data.Session
 import com.privatechat.app.ui.chat.ChatActivity
 import com.privatechat.app.utils.NotificationAvatarFactory
@@ -44,11 +43,6 @@ class ChatFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-
-        if (message.data["type"] == "call") {
-            handleIncomingCallPush(message)
-            return
-        }
 
         // Local, per-device setting (see Session.isMuted) — checked first
         // so a muted user never sees a notification, without any network
@@ -107,29 +101,6 @@ class ChatFirebaseMessagingService : FirebaseMessagingService() {
         // stacking a second, separate one, matching how WhatsApp
         // collapses a single conversation into one notification.
         NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
-    }
-
-    /**
-     * Incoming voice call push. The whole incoming-call surface — the
-     * full-screen/heads-up notification, the ringing, the single-call
-     * guard, and the Accept/Decline actions — lives in CallManager so
-     * there is exactly one path and therefore never a duplicate screen
-     * or notification. This method only extracts the caller id and
-     * forwards.
-     *
-     * launchUi is true only while the chat screen is already visible
-     * (the app is in the user's hands), so the call screen opens
-     * immediately; otherwise the full-screen notification surfaces the
-     * call over the lock screen / from the background.
-     */
-    private fun handleIncomingCallPush(message: RemoteMessage) {
-        val callerId = message.data["callerId"] ?: return
-        CallManager.onIncomingCall(
-            this,
-            callerId = callerId,
-            remotePhotoUrl = null,
-            launchUi = ChatActivity.isForeground
-        )
     }
 
     companion object {

@@ -46,54 +46,7 @@ class App : Application() {
             }
             manager.createNotificationChannel(channel)
 
-            // Separate, higher-urgency channel for incoming calls —
-            // IMPORTANCE_HIGH plus a ringtone-category audio attribute
-            // is what makes this actually ring/vibrate continuously
-            // (not just a single notification buzz) and is eligible to
-            // show as a full-screen incoming-call UI, matching how a
-            // real call is expected to interrupt regardless of the
-            // Messages channel's own settings.
-            val callChannel = NotificationChannel(
-                CALL_NOTIFICATION_CHANNEL_ID,
-                "Incoming calls",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Incoming voice call alerts"
-                enableVibration(true)
-                setSound(
-                    android.media.RingtoneManager.getActualDefaultRingtoneUri(
-                        this@App, android.media.RingtoneManager.TYPE_RINGTONE
-                    ),
-                    android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
-            }
-            manager.createNotificationChannel(callChannel)
-
-            // Separate again from the ringing channel above — this one
-            // backs the ongoing-call foreground service's persistent
-            // notification (see CallForegroundService), which updates
-            // roughly once a second while the call is live. LOW
-            // importance + no sound so those updates never re-alert or
-            // buzz; it only needs to sit quietly and stay visible/
-            // tappable, matching WhatsApp's "return to call" bar.
-            val ongoingCallChannel = NotificationChannel(
-                ONGOING_CALL_CHANNEL_ID,
-                "Ongoing call",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shown while a call is active, so you can return to it"
-                setSound(null, null)
-                enableVibration(false)
-            }
-            manager.createNotificationChannel(ongoingCallChannel)
         }
     }
 
-    companion object {
-        const val CALL_NOTIFICATION_CHANNEL_ID = "incoming_calls"
-        const val ONGOING_CALL_CHANNEL_ID = "ongoing_call"
-    }
 }
