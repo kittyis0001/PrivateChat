@@ -11,6 +11,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import com.privatechat.app.BuildConfig
@@ -41,13 +44,13 @@ class NotesSettingsActivity : AppCompatActivity() {
         findViewById<View>(R.id.cardTrash).setOnClickListener {
             startActivity(SimpleNotesActivity.intent(this, SimpleNotesActivity.MODE_TRASH))
         }
-        androidx.lifecycle.lifecycleScope.launch {
-            repo.observeArchivedCount().collect {
+        lifecycleScope.launch {
+            repo.observeArchivedCount().collectLatest {
                 findViewById<TextView>(R.id.settingsArchiveCount).text = it.toString()
             }
         }
-        androidx.lifecycle.lifecycleScope.launch {
-            repo.observeTrashCount().collect {
+        lifecycleScope.launch {
+            repo.observeTrashCount().collectLatest {
                 findViewById<TextView>(R.id.settingsTrashCount).text = it.toString()
             }
         }
