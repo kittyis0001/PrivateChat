@@ -33,6 +33,25 @@ class NotesSettingsActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.notesSettingsBack).setOnClickListener { finish() }
 
+        // Archive / Trash summary cards (live counts)
+        val repo = com.privatechat.app.notes.data.NotesRepository(this)
+        findViewById<View>(R.id.cardArchive).setOnClickListener {
+            startActivity(SimpleNotesActivity.intent(this, SimpleNotesActivity.MODE_ARCHIVE))
+        }
+        findViewById<View>(R.id.cardTrash).setOnClickListener {
+            startActivity(SimpleNotesActivity.intent(this, SimpleNotesActivity.MODE_TRASH))
+        }
+        androidx.lifecycle.lifecycleScope.launch {
+            repo.observeArchivedCount().collect {
+                findViewById<TextView>(R.id.settingsArchiveCount).text = it.toString()
+            }
+        }
+        androidx.lifecycle.lifecycleScope.launch {
+            repo.observeTrashCount().collect {
+                findViewById<TextView>(R.id.settingsTrashCount).text = it.toString()
+            }
+        }
+
         // Accent color
         findViewById<TextView>(R.id.accentValue).text = NotesLockManager.getAccent(this)
         findViewById<View>(R.id.rowAccent).setOnClickListener {

@@ -9,47 +9,48 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🎀"
-        android:textSize="34sp" />
+        android:text="☁"
+        android:textSize="40sp"
+        android:textColor="@color/kittyAccent" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/notes_title"
-        android:textSize="19sp"
+        android:text="@string/notes_sync_header"
+        android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="@color/textPrimary"
-        android:layout_marginTop="6dp" />
+        android:textColor="@color/kittyAccent"
+        android:layout_marginTop="4dp" />
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/notes_drawer_subtitle"
-        android:textSize="12sp"
+        android:text="@string/notes_sync_login"
+        android:textSize="13sp"
         android:textColor="@color/textSecondary" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@drawable/bg_premium_card"
-        android:padding="14dp"
-        android:layout_marginTop="14dp">
+        android:background="@drawable/bg_premium_gradient"
+        android:padding="16dp"
+        android:layout_marginTop="16dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/notes_premium_title"
-            android:textSize="14sp"
+            android:text="@string/notes_premium_card_title"
+            android:textSize="18sp"
             android:textStyle="bold"
-            android:textColor="@color/textPrimary" />
+            android:textColor="#FFFFFF" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/notes_premium_body"
             android:textSize="12sp"
-            android:textColor="@color/textSecondary"
-            android:layout_marginTop="3dp" />
+            android:textColor="#E3F2FD"
+            android:layout_marginTop="4dp" />
     </LinearLayout>
 </LinearLayout>

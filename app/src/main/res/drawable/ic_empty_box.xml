@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="180dp" android:height="150dp"
+    android:viewportWidth="180" android:viewportHeight="150">
+    <!-- dashed trail -->
+    <path android:strokeColor="#1E88E5" android:strokeWidth="5" android:strokeLineCap="round"
+        android:pathData="M96,14 q26,2 20,16 q-5,12 -22,12" />
+    <path android:strokeColor="#1E88E5" android:strokeWidth="5" android:strokeLineCap="round" android:strokeDashWidth="1"
+        android:pathData="M84,44 q-16,2 -14,14 q2,10 12,12" />
+    <!-- box body -->
+    <path android:fillColor="#BBDEFB" android:pathData="M52,62 L90,50 L128,62 L128,118 L90,130 L52,118 Z" />
+    <path android:fillColor="#90CAF9" android:pathData="M52,62 L90,74 L90,130 L52,118 Z" />
+    <path android:fillColor="#64B5F6" android:pathData="M128,62 L90,74 L90,130 L128,118 Z" />
+    <!-- flaps -->
+    <path android:fillColor="#E3F2FD" android:pathData="M52,62 L30,44 L68,34 L90,50 Z" />
+    <path android:fillColor="#E3F2FD" android:pathData="M128,62 L150,44 L112,34 L90,50 Z" />
+</vector>

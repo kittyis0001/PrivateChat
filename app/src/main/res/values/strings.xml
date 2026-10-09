@@ -12,8 +12,8 @@
     <string name="notes_search_hint">Search notes…</string>
     <string name="notes_clear">Clear</string>
     <string name="notes_empty_title">Create your first note</string>
-    <string name="notes_empty_body">Tap the pencil button to write something sweet. Your notes stay on this device.</string>
-    <string name="notes_create_first">Start Writing</string>
+    <string name="notes_empty_body">Any notes to add? Add your first note by tapping on add button</string>
+    <string name="notes_create_first">Start writing one</string>
     <string name="notes_lock_title">Notes Locked</string>
     <string name="notes_lock_subtitle">Enter your Notes password to continue. This lock protects only your notes on this device.</string>
     <string name="notes_lock_password_hint">Notes password</string>
@@ -190,4 +190,7 @@ Action items:</string>
 Details:
 
 Remember:</string>
+    <string name="notes_sync_header">Sync Notes</string>
+    <string name="notes_sync_login">Login</string>
+    <string name="notes_premium_card_title">Kitty Premium 🎀</string>
 </resources>
