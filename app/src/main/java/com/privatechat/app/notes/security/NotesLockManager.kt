@@ -105,4 +105,13 @@ object NotesLockManager {
     fun setAccent(context: Context, accent: String) {
         prefs(context).edit().putString(KEY_ACCENT, accent).apply()
     }
+
+    // ---- Google Drive backup bookkeeping (notes-scoped) ----
+    private const val KEY_DRIVE_LAST_BACKUP = "drive_last_backup"
+
+    fun getDriveLastBackup(context: Context): Long = prefs(context).getLong(KEY_DRIVE_LAST_BACKUP, 0L)
+
+    fun setDriveLastBackup(context: Context, timeMillis: Long) {
+        prefs(context).edit().putLong(KEY_DRIVE_LAST_BACKUP, timeMillis).apply()
+    }
 }

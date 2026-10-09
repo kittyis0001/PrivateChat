@@ -142,6 +142,24 @@ class NotesSettingsActivity : AppCompatActivity() {
         // Lock
         refreshLockRow()
         findViewById<View>(R.id.rowNotesLock).setOnClickListener { showLockDialog() }
+
+        // Google Drive backup (Notes only) — opens its own screen;
+        // the row shows the connected account or "Not connected".
+        refreshDriveRow()
+        findViewById<View>(R.id.rowNotesDrive).setOnClickListener {
+            startActivity(Intent(this, DriveBackupActivity::class.java))
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshDriveRow()
+    }
+
+    private fun refreshDriveRow() {
+        findViewById<TextView>(R.id.notesDriveValue).text =
+            com.privatechat.app.notes.drive.DriveBackupManager.signedInEmail(this)
+                ?: getString(R.string.notes_drive_not_connected)
     }
 
     private fun refreshLockRow() {
