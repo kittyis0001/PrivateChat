@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="8dp"
+        android:elevation="2dp">
+
+        <ImageButton
+            android:id="@+id/editorBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="Back" />
+
+        <TextView
+            android:id="@+id/editorMeta"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="12sp"
+            android:textColor="@color/textSecondary"
+            android:layout_marginStart="4dp" />
+
+        <TextView
+            android:id="@+id/editorPin"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📌"
+            android:textSize="17sp"
+            android:padding="9dp" />
+
+        <TextView
+            android:id="@+id/editorShare"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/notes_share_short"
+            android:textSize="13sp"
+            android:textColor="@color/primary"
+            android:padding="9dp" />
+
+        <TextView
+            android:id="@+id/editorCopy"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/notes_copy_short"
+            android:textSize="13sp"
+            android:textColor="@color/primary"
+            android:padding="9dp" />
+
+        <TextView
+            android:id="@+id/editorDelete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/notes_delete_short"
+            android:textSize="13sp"
+            android:textColor="@color/kittyError"
+            android:padding="9dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <EditText
+                android:id="@+id/editorTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/notes_editor_title_hint"
+                android:textSize="21sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:background="@null"
+                android:inputType="textCapSentences" />
+
+            <Spinner
+                android:id="@+id/editorCategory"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp" />
+
+            <EditText
+                android:id="@+id/editorContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/notes_editor_content_hint"
+                android:textSize="15sp"
+                android:textColor="@color/textPrimary"
+                android:background="@null"
+                android:gravity="top"
+                android:inputType="textMultiLine|textCapSentences"
+                android:minLines="12"
+                android:layout_marginTop="12dp" />
+        </LinearLayout>
+    </ScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/editorSave"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/notes_save_note"
+        android:layout_margin="16dp" />
+</LinearLayout>

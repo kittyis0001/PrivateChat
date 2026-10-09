@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_title">Kitty Notes</string>
+    <string name="notes_drawer_subtitle">তোমার ছোট্ট সুন্দর খাতা</string>
+    <string name="notes_premium_title">Kitty Notes Premium</string>
+    <string name="notes_premium_body">এই ডিভাইসে সব লোকাল ফিচার ফ্রি। নোট লিখে আনন্দ করো!</string>
+    <string name="notes_search_hint">নোট খোঁজো…</string>
+    <string name="notes_clear">মুছো</string>
+    <string name="notes_empty_title">তোমার প্রথম নোট তৈরি করো</string>
+    <string name="notes_empty_body">পেন্সিল বাটনে চাপ দিয়ে লেখা শুরু করো। তোমার নোট এই ডিভাইসেই থাকবে।</string>
+    <string name="notes_create_first">লেখা শুরু করো</string>
+    <string name="notes_lock_title">Notes লক করা আছে</string>
+    <string name="notes_lock_subtitle">চালিয়ে যেতে Notes পাসওয়ার্ড দাও। এই লক শুধু এই ডিভাইসে তোমার নোটগুলোকে রক্ষা করে।</string>
+    <string name="notes_lock_password_hint">Notes পাসওয়ার্ড</string>
+    <string name="notes_lock_error">পাসওয়ার্ড ভুল হয়েছে। আবার চেষ্টা করো।</string>
+    <string name="notes_unlock">খুলুন</string>
+    <string name="notes_untitled">শিরোনামহীন</string>
+    <string name="notes_saved">সেভ হয়েছে</string>
+    <string name="notes_calendar_title">ক্যালেন্ডার</string>
+    <string name="notes_templates_title">টেমপ্লেট</string>
+    <string name="notes_quick_title">Quick Note</string>
+    <string name="notes_sticky_title">Sticky Notes</string>
+    <string name="notes_tool_title">Note Tool</string>
+    <string name="notes_settings_title">সেটিংস</string>
+    <string name="notes_archive_title">আর্কাইভ</string>
+    <string name="notes_trash_title">ট্র্যাশ</string>
+    <string name="menu_enter_promo_code">Enter Promo Code</string>
+    <string name="notes_no_tag">No Tag</string>
+    <string name="notes_chip_all">সব</string>
+    <string name="notes_save">সেভ</string>
+    <string name="notes_delete">মুছে ফেলো</string>
+    <string name="notes_restore">ফিরিয়ে আনো</string>
+</resources>

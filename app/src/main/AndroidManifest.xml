@@ -33,15 +33,58 @@
         android:theme="@style/Theme.PrivateChat"
         android:usesCleartextTraffic="false">
 
+        <!-- Notes is the app's primary/launcher experience. The
+             existing chat is reached only from inside the app via
+             the Notes three-dot menu's "Enter Promo Code" flow. -->
         <activity
-            android:name=".ui.login.LoginActivity"
+            android:name=".notes.ui.NotesActivity"
             android:exported="true"
-            android:theme="@style/Theme.PrivateChat">
+            android:theme="@style/Theme.PrivateChat"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.login.LoginActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PrivateChat" />
+
+        <activity
+            android:name=".notes.ui.NoteEditorActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".notes.ui.SimpleNotesActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".notes.ui.CalendarActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".notes.ui.TemplatesActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".notes.ui.StickyNotesActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".notes.ui.NoteToolActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".notes.ui.NotesSettingsActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".notes.ui.AboutActivity"
+            android:exported="false" />
 
         <activity
             android:name=".ui.chat.ChatActivity"

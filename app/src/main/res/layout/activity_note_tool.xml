@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="10dp"
+        android:elevation="2dp">
+
+        <ImageButton
+            android:id="@+id/toolBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="Back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/notes_tool_title"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/textPrimary"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="18dp">
+
+        <EditText
+            android:id="@+id/toolInput"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:hint="@string/notes_tool_hint"
+            android:gravity="top"
+            android:inputType="textMultiLine|textCapSentences"
+            android:background="@drawable/bg_note_card"
+            android:padding="14dp"
+            android:textSize="15sp"
+            android:textColor="@color/textPrimary" />
+
+        <TextView
+            android:id="@+id/toolStats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="@color/textSecondary"
+            android:layout_marginTop="10dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="12dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/toolChecklist"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/notes_tool_checklist" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/toolCopy"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/notes_copy_short"
+                android:layout_marginStart="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/toolShare"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/notes_share_short"
+                android:layout_marginStart="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/toolClear"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/notes_clear"
+                android:layout_marginStart="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>
