@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.resource.bitmap.CircleCrop
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.privatechat.app.data.AccessGate
 import com.privatechat.app.data.Nicknames
 import com.privatechat.app.data.Session
 import com.privatechat.app.data.model.Message
@@ -1386,6 +1387,9 @@ adapter.submitList(messages.toMutableList()) {
         ) {
             repository.setBlocked(!isBlockedByMe)
         }
+        addItem(com.privatechat.app.R.drawable.ic_menu_settings, null, "Settings") {
+            startActivity(android.content.Intent(this, com.privatechat.app.ui.settings.SettingsActivity::class.java))
+        }
         addItem(com.privatechat.app.R.drawable.ic_menu_logout, null, "Log Out") {
             confirmLogout()
         }
@@ -1656,6 +1660,9 @@ adapter.submitList(messages.toMutableList()) {
 
     private fun performLogout() {
         Session.clear()
+        // Re-lock the access gate so the login screen is not left
+        // revealed after log out in the same process.
+        AccessGate.lock()
         val intent = android.content.Intent(this, com.privatechat.app.ui.login.LoginActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
         }

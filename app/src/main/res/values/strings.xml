@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">Private Chat</string>
     <string name="default_notification_channel_id">chat_messages</string>
+    <string name="settings_title">Settings</string>
+    <string name="access_code_title">Enter Access Code</string>
+    <string name="access_code_hint">Access Code</string>
+    <string name="access_code_error">Incorrect code. Please try again.</string>
 </resources>
