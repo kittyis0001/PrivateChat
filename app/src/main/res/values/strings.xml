@@ -232,4 +232,31 @@ Remember:</string>
     <string name="notes_fingerprint_prompt">Unlock Kitty Notes</string>
     <string name="notes_fingerprint_subtitle">Use your fingerprint to open your notes</string>
     <string name="notes_fingerprint_failed">Fingerprint not recognised — try again or use your password</string>
+
+    <!-- Google Drive backup (Notes only) -->
+    <string name="notes_section_cloud">Cloud backup</string>
+    <string name="notes_drive_title">Google Drive backup</string>
+    <string name="notes_drive_intro">Back up your Kitty Notes (text, colors, checklists and settings) to a private folder in your Google Drive. Note photos are not included. Chat messages are never backed up here.</string>
+    <string name="notes_drive_connected">Connected</string>
+    <string name="notes_drive_not_connected">Not connected</string>
+    <string name="notes_drive_connect">Connect Google Drive</string>
+    <string name="notes_drive_sign_out">Sign out</string>
+    <string name="notes_drive_backup_now">Back up now</string>
+    <string name="notes_drive_restore">Restore from Drive</string>
+    <string name="notes_drive_last_backup">Last backup: %1$s</string>
+    <string name="notes_drive_never">No backup yet</string>
+    <string name="notes_drive_connect_first">Connect your Google account first</string>
+    <string name="notes_drive_backup_done">Backup saved to Google Drive</string>
+    <string name="notes_drive_no_backup">No Drive backup found yet</string>
+    <string name="notes_drive_restore_title">Restore from Drive?</string>
+    <string name="notes_drive_restore_msg">Notes from the backup will be added. Your existing notes are kept — nothing is deleted.</string>
+    <string name="notes_drive_restored">Restored %1$d notes</string>
+    <string name="notes_drive_failed">Something went wrong — please try again</string>
+    <string name="notes_drive_setup_incomplete_title">One setup step left</string>
+    <string name="notes_drive_setup_incomplete_msg">Google needs this app registered once by its owner before sign-in can work. In Google Cloud Console: turn on the Google Drive API, then create an Android OAuth client using the package name and SHA-1 fingerprint shown below. After that, Connect will work.</string>
+    <string name="notes_drive_setup_label">Owner setup (one time)</string>
+    <string name="notes_drive_package_label">Package name</string>
+    <string name="notes_drive_sha_label">SHA-1 fingerprint of this build</string>
+    <string name="notes_drive_copy_sha">Copy SHA-1</string>
+    <string name="notes_drive_copied">Copied</string>
 </resources>
