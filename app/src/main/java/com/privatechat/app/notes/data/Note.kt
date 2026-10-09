@@ -1,5 +1,6 @@
 package com.privatechat.app.notes.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -19,5 +20,14 @@ data class Note(
     val archived: Boolean = false,
     val deletedAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    // Added in kitty_notes.db v2 (additive; defaults keep old rows valid):
+    /** Pastel card color as #RRGGBB, "" = default theme surface. */
+    @ColumnInfo(defaultValue = "''")
+    val color: String = "",
+    /** True when this note is edited as a checklist (items live in note_checklist_items). */
+    @ColumnInfo(defaultValue = "0")
+    val isChecklist: Boolean = false,
+    /** One-shot reminder time (epoch millis), null = no reminder. */
+    val reminderAt: Long? = null
 )

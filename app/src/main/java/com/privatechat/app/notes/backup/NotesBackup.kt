@@ -39,6 +39,11 @@ object NotesBackup {
                     .put("deletedAt", n.deletedAt ?: JSONObject.NULL)
                     .put("createdAt", n.createdAt)
                     .put("updatedAt", n.updatedAt)
+                    // v2 fields — additive; older parsers ignore them,
+                    // and this parser reads them optionally below.
+                    .put("color", n.color)
+                    .put("isChecklist", n.isChecklist)
+                    .put("reminderAt", n.reminderAt ?: JSONObject.NULL)
             )
         }
         root.put("notes", noteArr)
@@ -86,7 +91,10 @@ object NotesBackup {
                     archived = o.optBoolean("archived"),
                     deletedAt = if (o.isNull("deletedAt")) null else o.optLong("deletedAt"),
                     createdAt = o.optLong("createdAt", System.currentTimeMillis()),
-                    updatedAt = o.optLong("updatedAt", System.currentTimeMillis())
+                    updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+                    color = o.optString("color", ""),
+                    isChecklist = o.optBoolean("isChecklist", false),
+                    reminderAt = if (o.isNull("reminderAt")) null else o.optLong("reminderAt")
                 )
             )
         }

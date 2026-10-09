@@ -40,6 +40,18 @@ interface NotesDao {
     @Query("SELECT * FROM notes WHERE id = :id")
     suspend fun getById(id: Long): Note?
 
+    /** Active notes that have a reminder set (used to (re)schedule alarms). */
+    @Query("SELECT * FROM notes WHERE reminderAt IS NOT NULL AND archived = 0 AND deletedAt IS NULL")
+    suspend fun getNotesWithReminders(): List<Note>
+
+    /** Clears a fired one-shot reminder without touching updatedAt. */
+    @Query("UPDATE notes SET reminderAt = NULL WHERE id = :id")
+    suspend fun clearReminder(id: Long)
+
+    /** Trash entries deleted before [cutoff] (30-day auto-clean). */
+    @Query("SELECT * FROM notes WHERE deletedAt IS NOT NULL AND deletedAt < :cutoff")
+    suspend fun getTrashedBefore(cutoff: Long): List<Note>
+
     @Insert
     suspend fun insert(note: Note): Long
 

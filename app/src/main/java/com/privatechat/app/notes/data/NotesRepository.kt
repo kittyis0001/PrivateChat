@@ -4,6 +4,7 @@ import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Repository for the isolated Notes module. All writes run on IO and
@@ -12,13 +13,16 @@ import kotlinx.coroutines.withContext
  */
 class NotesRepository(context: Context) {
 
+    private val appContext = context.applicationContext
     private val db = NotesDatabase.get(context)
     private val notes = db.notesDao()
     private val categories = db.categoryDao()
     private val stickies = db.stickyDao()
+    private val extras = db.noteExtrasDao()
 
     companion object {
         val DEFAULT_CATEGORIES = listOf("Personal", "Study", "Work", "Shopping List", "Important")
+        const val TRASH_RETENTION_MS: Long = 30L * 24 * 60 * 60 * 1000
     }
 
     // ---- notes ----
@@ -59,10 +63,118 @@ class NotesRepository(context: Context) {
         notes.update(note.copy(deletedAt = null, updatedAt = System.currentTimeMillis()))
     }
 
-    /** Permanent delete — Notes table only. */
-    suspend fun deleteForever(note: Note) = withContext(Dispatchers.IO) { notes.delete(note) }
+    /** Permanent delete — Notes tables + this note's photo files only. */
+    suspend fun deleteForever(note: Note) = withContext(Dispatchers.IO) {
+        deleteNoteArtifacts(note.id)
+        notes.delete(note)
+    }
 
     suspend fun getAllForBackup(): List<Note> = withContext(Dispatchers.IO) { notes.getAllForBackup() }
+
+    // ---- v2: photos / checklist / duplicate / trash auto-clean ----
+
+    fun observeImages(noteId: Long): Flow<List<NoteImage>> = extras.observeImages(noteId)
+
+    fun observeImageCounts(): Flow<List<ImageCount>> = extras.observeImageCounts()
+
+    suspend fun getImages(noteId: Long): List<NoteImage> = withContext(Dispatchers.IO) { extras.imagesFor(noteId) }
+
+    /** Records an already-saved photo file for a note (see NoteImageStore). */
+    suspend fun addImageRecord(noteId: Long, fileName: String): Long = withContext(Dispatchers.IO) {
+        extras.insertImage(NoteImage(noteId = noteId, fileName = fileName))
+    }
+
+    suspend fun removeImage(image: NoteImage) = withContext(Dispatchers.IO) {
+        extras.deleteImage(image.id)
+        NoteImageStore.file(appContext, image.fileName).delete()
+    }
+
+    suspend fun getChecklistItems(noteId: Long): List<ChecklistItem> = withContext(Dispatchers.IO) {
+        extras.itemsFor(noteId)
+    }
+
+    /** Replaces all checklist rows of a note with the editor's current rows. */
+    suspend fun replaceChecklistItems(noteId: Long, items: List<ChecklistItem>) = withContext(Dispatchers.IO) {
+        extras.deleteItemsFor(noteId)
+        items.forEachIndexed { index, item ->
+            extras.insertItem(item.copy(id = 0, noteId = noteId, position = index))
+        }
+    }
+
+    suspend fun clearChecklistItems(noteId: Long) = withContext(Dispatchers.IO) {
+        extras.deleteItemsFor(noteId)
+    }
+
+    /**
+     * Full copy of a note: same title + " (Copy)", category, pin,
+     * color and checklist rows; photo files are copied byte-for-byte.
+     * The copy is fresh (not archived/trashed) and its reminder is NOT
+     * copied, so the user never gets surprise double notifications.
+     */
+    suspend fun duplicateNote(source: Note): Long = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val newId = notes.insert(
+            source.copy(
+                id = 0,
+                title = if (source.title.isBlank()) source.title else source.title + " (Copy)",
+                archived = false,
+                deletedAt = null,
+                reminderAt = null,
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+        // Checklist rows
+        extras.itemsFor(source.id).forEach { item ->
+            extras.insertItem(item.copy(id = 0, noteId = newId))
+        }
+        // Photo files
+        extras.imagesFor(source.id).forEach { image ->
+            val src = NoteImageStore.file(appContext, image.fileName)
+            if (src.exists()) {
+                val newName = NoteImageStore.newFileName()
+                val dst = NoteImageStore.file(appContext, newName)
+                runCatching { src.copyTo(dst, overwrite = false) }.onSuccess {
+                    extras.insertImage(NoteImage(noteId = newId, fileName = newName))
+                }
+            }
+        }
+        newId
+    }
+
+    /** Notes with a reminder set (for alarm (re)scheduling). */
+    suspend fun getNotesWithReminders(): List<Note> = withContext(Dispatchers.IO) {
+        notes.getNotesWithReminders()
+    }
+
+    /** Clears a fired one-shot reminder (list order/updatedAt untouched). */
+    suspend fun clearReminder(noteId: Long) = withContext(Dispatchers.IO) {
+        notes.clearReminder(noteId)
+    }
+
+    /**
+     * Permanently deletes Trash entries older than 30 days, including
+     * their photo files and checklist rows. Only Notes data.
+     * Returns how many notes were removed.
+     */
+    suspend fun autoCleanTrash(): Int = withContext(Dispatchers.IO) {
+        val cutoff = System.currentTimeMillis() - TRASH_RETENTION_MS
+        val old = notes.getTrashedBefore(cutoff)
+        old.forEach { note ->
+            deleteNoteArtifacts(note.id)
+            notes.delete(note)
+        }
+        old.size
+    }
+
+    /** Removes photo files/rows and checklist rows belonging to a note. */
+    private suspend fun deleteNoteArtifacts(noteId: Long) {
+        extras.imagesFor(noteId).forEach { image ->
+            NoteImageStore.file(appContext, image.fileName).delete()
+        }
+        extras.deleteImagesFor(noteId)
+        extras.deleteItemsFor(noteId)
+    }
 
     // ---- categories ----
     fun observeCategories(): Flow<List<Category>> = categories.observeAll()
