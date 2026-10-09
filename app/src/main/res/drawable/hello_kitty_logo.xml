@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hello Kitty face, hand-drawn as a vector matching the user-supplied reference image. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp" android:height="164dp"
+    android:viewportWidth="240" android:viewportHeight="196">
+
+    <!-- Head outline -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#23262B"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M52,78 C46,50 52,26 70,20 C82,16 92,26 98,38 C108,32 132,32 142,38 C148,26 158,16 170,20 C188,26 194,50 188,78 C196,108 186,140 156,154 C134,164 106,164 84,154 C54,140 44,108 52,78 Z" />
+
+    <!-- Bow (right ear) -->
+    <path
+        android:fillColor="#E2547A"
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:strokeLineJoin="round"
+        android:pathData="M170,34 C152,12 128,16 128,34 C128,52 152,56 170,34 Z" />
+    <path
+        android:fillColor="#E2547A"
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:strokeLineJoin="round"
+        android:pathData="M170,34 C188,12 212,16 212,34 C212,52 188,56 170,34 Z" />
+    <path
+        android:fillColor="#E2547A"
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:pathData="M159,34 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0" />
+
+    <!-- Eyes -->
+    <path
+        android:fillColor="#23262B"
+        android:pathData="M82,104 a6.5,8.5 0 1,0 13,0 a6.5,8.5 0 1,0 -13,0" />
+    <path
+        android:fillColor="#23262B"
+        android:pathData="M145,104 a6.5,8.5 0 1,0 13,0 a6.5,8.5 0 1,0 -13,0" />
+
+    <!-- Nose -->
+    <path
+        android:fillColor="#FFD93B"
+        android:strokeColor="#23262B"
+        android:strokeWidth="3.5"
+        android:pathData="M110,122 a10,7 0 1,0 20,0 a10,7 0 1,0 -20,0" />
+
+    <!-- Whiskers left -->
+    <path
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M54,96 L22,90" />
+    <path
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M52,110 L20,112" />
+    <path
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M56,124 L30,134" />
+
+    <!-- Whiskers right -->
+    <path
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M186,96 L218,90" />
+    <path
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M188,110 L220,112" />
+    <path
+        android:strokeColor="#23262B"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M184,124 L210,134" />
+</vector>
