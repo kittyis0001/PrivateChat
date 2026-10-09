@@ -23,6 +23,7 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -176,11 +177,7 @@ class NoteEditorActivity : AppCompatActivity() {
             scheduleSave()
         }
         findViewById<View>(R.id.editorAddPhoto).setOnClickListener {
-            pickPhoto.launch(
-                ActivityResultContracts.PickVisualMediaRequest.Builder()
-                    .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    .build()
-            )
+            pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
         findViewById<View>(R.id.editorDuplicate).setOnClickListener { duplicateCurrent() }
         findViewById<View>(R.id.editorExportTxt).setOnClickListener {
@@ -686,26 +683,28 @@ class NoteEditorActivity : AppCompatActivity() {
             if (lines.isEmpty()) lines.add("" to bodyPaint)
 
             var pageNumber = 1
+            var currentPage: PdfDocument.Page? = null
             var canvas: android.graphics.Canvas? = null
             var y = margin + 20f
             fun newPage() {
                 val info = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
                 val page = doc.startPage(info)
+                currentPage = page
                 canvas = page.canvas
                 y = margin + 20f
+                pageNumber++
             }
             newPage()
             lines.forEach { (line, paint) ->
                 val lineHeight = paint.textSize + 7f
                 if (y + lineHeight > pageHeight - margin) {
-                    doc.finishPage(doc.pages.last())
-                    pageNumber++
+                    doc.finishPage(currentPage!!)
                     newPage()
                 }
                 canvas?.drawText(line, margin, y, paint)
                 y += lineHeight
             }
-            doc.finishPage(doc.pages.last())
+            doc.finishPage(currentPage!!)
             contentResolver.openOutputStream(uri)?.use { doc.writeTo(it) } ?: error("no stream")
         } finally {
             doc.close()

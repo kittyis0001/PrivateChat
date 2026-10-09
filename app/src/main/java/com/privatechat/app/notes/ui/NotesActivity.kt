@@ -273,12 +273,13 @@ class NotesActivity : AppCompatActivity() {
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
-                        if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
-                            errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON
-                        ) {
-                            error.text = getString(R.string.notes_fingerprint_failed)
-                            error.visibility = View.VISIBLE
-                        }
+                        // Cancel/lockout etc.: the system prompt already
+                        // explained it; the password path stays as-is.
+                    }
+
+                    override fun onAuthenticationFailed() {
+                        error.text = getString(R.string.notes_fingerprint_failed)
+                        error.visibility = View.VISIBLE
                     }
                 }
             )
