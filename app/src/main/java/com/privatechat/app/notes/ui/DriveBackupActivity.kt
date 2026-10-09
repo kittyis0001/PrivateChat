@@ -73,7 +73,8 @@ class DriveBackupActivity : AppCompatActivity() {
         } catch (e: ApiException) {
             when (e.statusCode) {
                 CommonStatusCodes.DEVELOPER_ERROR -> showSetupIncomplete()
-                CommonStatusCodes.SIGN_IN_CANCELLED -> Unit // user backed out
+                // 12501: Google sign-in cancelled by the user
+                12501 -> Unit
                 else -> toast(getString(R.string.notes_drive_failed))
             }
             refreshUi()
