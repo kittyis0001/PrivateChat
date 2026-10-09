@@ -23,6 +23,11 @@
         android:maxSdkVersion="32" />
     <!-- Voice messages -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Exact note reminders (Kitty Notes). On Android 13/14 this is
+         NOT auto-granted; the Notes editor offers the system grant
+         screen and reminders fall back to near-exact timing without
+         it. Declaring it changes nothing for chat notifications. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application android:name=".App"
         
@@ -129,6 +134,19 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- Kitty Notes reminders (additive; Notes database only). -->
+        <receiver
+            android:name=".notes.reminder.ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notes.reminder.NotesBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"

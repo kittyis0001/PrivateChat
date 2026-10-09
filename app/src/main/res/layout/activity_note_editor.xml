@@ -108,6 +108,157 @@
                 android:inputType="textMultiLine|textCapSentences"
                 android:minLines="12"
                 android:layout_marginTop="12dp" />
+
+            <!-- Kitty Notes Plus (additive sections; everything above is unchanged) -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/notes_color_title"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:layout_marginTop="20dp" />
+
+            <LinearLayout
+                android:id="@+id/editorColorRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="18dp">
+
+                <TextView
+                    android:id="@+id/editorChecklistToggle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorReminderSet"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_reminder_set"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/editorChecklistBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:id="@+id/editorChecklistItems"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/editorChecklistAdd"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_checklist_add"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="6dp">
+
+                <TextView
+                    android:id="@+id/editorReminderValue"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="12sp"
+                    android:textColor="@color/textSecondary" />
+
+                <TextView
+                    android:id="@+id/editorReminderClear"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✕"
+                    android:textSize="14sp"
+                    android:textColor="@color/kittyError"
+                    android:padding="9dp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/notes_photos_title"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:layout_marginTop="14dp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/editorImages"
+                android:layout_width="match_parent"
+                android:layout_height="84dp"
+                android:layout_marginTop="8dp" />
+
+            <TextView
+                android:id="@+id/editorAddPhoto"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/notes_add_photo"
+                android:textSize="13sp"
+                android:textColor="@color/primary"
+                android:padding="9dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="14dp">
+
+                <TextView
+                    android:id="@+id/editorDuplicate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_duplicate"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorExportTxt"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_export_txt"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorExportPdf"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_export_pdf"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 

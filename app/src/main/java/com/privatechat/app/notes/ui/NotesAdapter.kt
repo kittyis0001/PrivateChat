@@ -18,6 +18,9 @@ class NotesAdapter(
     private val onLongClick: (Note) -> Unit
 ) : ListAdapter<Note, NotesAdapter.VH>(DIFF) {
 
+    /** noteId -> photo count, for the small 🖼 badge (0/absent = no badge). */
+    var imageCounts: Map<Long, Int> = emptyMap()
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.item_note, parent, false)
         return VH(v)
@@ -26,9 +29,12 @@ class NotesAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val note = getItem(position)
         holder.title.text = note.title.ifBlank { holder.itemView.context.getString(R.string.notes_untitled) }
-        holder.preview.text = note.content.replace("\n", " ").take(120)
         holder.date.text = DATE_FMT.format(Date(note.updatedAt))
         holder.pin.visibility = if (note.pinned) View.VISIBLE else View.GONE
+        NoteCardStyle.bind(
+            holder.itemView, holder.title, holder.preview, holder.date,
+            note, imageCounts[note.id] ?: 0
+        )
         holder.itemView.setOnClickListener { onClick(note) }
         holder.itemView.setOnLongClickListener { onLongClick(note); true }
     }

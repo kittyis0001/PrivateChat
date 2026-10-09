@@ -88,6 +88,18 @@ object NotesLockManager {
             .apply()
     }
 
+    // ---- Notes sort order (notes-scoped, persisted) ----
+    // 0 = pinned + last edited (original order), 1 = newest first,
+    // 2 = oldest first, 3 = title A-Z. Pinned notes stay on top in
+    // every mode, exactly as the original list behaved.
+    private const val KEY_SORT_MODE = "notes_sort_mode"
+
+    fun getSortMode(context: Context): Int = prefs(context).getInt(KEY_SORT_MODE, 0)
+
+    fun setSortMode(context: Context, mode: Int) {
+        prefs(context).edit().putInt(KEY_SORT_MODE, mode).apply()
+    }
+
     // ---- Notes theme accent (notes-scoped only) ----
     fun getAccent(context: Context): String = prefs(context).getString(KEY_ACCENT, "pink") ?: "pink"
     fun setAccent(context: Context, accent: String) {

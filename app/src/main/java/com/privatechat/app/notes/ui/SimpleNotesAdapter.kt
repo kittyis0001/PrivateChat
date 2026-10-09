@@ -26,9 +26,9 @@ class SimpleNotesAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val note = getItem(position)
         holder.title.text = note.title.ifBlank { holder.itemView.context.getString(R.string.notes_untitled) }
-        holder.preview.text = note.content.replace("\n", " ").take(120)
         holder.date.text = DATE_FMT.format(Date(note.updatedAt))
         holder.pin.visibility = if (note.pinned) View.VISIBLE else View.GONE
+        NoteCardStyle.bind(holder.itemView, holder.title, holder.preview, holder.date, note)
         holder.itemView.setOnClickListener { onClick(note) }
     }
 

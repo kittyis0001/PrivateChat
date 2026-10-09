@@ -1,6 +1,8 @@
 package com.privatechat.app.notes.ui
 
 import android.content.Intent
+import android.hardware.biometrics.BiometricPrompt
+import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -12,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
@@ -24,6 +27,7 @@ import com.privatechat.app.notes.backup.NotesBackup
 import com.privatechat.app.notes.data.Category
 import com.privatechat.app.notes.data.Note
 import com.privatechat.app.notes.data.NotesRepository
+import com.privatechat.app.notes.reminder.ReminderManager
 import com.privatechat.app.notes.security.NotesLockManager
 import com.privatechat.app.ui.login.LoginActivity
 import kotlinx.coroutines.Job
@@ -171,6 +175,17 @@ class NotesActivity : AppCompatActivity() {
 
         setupDrawer()
         setupLock()
+
+        // Kitty Notes Plus housekeeping (Notes data only): permanently
+        // remove Trash entries older than 30 days, and re-arm any note
+        // reminders (covers reboot/restore/timezone changes).
+        lifecycleScope.launch {
+            runCatching {
+                repo.autoCleanTrash()
+                ReminderManager.ensureChannel(this@NotesActivity)
+                ReminderManager.rescheduleAll(this@NotesActivity)
+            }
+        }
     }
 
     override fun onResume() {
@@ -218,6 +233,55 @@ class NotesActivity : AppCompatActivity() {
                 error.visibility = View.VISIBLE
                 input.text.clear()
             }
+        }
+        setupFingerprintUnlock(error)
+    }
+
+    /**
+     * Additive fingerprint unlock (framework BiometricPrompt, API 28+).
+     * Shown only when the device has fingerprint hardware with an
+     * enrolled fingerprint; the Notes password always remains as the
+     * fallback and is verified by the unchanged password path.
+     */
+    private fun setupFingerprintUnlock(error: TextView) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        val button = findViewById<View>(R.id.lockFingerprintButton)
+        val available = runCatching {
+            @Suppress("DEPRECATION")
+            androidx.core.hardware.fingerprint.FingerprintManagerCompat.from(this)
+                .let { it.isHardwareDetected && it.hasEnrolledFingerprints() }
+        }.getOrDefault(false)
+        if (!available) return
+        button.visibility = View.VISIBLE
+        button.setOnClickListener {
+            val executor = ContextCompat.getMainExecutor(this)
+            val prompt = BiometricPrompt.Builder(this)
+                .setTitle(getString(R.string.notes_fingerprint_prompt))
+                .setSubtitle(getString(R.string.notes_fingerprint_subtitle))
+                .setNegativeButton(getString(android.R.string.cancel), executor) { _, _ -> }
+                .build()
+            prompt.authenticate(
+                android.os.CancellationSignal(),
+                executor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) {
+                        NotesLockManager.unlockedThisProcess = true
+                        lockView.visibility = View.GONE
+                        mainContent.visibility = View.VISIBLE
+                        findViewById<View>(R.id.notesFab).visibility = View.VISIBLE
+                        error.visibility = View.GONE
+                    }
+
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                        if (errorCode != BiometricPrompt.ERROR_USER_CANCELED &&
+                            errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON
+                        ) {
+                            error.text = getString(R.string.notes_fingerprint_failed)
+                            error.visibility = View.VISIBLE
+                        }
+                    }
+                }
+            )
         }
     }
 
@@ -291,6 +355,7 @@ class NotesActivity : AppCompatActivity() {
             add(0, 2, 1, getString(R.string.notes_settings_title))
             add(0, 3, 2, getString(R.string.notes_about_title))
             add(0, 4, 3, getString(R.string.notes_privacy_title))
+            add(0, 5, 4, getString(R.string.notes_sort_title))
         }
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -298,10 +363,39 @@ class NotesActivity : AppCompatActivity() {
                 2 -> { startActivity(Intent(this, NotesSettingsActivity::class.java)); true }
                 3 -> { startActivity(Intent(this, AboutActivity::class.java)); true }
                 4 -> { showPrivacy(); true }
+                5 -> { showSortDialog(); true }
                 else -> false
             }
         }
         popup.show()
+    }
+
+    private fun showSortDialog() {
+        val labels = arrayOf(
+            getString(R.string.notes_sort_recent),
+            getString(R.string.notes_sort_newest),
+            getString(R.string.notes_sort_oldest),
+            getString(R.string.notes_sort_title_az)
+        )
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_sort_title))
+            .setSingleChoiceItems(labels, NotesLockManager.getSortMode(this)) { dialog, which ->
+                NotesLockManager.setSortMode(this@NotesActivity, which)
+                refreshList()
+                dialog.dismiss()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Applies the chosen sort order; mode 0 keeps the original order. */
+    private fun sortNotes(list: List<Note>): List<Note> {
+        return when (NotesLockManager.getSortMode(this)) {
+            1 -> list.sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.createdAt })
+            2 -> list.sortedWith(compareByDescending<Note> { it.pinned }.thenBy { it.createdAt })
+            3 -> list.sortedWith(compareByDescending<Note> { it.pinned }.thenBy { it.title.lowercase() })
+            else -> list
+        }
     }
 
     private fun showPrivacy() {
@@ -372,6 +466,12 @@ class NotesActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repo.observeTrashCount().collectLatest { count ->
                 updateDrawerCount(R.id.nav_trash, getString(R.string.notes_trash_title), count)
+            }
+        }
+        lifecycleScope.launch {
+            repo.observeImageCounts().collectLatest { counts ->
+                adapter.imageCounts = counts.associate { it.noteId to it.cnt }
+                adapter.notifyDataSetChanged()
             }
         }
     }
@@ -478,7 +578,7 @@ class NotesActivity : AppCompatActivity() {
         }
         listJob = lifecycleScope.launch {
             flow.collectLatest { list ->
-                adapter.submitList(list)
+                adapter.submitList(sortNotes(list))
                 val showEmpty = list.isEmpty() && searchQuery.isBlank()
                 emptyState.visibility = if (showEmpty) View.VISIBLE else View.GONE
                 notesList.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
@@ -491,16 +591,27 @@ class NotesActivity : AppCompatActivity() {
             if (note.pinned) getString(R.string.notes_unpin) else getString(R.string.notes_pin),
             getString(R.string.notes_archive_action),
             getString(R.string.notes_share_note),
-            getString(R.string.notes_delete)
+            getString(R.string.notes_delete),
+            getString(R.string.notes_duplicate)
         )
         AlertDialog.Builder(this)
             .setTitle(note.title.ifBlank { getString(R.string.notes_untitled) })
             .setItems(labels) { _, which ->
                 when (which) {
                     0 -> lifecycleScope.launch { repo.setPinned(note, !note.pinned) }
-                    1 -> lifecycleScope.launch { repo.setArchived(note, true) }
+                    1 -> lifecycleScope.launch {
+                        repo.setArchived(note, true)
+                        ReminderManager.cancel(this@NotesActivity, note.id)
+                    }
                     2 -> shareNote(note)
-                    3 -> lifecycleScope.launch { repo.moveToTrash(note) }
+                    3 -> lifecycleScope.launch {
+                        repo.moveToTrash(note)
+                        ReminderManager.cancel(this@NotesActivity, note.id)
+                    }
+                    4 -> lifecycleScope.launch {
+                        repo.duplicateNote(note)
+                        Toast.makeText(this@NotesActivity, getString(R.string.notes_duplicated), Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
             .show()
