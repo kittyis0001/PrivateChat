@@ -117,6 +117,16 @@ class NotesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Restore the persisted Notes theme before the first frame is
+        // drawn, so Dark Mode survives relaunch without flicker. This
+        // only applies the Notes choice; the chat theme preference
+        // (Session, applied in App.onCreate) is untouched.
+        NotesLockManager.notesDarkMode(this)?.let { dark ->
+            androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                if (dark) androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+                else androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+            )
+        }
         setContentView(R.layout.activity_notes)
 
         drawer = findViewById(R.id.notesDrawer)
@@ -188,6 +198,10 @@ class NotesActivity : AppCompatActivity() {
         val mustLock = NotesLockManager.isLockEnabled(this) && !NotesLockManager.unlockedThisProcess
         lockView.visibility = if (mustLock) View.VISIBLE else View.GONE
         mainContent.visibility = if (mustLock) View.GONE else View.VISIBLE
+        // The pen FAB is an editing control: never visible before unlock.
+        // Set synchronously here in onCreate, before the first frame draws,
+        // so it cannot flash on launch or recreation.
+        findViewById<View>(R.id.notesFab).visibility = if (mustLock) View.GONE else View.VISIBLE
         if (!mustLock) return
 
         val input = findViewById<EditText>(R.id.lockPasswordInput)
@@ -198,6 +212,7 @@ class NotesActivity : AppCompatActivity() {
                 NotesLockManager.unlockedThisProcess = true
                 lockView.visibility = View.GONE
                 mainContent.visibility = View.VISIBLE
+                findViewById<View>(R.id.notesFab).visibility = View.VISIBLE
                 error.visibility = View.GONE
             } else {
                 error.visibility = View.VISIBLE

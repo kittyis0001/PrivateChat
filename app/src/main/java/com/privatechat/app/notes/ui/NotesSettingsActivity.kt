@@ -69,11 +69,14 @@ class NotesSettingsActivity : AppCompatActivity() {
                 .show()
         }
 
-        // Dark mode (shared night mode; chat Session preference untouched)
+        // Dark mode — persisted in the Notes preferences and restored
+        // by NotesActivity before first render. The chat app's own
+        // saved theme preference (Session) is never written here.
         val darkSwitch = findViewById<Switch>(R.id.notesDarkSwitch)
-        darkSwitch.isChecked = Session.isDarkThemeEnabled() ||
-            AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES
+        darkSwitch.isChecked = NotesLockManager.notesDarkMode(this)
+            ?: (AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES)
         darkSwitch.setOnCheckedChangeListener { _, isChecked ->
+            NotesLockManager.setNotesDarkMode(this, isChecked)
             AppCompatDelegate.setDefaultNightMode(
                 if (isChecked) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO
             )
