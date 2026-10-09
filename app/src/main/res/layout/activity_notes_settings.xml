@@ -178,11 +178,21 @@
 
             <TextView style="@style/NotesSectionLabel" android:text="@string/notes_section_lock" android:layout_marginTop="20dp" />
 
-            <LinearLayout style="@style/NotesCard" android:layout_marginBottom="24dp">
+            <LinearLayout style="@style/NotesCard">
 
                 <LinearLayout android:id="@+id/rowNotesLock" style="@style/NotesRow">
                     <TextView style="@style/NotesRowLabel" android:text="@string/notes_lock_password_label" />
                     <TextView android:id="@+id/notesLockValue" style="@style/NotesRowValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView style="@style/NotesSectionLabel" android:text="@string/notes_section_cloud" android:layout_marginTop="20dp" />
+
+            <LinearLayout style="@style/NotesCard" android:layout_marginBottom="24dp">
+
+                <LinearLayout android:id="@+id/rowNotesDrive" style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_drive_title" />
+                    <TextView android:id="@+id/notesDriveValue" style="@style/NotesRowValue" />
                 </LinearLayout>
             </LinearLayout>
 
