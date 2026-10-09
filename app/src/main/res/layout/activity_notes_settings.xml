@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/surface"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="10dp"
+        android:elevation="2dp">
+
+        <ImageButton
+            android:id="@+id/notesSettingsBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_arrow_back"
+            android:contentDescription="Back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/notes_settings_title"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/textPrimary"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView style="@style/NotesSectionLabel" android:text="@string/notes_section_general" />
+
+            <LinearLayout style="@style/NotesCard">
+
+                <LinearLayout
+                    android:id="@+id/rowAccent"
+                    style="@style/NotesRow">
+
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_accent_title" />
+                    <TextView android:id="@+id/accentValue" style="@style/NotesRowValue" />
+                </LinearLayout>
+
+                <View style="@style/SettingsDivider" />
+
+                <LinearLayout
+                    android:id="@+id/rowNotesDark"
+                    style="@style/NotesRow">
+
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_dark_mode" />
+                    <Switch android:id="@+id/notesDarkSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <View style="@style/SettingsDivider" />
+
+                <LinearLayout
+                    android:id="@+id/rowNotesLanguage"
+                    style="@style/NotesRow">
+
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_language_title" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView style="@style/NotesSectionLabel" android:text="@string/notes_section_others" android:layout_marginTop="20dp" />
+
+            <LinearLayout style="@style/NotesCard">
+
+                <LinearLayout
+                    style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_version_label" />
+                    <TextView android:id="@+id/notesVersionValue" style="@style/NotesRowValue" />
+                </LinearLayout>
+
+                <View style="@style/SettingsDivider" />
+
+                <LinearLayout android:id="@+id/rowNotesShare" style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_share_app" />
+                </LinearLayout>
+
+                <View style="@style/SettingsDivider" />
+
+                <LinearLayout android:id="@+id/rowNotesPrivacy" style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_privacy_title" />
+                </LinearLayout>
+
+                <View style="@style/SettingsDivider" />
+
+                <LinearLayout android:id="@+id/rowNotesFeedback" style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_feedback" />
+                </LinearLayout>
+
+                <View style="@style/SettingsDivider" />
+
+                <LinearLayout android:id="@+id/rowNotesAbout" style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_about_title" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView style="@style/NotesSectionLabel" android:text="@string/notes_section_lock" android:layout_marginTop="20dp" />
+
+            <LinearLayout style="@style/NotesCard" android:layout_marginBottom="24dp">
+
+                <LinearLayout android:id="@+id/rowNotesLock" style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_lock_password_label" />
+                    <TextView android:id="@+id/notesLockValue" style="@style/NotesRowValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

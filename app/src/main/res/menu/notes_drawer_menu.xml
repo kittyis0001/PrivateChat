@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:checkableBehavior="none">
+        <item android:id="@+id/nav_sync" android:title="@string/notes_sync_title" />
+        <item android:id="@+id/nav_backup" android:title="@string/notes_backup" />
+        <item android:id="@+id/nav_restore" android:title="@string/notes_restore" />
+    </group>
+    <group android:checkableBehavior="none">
+        <item android:id="@+id/nav_calendar" android:title="@string/notes_calendar_title" />
+        <item android:id="@+id/nav_templates" android:title="@string/notes_templates_title" />
+        <item android:id="@+id/nav_settings" android:title="@string/notes_settings_title" />
+    </group>
+    <group android:checkableBehavior="none">
+        <item android:id="@+id/nav_quick_note" android:title="@string/notes_quick_title" />
+        <item android:id="@+id/nav_sticky" android:title="@string/notes_sticky_title" />
+        <item android:id="@+id/nav_note_tool" android:title="@string/notes_tool_title" />
+    </group>
+    <group android:checkableBehavior="none">
+        <item android:id="@+id/nav_archive" android:title="@string/notes_archive_title" />
+        <item android:id="@+id/nav_trash" android:title="@string/notes_trash_title" />
+    </group>
+</menu>
