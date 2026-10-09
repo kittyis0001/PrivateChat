@@ -67,6 +67,27 @@ object NotesLockManager {
         return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec).encoded
     }
 
+    // ---- Notes dark mode (notes-scoped, persisted) ----
+    // Stored in the same dedicated Notes preferences file. Applied by
+    // NotesActivity before its first frame so reopening the app keeps
+    // the chosen mode. The chat app's own theme preference (Session)
+    // is a separate source of truth and is never written here.
+    private const val KEY_NOTES_DARK_SET = "notes_dark_set"
+    private const val KEY_NOTES_DARK = "notes_dark"
+
+    /** true = dark, false = light, null = user has not chosen in Notes yet. */
+    fun notesDarkMode(context: Context): Boolean? {
+        val p = prefs(context)
+        return if (p.contains(KEY_NOTES_DARK_SET)) p.getBoolean(KEY_NOTES_DARK, false) else null
+    }
+
+    fun setNotesDarkMode(context: Context, dark: Boolean) {
+        prefs(context).edit()
+            .putBoolean(KEY_NOTES_DARK_SET, true)
+            .putBoolean(KEY_NOTES_DARK, dark)
+            .apply()
+    }
+
     // ---- Notes theme accent (notes-scoped only) ----
     fun getAccent(context: Context): String = prefs(context).getString(KEY_ACCENT, "pink") ?: "pink"
     fun setAccent(context: Context, accent: String) {
