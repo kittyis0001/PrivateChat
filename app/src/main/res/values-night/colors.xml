@@ -14,8 +14,8 @@
     <color name="inputFieldBg">#2A2636</color>
     <color name="menuIconTint">#FFFFFF</color>
     <color name="kittyHeaderBg">#2A1E2E</color>
-    <color name="kittyAccent">#F48FB1</color>
+    <color name="kittyAccent">#64B5F6</color>
     <color name="kittyOnPrimary">#1E1B26</color>
-    <color name="kittyFab">#EC407A</color>
+    <color name="kittyFab">#1E88E5</color>
     <color name="kittyError">#EF9A9A</color>
 </resources>

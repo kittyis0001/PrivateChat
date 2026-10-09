@@ -20,8 +20,8 @@
          not the app's accent-tinted text color. -->
     <color name="menuIconTint">#000000</color>
     <color name="kittyHeaderBg">#FCE4EC</color>
-    <color name="kittyAccent">#EC407A</color>
+    <color name="kittyAccent">#1E88E5</color>
     <color name="kittyOnPrimary">#FFFFFF</color>
-    <color name="kittyFab">#EC407A</color>
+    <color name="kittyFab">#1E88E5</color>
     <color name="kittyError">#D32F2F</color>
 </resources>

@@ -167,6 +167,19 @@ class NotesActivity : AppCompatActivity() {
         super.onResume()
         lifecycleScope.launch { repo.ensureDefaultCategories() }
         observeData()
+        applyAccent()
+    }
+
+    /** Applies the chosen Notes theme accent to real UI elements (FAB tint). */
+    private fun applyAccent() {
+        val hex = when (NotesLockManager.getAccent(this)) {
+            "lavender" -> "#7E57C2"
+            "mint" -> "#43A047"
+            "sky" -> "#1E88E5"
+            else -> "#EC407A"
+        }
+        findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.notesFab)
+            .backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor(hex))
     }
 
     // ---------------- lock ----------------

@@ -134,11 +134,11 @@
                     android:padding="40dp"
                     android:visibility="gone">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="🎀"
-                        android:textSize="64sp" />
+                    <ImageView
+                        android:layout_width="180dp"
+                        android:layout_height="150dp"
+                        android:src="@drawable/ic_empty_box"
+                        android:contentDescription="Empty" />
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -251,6 +251,7 @@
         android:layout_gravity="start"
         android:background="@color/surface"
         app:headerLayout="@layout/nav_header_kitty"
+        app:itemIconTint="@color/kittyAccent"
         app:menu="@menu/notes_drawer_menu"
         xmlns:app="http://schemas.android.com/apk/res-auto" />
 </androidx.drawerlayout.widget.DrawerLayout>
