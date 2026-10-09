@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
+    id("org.jetbrains.kotlin.kapt") version "1.9.22"
 }
 
 android {
@@ -99,6 +100,12 @@ dependencies {
     // request in AndroidManifest.xml covers the older-API fallback
     // path this pulls in.
     implementation("androidx.activity:activity-ktx:1.9.3")
+
+    // Notes module — local Room database (kitty_notes.db), fully
+    // isolated from the chat app's Firebase data.
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

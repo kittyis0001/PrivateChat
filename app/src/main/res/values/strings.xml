@@ -5,4 +5,189 @@
     <string name="access_code_title">Enter Access Code</string>
     <string name="access_code_hint">Access Code</string>
     <string name="access_code_error">Incorrect code. Please try again.</string>
+    <string name="notes_title">Kitty Notes</string>
+    <string name="notes_drawer_subtitle">Your cute little notebook</string>
+    <string name="notes_premium_title">Kitty Notes Premium</string>
+    <string name="notes_premium_body">All local features are free on this device. Enjoy your notes!</string>
+    <string name="notes_search_hint">Search notes…</string>
+    <string name="notes_clear">Clear</string>
+    <string name="notes_empty_title">Create your first note</string>
+    <string name="notes_empty_body">Tap the pencil button to write something sweet. Your notes stay on this device.</string>
+    <string name="notes_create_first">Start Writing</string>
+    <string name="notes_lock_title">Notes Locked</string>
+    <string name="notes_lock_subtitle">Enter your Notes password to continue. This lock protects only your notes on this device.</string>
+    <string name="notes_lock_password_hint">Notes password</string>
+    <string name="notes_lock_error">Incorrect password. Please try again.</string>
+    <string name="notes_unlock">Unlock</string>
+    <string name="notes_untitled">Untitled</string>
+    <string name="notes_pinned">Pinned</string>
+    <string name="notes_unpinned">Unpinned</string>
+    <string name="notes_saved">Saved</string>
+    <string name="notes_copied">Copied</string>
+    <string name="notes_share_note">Share note</string>
+    <string name="notes_nothing_to_share">Nothing to share yet</string>
+    <string name="notes_move_to_trash_title">Move to Trash?</string>
+    <string name="notes_move_to_trash_msg">You can restore this note from Trash later.</string>
+    <string name="notes_move_to_trash">Move to Trash</string>
+    <string name="notes_last_edited">Last edited %1$s</string>
+    <string name="notes_new_note">New note</string>
+    <string name="notes_sync_title">Cloud Sync</string>
+    <string name="notes_sync_unavailable">Cloud sync is not configured for Notes yet. Your notes are safely stored on this device, and you can back them up or restore them from the drawer menu.</string>
+    <string name="notes_backup">Back up notes</string>
+    <string name="notes_restore">Restore</string>
+    <string name="notes_calendar_title">Calendar</string>
+    <string name="notes_templates_title">Templates</string>
+    <string name="notes_quick_title">Quick Note</string>
+    <string name="notes_sticky_title">Sticky Notes</string>
+    <string name="notes_tool_title">Note Tool</string>
+    <string name="notes_settings_title">Settings</string>
+    <string name="notes_archive_title">Archive</string>
+    <string name="notes_trash_title">Trash</string>
+    <string name="menu_enter_promo_code">Enter Promo Code</string>
+    <string name="promo_hint">Promo code</string>
+    <string name="promo_error">Incorrect code. Please try again.</string>
+    <string name="promo_subtitle">Enter your promo code to continue.</string>
+    <string name="promo_continue">Continue</string>
+    <string name="notes_no_tag">No Tag</string>
+    <string name="notes_chip_all">All</string>
+    <string name="notes_chip_new_category">Category</string>
+    <string name="notes_category_name_hint">Category name</string>
+    <string name="notes_add_category">New Category</string>
+    <string name="notes_edit_category">Edit Category</string>
+    <string name="notes_delete_category">Delete category</string>
+    <string name="notes_delete_category_title">Delete category?</string>
+    <string name="notes_delete_category_msg">Notes in this category will not be deleted. They will move to No Tag.</string>
+    <string name="notes_delete">Delete</string>
+    <string name="notes_pin">Pin</string>
+    <string name="notes_unpin">Unpin</string>
+    <string name="notes_archive_action">Archive</string>
+    <string name="notes_save">Save</string>
+    <string name="notes_quick_hint">Write something quick…</string>
+    <string name="notes_delete_forever">Delete forever</string>
+    <string name="notes_delete_forever_title">Delete forever?</string>
+    <string name="notes_delete_forever_msg">This note will be permanently deleted. This cannot be undone.</string>
+    <string name="notes_archive_empty">No archived notes</string>
+    <string name="notes_trash_empty">Trash is empty</string>
+    <string name="notes_share_short">Share</string>
+    <string name="notes_copy_short">Copy</string>
+    <string name="notes_delete_short">Delete</string>
+    <string name="notes_save_note">Save Note</string>
+    <string name="notes_editor_title_hint">Title</string>
+    <string name="notes_editor_content_hint">Start writing…</string>
+    <string name="notes_calendar_basis">Dates use each note\'s last-edited date.</string>
+    <string name="notes_calendar_day_notes">Notes on %1$s</string>
+    <string name="notes_calendar_add">Add note</string>
+    <string name="notes_sticky_hint">Sticky note…</string>
+    <string name="notes_sticky_new">New Sticky</string>
+    <string name="notes_sticky_edit">Edit Sticky</string>
+    <string name="notes_sticky_empty">No sticky notes yet</string>
+    <string name="notes_tool_hint">Paste or write text here…</string>
+    <string name="notes_tool_stats">Words: %1$d · Characters: %2$d · Without spaces: %3$d</string>
+    <string name="notes_tool_checklist">Checklist</string>
+    <string name="notes_section_general">General</string>
+    <string name="notes_section_others">Others</string>
+    <string name="notes_section_lock">Lock</string>
+    <string name="notes_accent_title">Theme Color</string>
+    <string name="notes_accent_applied">Theme color applied to Notes</string>
+    <string name="notes_dark_mode">Dark Mode</string>
+    <string name="notes_language_title">Language</string>
+    <string name="notes_version_label">App Version</string>
+    <string name="notes_share_app">Share App</string>
+    <string name="notes_share_app_text">Kitty Notes — a cute little notes app.</string>
+    <string name="notes_privacy_title">Privacy Policy</string>
+    <string name="notes_privacy_body">Kitty Notes stores your notes, categories and sticky notes only on this device in a private local database. Notes are not uploaded anywhere by the Notes feature, and cloud sync is not configured. You can export a backup file yourself from the drawer (Back up notes) and restore it later; that file is wherever you choose to save it. Deleting a note moves it to Trash; permanent deletion removes it from the device. The Notes password lock stores only a secure password hash on this device and protects the Notes section only.</string>
+    <string name="notes_feedback">Feedback or Suggestion</string>
+    <string name="notes_no_email_app">No email app found</string>
+    <string name="notes_about_title">About</string>
+    <string name="notes_about_body">Kitty Notes is a sweet little notebook for your everyday thoughts.
+
+• Write and organize notes with categories and tags
+• Pin important notes and find them fast with search
+• See your notes on a calendar by last-edited date
+• Start quickly with templates and Quick Note
+• Keep little reminders as Sticky Notes
+• Archive old notes or restore them from Trash
+• Personalize theme colors and dark mode
+• Protect your notes with a password lock
+• Back up and restore your notes from a file</string>
+    <string name="notes_about_version">Version %1$s</string>
+    <string name="notes_lock_on">On</string>
+    <string name="notes_lock_off">Off</string>
+    <string name="notes_lock_new_hint">New password (min 4 characters)</string>
+    <string name="notes_lock_confirm_hint">Confirm password</string>
+    <string name="notes_lock_set_title">Set Notes Password</string>
+    <string name="notes_lock_scope_note">This password protects only the Notes section on this device.</string>
+    <string name="notes_enable">Enable</string>
+    <string name="notes_lock_too_short">Password must be at least 4 characters</string>
+    <string name="notes_lock_mismatch">Passwords do not match</string>
+    <string name="notes_lock_enabled">Notes lock enabled</string>
+    <string name="notes_lock_manage_title">Notes Lock</string>
+    <string name="notes_lock_current_hint">Current password</string>
+    <string name="notes_lock_disable">Disable Lock</string>
+    <string name="notes_lock_disabled">Notes lock disabled</string>
+    <string name="notes_lock_wrong">Incorrect password</string>
+    <string name="notes_lock_password_label">Set Password</string>
+    <string name="notes_backup_done">Backup saved</string>
+    <string name="notes_backup_failed">Backup failed</string>
+    <string name="notes_restore_done">Restored %1$d notes</string>
+    <string name="notes_restore_failed">Restore failed — invalid file</string>
+    <string name="tpl_daily_journal">Daily Journal</string>
+    <string name="tpl_daily_journal_body">Date:
+
+Today I feel:
+
+Highlights:
+
+Tomorrow I will:</string>
+    <string name="tpl_study">Study Notes</string>
+    <string name="tpl_study_body">Subject:
+Topic:
+
+Key points:
+• 
+• 
+
+Questions:</string>
+    <string name="tpl_shopping">Shopping List</string>
+    <string name="tpl_shopping_body">Items:
+- [ ] 
+- [ ] 
+- [ ] </string>
+    <string name="tpl_todo">To-Do List</string>
+    <string name="tpl_todo_body">Today:
+- [ ] 
+- [ ] 
+- [ ] 
+
+Later:
+- [ ] </string>
+    <string name="tpl_work">Work Notes</string>
+    <string name="tpl_work_body">Project:
+
+Tasks:
+• 
+
+Deadlines:
+
+Notes:</string>
+    <string name="tpl_diary">Personal Diary</string>
+    <string name="tpl_diary_body">Dear diary,
+
+</string>
+    <string name="tpl_meeting">Meeting Notes</string>
+    <string name="tpl_meeting_body">Meeting:
+Date:
+People:
+
+Discussion:
+
+Decisions:
+
+Action items:</string>
+    <string name="tpl_important">Important Information</string>
+    <string name="tpl_important_body">Title:
+
+Details:
+
+Remember:</string>
 </resources>
