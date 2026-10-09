@@ -193,4 +193,43 @@ Remember:</string>
     <string name="notes_sync_header">Sync Notes</string>
     <string name="notes_sync_login">Login</string>
     <string name="notes_premium_card_title">Kitty Premium 🎀</string>
+
+    <!-- Kitty Notes Plus (additive features) -->
+    <string name="notes_color_title">Note color</string>
+    <string name="notes_color_none">None</string>
+    <string name="notes_duplicate">Duplicate</string>
+    <string name="notes_duplicated">Note duplicated</string>
+    <string name="notes_sort_title">Sort notes</string>
+    <string name="notes_sort_recent">Last edited</string>
+    <string name="notes_sort_newest">Newest first</string>
+    <string name="notes_sort_oldest">Oldest first</string>
+    <string name="notes_sort_title_az">Title (A–Z)</string>
+    <string name="notes_export_txt">Export as text</string>
+    <string name="notes_export_pdf">Export as PDF</string>
+    <string name="notes_exported">Note exported</string>
+    <string name="notes_export_failed">Export failed</string>
+    <string name="notes_checklist">Checklist</string>
+    <string name="notes_checklist_add">+ Add item</string>
+    <string name="notes_checklist_hint">List item</string>
+    <string name="notes_photos_title">Photos</string>
+    <string name="notes_add_photo">Add photo</string>
+    <string name="notes_photo_failed">Could not add that photo</string>
+    <string name="notes_photo_limit">You can add up to %1$d photos per note</string>
+    <string name="notes_reminder_title">Note reminder</string>
+    <string name="notes_reminder_channel">Note reminders</string>
+    <string name="notes_reminder_set">Set reminder</string>
+    <string name="notes_reminder_none">No reminder set</string>
+    <string name="notes_reminder_pick_date">Pick a date</string>
+    <string name="notes_reminder_pick_time">Pick a time</string>
+    <string name="notes_reminder_future_only">Please pick a future time</string>
+    <string name="notes_reminder_clear">Clear reminder</string>
+    <string name="notes_reminder_exact_title">Exact reminders</string>
+    <string name="notes_reminder_exact_msg">Allow "Alarms &amp; reminders" so this reminder fires at the exact minute. Without it, Android may delay it a little while the phone sleeps.</string>
+    <string name="notes_reminder_open_settings">Open settings</string>
+    <string name="notes_reminder_continue">Continue anyway</string>
+    <string name="notes_notifications_off">Notifications are off — turn them on to see reminders</string>
+    <string name="notes_fingerprint_unlock">Unlock with fingerprint</string>
+    <string name="notes_fingerprint_prompt">Unlock Kitty Notes</string>
+    <string name="notes_fingerprint_subtitle">Use your fingerprint to open your notes</string>
+    <string name="notes_fingerprint_failed">Fingerprint not recognised — try again or use your password</string>
 </resources>

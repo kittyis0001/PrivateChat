@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="76dp"
+    android:layout_height="76dp"
+    android:layout_marginEnd="8dp">
+
+    <ImageView
+        android:id="@+id/editorImageThumb"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:contentDescription="@string/notes_photos_title" />
+
+    <TextView
+        android:id="@+id/editorImageRemove"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:text="✕"
+        android:textSize="12sp"
+        android:textColor="#FFFFFF"
+        android:background="#99000000"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp" />
+</FrameLayout>

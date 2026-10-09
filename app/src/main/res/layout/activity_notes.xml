@@ -242,6 +242,17 @@
                 android:layout_height="wrap_content"
                 android:text="@string/notes_unlock"
                 android:layout_marginTop="16dp" />
+
+            <!-- Kitty Notes Plus: shown only when the device has an
+                 enrolled fingerprint (API 28+). Password always stays. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/lockFingerprintButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/notes_fingerprint_unlock"
+                android:visibility="gone"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_marginTop="10dp" />
         </LinearLayout>
     </FrameLayout>
 
