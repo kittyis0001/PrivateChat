@@ -107,6 +107,10 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
 
+    // Kitty Notes Google Drive backup: Sign-In + Drive appDataFolder
+    // (upload/download done with plain REST; no Drive UI dependency).
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }
