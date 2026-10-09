@@ -5,7 +5,7 @@
     <!-- dashed trail -->
     <path android:strokeColor="#1E88E5" android:strokeWidth="5" android:strokeLineCap="round"
         android:pathData="M96,14 q26,2 20,16 q-5,12 -22,12" />
-    <path android:strokeColor="#1E88E5" android:strokeWidth="5" android:strokeLineCap="round" android:strokeDashWidth="1"
+    <path android:strokeColor="#1E88E5" android:strokeWidth="5" android:strokeLineCap="round"
         android:pathData="M84,44 q-16,2 -14,14 q2,10 12,12" />
     <!-- box body -->
     <path android:fillColor="#BBDEFB" android:pathData="M52,62 L90,50 L128,62 L128,118 L90,130 L52,118 Z" />
