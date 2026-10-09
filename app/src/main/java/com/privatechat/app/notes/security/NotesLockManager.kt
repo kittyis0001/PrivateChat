@@ -7,7 +7,7 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
 /**
- * Notes-only app lock. Stores a PBKDF2 password hash with a random
+ * Notes-only app lock. Stores a PBKDF2 (HmacSHA1, API-24-safe) password hash with a random
  * salt in a dedicated SharedPreferences file — never plaintext, and
  * completely separate from the chat login password and the promo
  * access-code gate.
@@ -64,7 +64,7 @@ object NotesLockManager {
 
     private fun hash(password: String, salt: ByteArray): ByteArray {
         val spec = PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH)
-        return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1").generateSecret(spec).encoded
     }
 
     // ---- Notes theme accent (notes-scoped only) ----
