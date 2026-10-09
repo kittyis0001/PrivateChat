@@ -15,10 +15,15 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.messaging.FirebaseMessaging
 import com.privatechat.app.R
+import com.privatechat.app.data.AccessGate
 import com.privatechat.app.data.Session
 import com.privatechat.app.ui.chat.ChatActivity
 import android.view.View
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import com.google.android.material.button.MaterialButton
 
@@ -39,24 +44,55 @@ import com.google.android.material.button.MaterialButton
  */
 class LoginActivity : AppCompatActivity() {
 
+    companion object {
+        private const val KEY_GATE_UNLOCKED = "gate_unlocked"
+    }
+
     // No-op result callback — notifications simply won't show if the user
     // declines; nothing else in the app depends on this being granted.
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    private lateinit var accessContainer: LinearLayout
+    private lateinit var loginContainer: LinearLayout
+    private lateinit var accessCodeInput: TextInputEditText
+    private lateinit var accessErrorText: TextView
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Restore gate state across configuration changes within the same
+        // process. A fresh process starts locked because AccessGate lives
+        // only in process memory and nothing is persisted.
+        val wasUnlocked = savedInstanceState?.getBoolean(KEY_GATE_UNLOCKED, false) == true ||
+            AccessGate.isUnlocked
+        if (wasUnlocked) AccessGate.unlock()
+
+        // Always inflate the layout first and keep the login form hidden
+        // so the username/password fields never flash before the gate
+        // has been passed.
+        setContentView(R.layout.activity_login)
+        accessContainer = findViewById(R.id.accessContainer)
+        loginContainer = findViewById(R.id.loginContainer)
+        accessCodeInput = findViewById(R.id.accessCodeInput)
+        accessErrorText = findViewById(R.id.accessErrorText)
+
         requestNotificationPermissionIfNeeded()
 
-        // Session already valid from a previous launch — skip login
-        // entirely, satisfying "no forced logout on restart".
-        if (Session.isLoggedIn()) {
-            goToChat()
-            return
+        findViewById<ImageButton>(R.id.accessMenuButton).setOnClickListener { showAccessOverflow(it) }
+        findViewById<MaterialButton>(R.id.accessContinueButton).setOnClickListener { onAccessContinue() }
+        accessCodeInput.setOnEditorActionListener { _, _, _ ->
+            onAccessContinue()
+            true
         }
 
-        setContentView(R.layout.activity_login)
+        if (AccessGate.isUnlocked) {
+            showLoginAfterGate()
+        } else {
+            accessContainer.visibility = View.VISIBLE
+            loginContainer.visibility = View.GONE
+            accessErrorText.visibility = View.GONE
+        }
 
         val usernameInput = findViewById<TextInputEditText>(R.id.usernameInput)
         val passwordInput = findViewById<TextInputEditText>(R.id.passwordInput)
@@ -98,6 +134,84 @@ class LoginActivity : AppCompatActivity() {
                     }
                 })
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(KEY_GATE_UNLOCKED, AccessGate.isUnlocked)
+    }
+
+    private fun onAccessContinue() {
+        val entered = accessCodeInput.text?.toString()?.trim().orEmpty()
+        if (entered == AccessGate.REQUIRED_CODE) {
+            accessErrorText.visibility = View.GONE
+            AccessGate.unlock()
+            showLoginAfterGate()
+        } else {
+            accessErrorText.visibility = View.VISIBLE
+            accessCodeInput.text?.clear()
+            // Subtle shake via translation — no framework shake anim exists.
+            accessContainer.animate()
+                .translationX(10f).setDuration(50)
+                .withEndAction {
+                    accessContainer.animate()
+                        .translationX(-10f).setDuration(50)
+                        .withEndAction {
+                            accessContainer.animate().translationX(0f).setDuration(50).start()
+                        }
+                        .start()
+                }
+                .start()
+        }
+    }
+
+    /**
+     * Called only after the access code has been accepted in this
+     * process. Preserves the existing session behaviour: an already
+     * logged-in user goes straight to chat, otherwise the original
+     * username/password form is revealed unchanged.
+     */
+    private fun showLoginAfterGate() {
+        accessContainer.visibility = View.GONE
+        accessErrorText.visibility = View.GONE
+        if (Session.isLoggedIn()) {
+            goToChat()
+            return
+        }
+        loginContainer.visibility = View.VISIBLE
+        loginContainer.alpha = 0f
+        loginContainer.animate().alpha(1f).setDuration(220).start()
+    }
+
+    private fun showAccessOverflow(anchor: View) {
+        val popup = PopupMenu(this, anchor)
+        popup.menu.apply {
+            add(0, 1, 0, "About")
+            add(0, 2, 1, "Privacy Policy")
+            add(0, 3, 2, "App version 1.0")
+        }
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1 -> {
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Private Chat")
+                        .setMessage("Premium Secret Chat for two authorised users. Enter your access code, then sign in with your existing username and password.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                    true
+                }
+                2 -> {
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Privacy Policy")
+                        .setMessage("This app is for private communication between two authorised users. Messages and profile data are stored in the configured Firebase Realtime Database and media in Cloudinary, as set up by the app owner. The access code screen is an extra access step and does not replace your username and password login.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                    true
+                }
+                else -> true
+            }
+        }
+        popup.show()
     }
 
     private fun requestNotificationPermissionIfNeeded() {

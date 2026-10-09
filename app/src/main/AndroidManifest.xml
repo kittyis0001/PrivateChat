@@ -49,6 +49,10 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".ui.settings.SettingsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".ui.photo.PhotoViewerActivity"
             android:exported="false"
             android:theme="@style/Theme.PhotoViewer" />
