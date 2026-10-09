@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.privatechat.app.R
 import com.privatechat.app.notes.data.Note
 import com.privatechat.app.notes.data.NotesRepository
+import com.privatechat.app.notes.reminder.ReminderManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -62,7 +63,13 @@ class SimpleNotesActivity : AppCompatActivity() {
                 .setTitle(note.title.ifBlank { getString(R.string.notes_untitled) })
                 .setItems(arrayOf(getString(R.string.notes_restore), getString(R.string.notes_delete_forever))) { _, which ->
                     lifecycleScope.launch {
-                        if (which == 0) repo.setArchived(note, false) else repo.deleteForever(note)
+                        if (which == 0) {
+                            repo.setArchived(note, false)
+                            ReminderManager.rescheduleAll(this@SimpleNotesActivity)
+                        } else {
+                            repo.deleteForever(note)
+                            ReminderManager.cancel(this@SimpleNotesActivity, note.id)
+                        }
                     }
                 }
                 .show()
@@ -71,7 +78,10 @@ class SimpleNotesActivity : AppCompatActivity() {
                 .setTitle(note.title.ifBlank { getString(R.string.notes_untitled) })
                 .setItems(arrayOf(getString(R.string.notes_restore), getString(R.string.notes_delete_forever))) { _, which ->
                     if (which == 0) {
-                        lifecycleScope.launch { repo.restoreFromTrash(note) }
+                        lifecycleScope.launch {
+                            repo.restoreFromTrash(note)
+                            ReminderManager.rescheduleAll(this@SimpleNotesActivity)
+                        }
                     } else {
                         confirmPermanentDelete(note)
                     }
@@ -85,7 +95,10 @@ class SimpleNotesActivity : AppCompatActivity() {
             .setTitle(getString(R.string.notes_delete_forever_title))
             .setMessage(getString(R.string.notes_delete_forever_msg))
             .setPositiveButton(getString(R.string.notes_delete)) { _, _ ->
-                lifecycleScope.launch { repo.deleteForever(note) }
+                lifecycleScope.launch {
+                    repo.deleteForever(note)
+                    ReminderManager.cancel(this@SimpleNotesActivity, note.id)
+                }
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
