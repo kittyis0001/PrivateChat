@@ -26,4 +26,5 @@
     <color name="kittyOnPrimary">#FFFFFF</color>
     <color name="kittyFab">#1E88E5</color>
     <color name="kittyError">#D32F2F</color>
+    <color name="ic_launcher_background">#F8F4E9</color>
 </resources>
