@@ -194,7 +194,7 @@ class LoginActivity : AppCompatActivity() {
             when (item.itemId) {
                 1 -> {
                     android.app.AlertDialog.Builder(this)
-                        .setTitle("Private Chat")
+                        .setTitle("Kitty Notes")
                         .setMessage("Premium Secret Chat for two authorised users. Enter your access code, then sign in with your existing username and password.")
                         .setPositiveButton("OK", null)
                         .show()

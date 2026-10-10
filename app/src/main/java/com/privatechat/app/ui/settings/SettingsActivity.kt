@@ -101,10 +101,10 @@ class SettingsActivity : AppCompatActivity() {
 
         // Feedback / Contact — mail intents
         findViewById<View>(R.id.rowFeedback).setOnClickListener {
-            sendMail("Private Chat feedback", "Hi,\n\n")
+            sendMail("Kitty Notes feedback", "Hi,\n\n")
         }
         findViewById<View>(R.id.rowContact).setOnClickListener {
-            sendMail("Private Chat support", "Hi,\n\n")
+            sendMail("Kitty Notes support", "Hi,\n\n")
         }
 
         // Rate
@@ -122,7 +122,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // Share
         findViewById<View>(R.id.rowShare).setOnClickListener {
-            val text = "Private Chat — a private chat app for two."
+            val text = "Kitty Notes — a private chat app for two."
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
                 putExtra(Intent.EXTRA_TEXT, text)
