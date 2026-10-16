@@ -28,6 +28,7 @@ import com.privatechat.app.data.model.StoryEdit
 import com.privatechat.app.data.repository.StoryRepository
 import com.privatechat.app.databinding.ActivityStoryUploadBinding
 import com.privatechat.app.media.CloudinaryUploader
+import com.privatechat.app.notes.ui.SecureWindow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -80,6 +81,8 @@ class StoryUploadActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of private chat content.
+        SecureWindow.protect(this)
         binding = ActivityStoryUploadBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
