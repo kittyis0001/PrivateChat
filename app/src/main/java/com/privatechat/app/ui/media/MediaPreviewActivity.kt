@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.privatechat.app.databinding.ActivityMediaPreviewBinding
 import com.privatechat.app.media.CloudinaryUploader
+import com.privatechat.app.notes.ui.SecureWindow
 import kotlinx.coroutines.launch
 
 /**
@@ -30,6 +31,8 @@ class MediaPreviewActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of private chat content.
+        SecureWindow.protect(this)
         binding = ActivityMediaPreviewBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
