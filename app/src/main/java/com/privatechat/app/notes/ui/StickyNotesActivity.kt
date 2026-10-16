@@ -37,6 +37,8 @@ class StickyNotesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of note content.
+        SecureWindow.protect(this)
         setContentView(R.layout.activity_sticky)
         findViewById<View>(R.id.stickyBack).setOnClickListener { finish() }
         findViewById<View>(R.id.stickyAdd).setOnClickListener { showEditor(null) }

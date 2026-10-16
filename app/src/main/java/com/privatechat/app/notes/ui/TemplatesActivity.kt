@@ -29,6 +29,8 @@ class TemplatesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of template content.
+        SecureWindow.protect(this)
         setContentView(R.layout.activity_templates)
         findViewById<View>(R.id.templatesBack).setOnClickListener { finish() }
 

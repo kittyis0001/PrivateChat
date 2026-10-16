@@ -42,6 +42,8 @@ class CalendarActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of note content.
+        SecureWindow.protect(this)
         setContentView(R.layout.activity_calendar)
 
         monthTitle = findViewById(R.id.calendarMonthTitle)

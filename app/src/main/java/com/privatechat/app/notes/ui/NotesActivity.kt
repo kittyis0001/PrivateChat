@@ -124,6 +124,8 @@ class NotesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of note content.
+        SecureWindow.protect(this)
         // Restore the persisted Notes theme before the first frame is
         // drawn, so Dark Mode survives relaunch without flicker. This
         // only applies the Notes choice; the chat theme preference

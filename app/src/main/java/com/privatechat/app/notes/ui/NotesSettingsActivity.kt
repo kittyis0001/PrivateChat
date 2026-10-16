@@ -32,6 +32,8 @@ class NotesSettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings (lock/password area).
+        SecureWindow.protect(this)
         setContentView(R.layout.activity_notes_settings)
 
         findViewById<View>(R.id.notesSettingsBack).setOnClickListener { finish() }
