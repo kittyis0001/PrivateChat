@@ -27,6 +27,7 @@ import com.privatechat.app.data.model.Message
 import com.privatechat.app.data.repository.ChatRepository
 import com.privatechat.app.databinding.ActivityChatBinding
 import com.privatechat.app.media.CloudinaryUploader
+import com.privatechat.app.notes.ui.SecureWindow
 import com.privatechat.app.voice.VoicePlaybackController
 import com.privatechat.app.notification.NotificationRepository
 import com.privatechat.app.ui.photo.PhotoViewerActivity
@@ -227,6 +228,8 @@ class ChatActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of private chat content.
+        SecureWindow.protect(this)
 
         val currentUser = Session.currentUser()
         val otherUser = Session.otherUser()
