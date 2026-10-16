@@ -43,6 +43,9 @@ class ChatRepository(
     private var isNicknamesListenerAttached = false
     private var isVanishModeListenerAttached = false
     private var isPhotosListenerAttached = false
+    private var isConnectionMonitorAttached = false
+    private var isPresenceListenerAttached = false
+    private var isTypingListenerAttached = false
 
     var onMessageAdded: ((Message) -> Unit)? = null
     var onMessageChanged: ((Message) -> Unit)? = null
@@ -89,11 +92,8 @@ class ChatRepository(
     // forever, per the architecture requirement.
 
     override fun onStart(owner: LifecycleOwner) {
-        if (!isListenerAttached) {
-            messagesListener = null
-            attachMessagesListener()
-        }
-        markOnline()
+        // attachMessagesListener() is self-guarding (isListenerAttached),
+        // so a single call is enough even across repeated onStart calls.
         attachMessagesListener()
         attachConnectionMonitor()
         attachPresenceListener()
@@ -125,6 +125,8 @@ class ChatRepository(
     // ── Connection monitoring ────────────────────────────────────
 
     private fun attachConnectionMonitor() {
+        if (isConnectionMonitorAttached) return
+        isConnectionMonitorAttached = true
         connectedRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val connected = snapshot.getValue(Boolean::class.java) ?: false
@@ -417,6 +419,8 @@ class ChatRepository(
     }
 
     private fun attachPresenceListener() {
+        if (isPresenceListenerAttached) return
+        isPresenceListenerAttached = true
         statusRef.child(otherUser).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val status = snapshot.getValue(PresenceStatus::class.java) ?: PresenceStatus()
@@ -433,6 +437,8 @@ class ChatRepository(
     }
 
     private fun attachTypingListener() {
+        if (isTypingListenerAttached) return
+        isTypingListenerAttached = true
         typingRef.child(otherUser).addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 onOtherUserTyping?.invoke(snapshot.getValue(Boolean::class.java) ?: false)

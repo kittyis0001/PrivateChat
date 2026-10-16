@@ -61,6 +61,11 @@ object ReminderManager {
     /** Schedules (or re-schedules) the alarm for a note's reminder. */
     fun schedule(context: Context, note: Note) {
         val trigger = note.reminderAt ?: return cancel(context, note.id)
+        // A past-due trigger (missed while the phone was off, clock change, …)
+        // must not arm an alarm that fires instantly — that wakes the device
+        // for a stale reminder on every boot/resume. Just clear any pending
+        // alarm; the note keeps its data and the UI is untouched.
+        if (trigger <= System.currentTimeMillis()) return cancel(context, note.id)
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val pi = pendingIntent(context, note.id, note.title)
         runCatching {

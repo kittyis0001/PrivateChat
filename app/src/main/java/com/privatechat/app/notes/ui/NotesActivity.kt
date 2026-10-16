@@ -63,6 +63,9 @@ class NotesActivity : AppCompatActivity() {
     private var selectedCategoryId: Long? = null
     private var searchQuery: String = ""
     private var listJob: Job? = null
+    /** Guards observeData(): re-collecting on every onResume must not
+     *  stack duplicate Flow collectors — the previous set is cancelled first. */
+    private var observeJob: Job? = null
 
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -223,15 +226,19 @@ class NotesActivity : AppCompatActivity() {
         val error = findViewById<TextView>(R.id.lockError)
         findViewById<View>(R.id.lockUnlockButton).setOnClickListener {
             val pw = input.text.toString()
-            if (NotesLockManager.verify(this, pw)) {
-                NotesLockManager.unlockedThisProcess = true
-                lockView.visibility = View.GONE
-                mainContent.visibility = View.VISIBLE
-                findViewById<View>(R.id.notesFab).visibility = View.VISIBLE
-                error.visibility = View.GONE
-            } else {
-                error.visibility = View.VISIBLE
-                input.text.clear()
+            // PBKDF2 hashing takes ~100-300ms: keep the tap responsive by
+            // verifying off the UI thread, then applying the same UI result.
+            lifecycleScope.launch {
+                if (NotesLockManager.verify(this@NotesActivity, pw)) {
+                    NotesLockManager.unlockedThisProcess = true
+                    lockView.visibility = View.GONE
+                    mainContent.visibility = View.VISIBLE
+                    findViewById<View>(R.id.notesFab).visibility = View.VISIBLE
+                    error.visibility = View.GONE
+                } else {
+                    error.visibility = View.VISIBLE
+                    input.text.clear()
+                }
             }
         }
         setupFingerprintUnlock(error)
@@ -452,27 +459,33 @@ class NotesActivity : AppCompatActivity() {
     // ---------------- data ----------------
 
     private fun observeData() {
-        lifecycleScope.launch {
-            repo.observeCategories().collectLatest { cats ->
-                categories = cats
-                renderChips()
-                refreshList()
+        // onResume() runs on every return to this screen; without this
+        // cancel, each resume would add 4 more live collectors doing
+        // identical rendering work (wasted CPU/battery, flicker risk).
+        observeJob?.cancel()
+        observeJob = lifecycleScope.launch {
+            launch {
+                repo.observeCategories().collectLatest { cats ->
+                    categories = cats
+                    renderChips()
+                    refreshList()
+                }
             }
-        }
-        lifecycleScope.launch {
-            repo.observeArchivedCount().collectLatest { count ->
-                updateDrawerCount(R.id.nav_archive, getString(R.string.notes_archive_title), count)
+            launch {
+                repo.observeArchivedCount().collectLatest { count ->
+                    updateDrawerCount(R.id.nav_archive, getString(R.string.notes_archive_title), count)
+                }
             }
-        }
-        lifecycleScope.launch {
-            repo.observeTrashCount().collectLatest { count ->
-                updateDrawerCount(R.id.nav_trash, getString(R.string.notes_trash_title), count)
+            launch {
+                repo.observeTrashCount().collectLatest { count ->
+                    updateDrawerCount(R.id.nav_trash, getString(R.string.notes_trash_title), count)
+                }
             }
-        }
-        lifecycleScope.launch {
-            repo.observeImageCounts().collectLatest { counts ->
-                adapter.imageCounts = counts.associate { it.noteId to it.cnt }
-                adapter.notifyDataSetChanged()
+            launch {
+                repo.observeImageCounts().collectLatest { counts ->
+                    adapter.imageCounts = counts.associate { it.noteId to it.cnt }
+                    adapter.notifyDataSetChanged()
+                }
             }
         }
     }

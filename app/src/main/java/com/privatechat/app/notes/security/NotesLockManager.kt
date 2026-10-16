@@ -5,6 +5,8 @@ import android.util.Base64
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Notes-only app lock. Stores a PBKDF2 (HmacSHA1, API-24-safe) password hash with a random
@@ -31,7 +33,8 @@ object NotesLockManager {
 
     fun isLockEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
 
-    fun setPassword(context: Context, password: String) {
+    /** 120k PBKDF2 iterations take ~100-300ms: always run off the UI thread. */
+    suspend fun setPassword(context: Context, password: String) = withContext(Dispatchers.IO) {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val hash = hash(password, salt)
         prefs(context).edit()
@@ -51,15 +54,16 @@ object NotesLockManager {
         unlockedThisProcess = false
     }
 
-    fun verify(context: Context, password: String): Boolean {
+    /** 120k PBKDF2 iterations take ~100-300ms: always run off the UI thread. */
+    suspend fun verify(context: Context, password: String): Boolean = withContext(Dispatchers.IO) {
         val p = prefs(context)
-        val hashB64 = p.getString(KEY_HASH, null) ?: return false
-        val saltB64 = p.getString(KEY_SALT, null) ?: return false
+        val hashB64 = p.getString(KEY_HASH, null) ?: return@withContext false
+        val saltB64 = p.getString(KEY_SALT, null) ?: return@withContext false
         val expected = Base64.decode(hashB64, Base64.NO_WRAP)
         val actual = hash(password, Base64.decode(saltB64, Base64.NO_WRAP))
         val ok = expected.contentEquals(actual)
         if (ok) unlockedThisProcess = true
-        return ok
+        ok
     }
 
     private fun hash(password: String, salt: ByteArray): ByteArray {
@@ -104,14 +108,5 @@ object NotesLockManager {
     fun getAccent(context: Context): String = prefs(context).getString(KEY_ACCENT, "pink") ?: "pink"
     fun setAccent(context: Context, accent: String) {
         prefs(context).edit().putString(KEY_ACCENT, accent).apply()
-    }
-
-    // ---- Google Drive backup bookkeeping (notes-scoped) ----
-    private const val KEY_DRIVE_LAST_BACKUP = "drive_last_backup"
-
-    fun getDriveLastBackup(context: Context): Long = prefs(context).getLong(KEY_DRIVE_LAST_BACKUP, 0L)
-
-    fun setDriveLastBackup(context: Context, timeMillis: Long) {
-        prefs(context).edit().putLong(KEY_DRIVE_LAST_BACKUP, timeMillis).apply()
     }
 }
