@@ -142,24 +142,6 @@ class NotesSettingsActivity : AppCompatActivity() {
         // Lock
         refreshLockRow()
         findViewById<View>(R.id.rowNotesLock).setOnClickListener { showLockDialog() }
-
-        // Google Drive backup (Notes only) — opens its own screen;
-        // the row shows the connected account or "Not connected".
-        refreshDriveRow()
-        findViewById<View>(R.id.rowNotesDrive).setOnClickListener {
-            startActivity(Intent(this, DriveBackupActivity::class.java))
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        refreshDriveRow()
-    }
-
-    private fun refreshDriveRow() {
-        findViewById<TextView>(R.id.notesDriveValue).text =
-            com.privatechat.app.notes.drive.DriveBackupManager.signedInEmail(this)
-                ?: getString(R.string.notes_drive_not_connected)
     }
 
     private fun refreshLockRow() {
@@ -193,9 +175,11 @@ class NotesSettingsActivity : AppCompatActivity() {
                         a.length < 4 -> Toast.makeText(this, getString(R.string.notes_lock_too_short), Toast.LENGTH_SHORT).show()
                         a != b -> Toast.makeText(this, getString(R.string.notes_lock_mismatch), Toast.LENGTH_SHORT).show()
                         else -> {
-                            NotesLockManager.setPassword(this, a)
-                            Toast.makeText(this, getString(R.string.notes_lock_enabled), Toast.LENGTH_SHORT).show()
-                            refreshLockRow()
+                            lifecycleScope.launch {
+                                NotesLockManager.setPassword(this@NotesSettingsActivity, a)
+                                Toast.makeText(this@NotesSettingsActivity, getString(R.string.notes_lock_enabled), Toast.LENGTH_SHORT).show()
+                                refreshLockRow()
+                            }
                         }
                     }
                 }
@@ -216,12 +200,14 @@ class NotesSettingsActivity : AppCompatActivity() {
                 .setTitle(getString(R.string.notes_lock_manage_title))
                 .setView(container)
                 .setPositiveButton(getString(R.string.notes_lock_disable)) { _, _ ->
-                    if (NotesLockManager.verify(this, current.text.toString())) {
-                        NotesLockManager.disableLock(this)
-                        Toast.makeText(this, getString(R.string.notes_lock_disabled), Toast.LENGTH_SHORT).show()
-                        refreshLockRow()
-                    } else {
-                        Toast.makeText(this, getString(R.string.notes_lock_wrong), Toast.LENGTH_SHORT).show()
+                    lifecycleScope.launch {
+                        if (NotesLockManager.verify(this@NotesSettingsActivity, current.text.toString())) {
+                            NotesLockManager.disableLock(this@NotesSettingsActivity)
+                            Toast.makeText(this@NotesSettingsActivity, getString(R.string.notes_lock_disabled), Toast.LENGTH_SHORT).show()
+                            refreshLockRow()
+                        } else {
+                            Toast.makeText(this@NotesSettingsActivity, getString(R.string.notes_lock_wrong), Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
                 .setNegativeButton(android.R.string.cancel, null)
