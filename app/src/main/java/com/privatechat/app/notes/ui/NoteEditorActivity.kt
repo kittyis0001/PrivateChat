@@ -122,6 +122,8 @@ class NoteEditorActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of note content.
+        SecureWindow.protect(this)
         setContentView(R.layout.activity_note_editor)
 
         titleInput = findViewById(R.id.editorTitle)
@@ -610,6 +612,7 @@ class NoteEditorActivity : AppCompatActivity() {
             .setView(imageView)
             .setPositiveButton(android.R.string.ok, null)
             .show()
+            .also { SecureWindow.protect(it) } // photo dialog is its own window
     }
 
     // ---------------- duplicate & export ----------------

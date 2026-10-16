@@ -13,6 +13,7 @@ import com.privatechat.app.data.Session
 import com.privatechat.app.data.model.StoryGroup
 import com.privatechat.app.data.repository.StoryRepository
 import com.privatechat.app.databinding.ActivityStoryViewerBinding
+import com.privatechat.app.notes.ui.SecureWindow
 import com.privatechat.app.utils.NotificationAvatarFactory
 import kotlin.math.abs
 
@@ -42,6 +43,8 @@ class StoryViewerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of private chat content.
+        SecureWindow.protect(this)
         binding = ActivityStoryViewerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.MediaController
 import androidx.appcompat.app.AppCompatActivity
 import com.privatechat.app.databinding.ActivityVideoViewerBinding
+import com.privatechat.app.notes.ui.SecureWindow
 
 /**
  * Full-screen video message playback — tapping a video bubble opens
@@ -22,6 +23,8 @@ class VideoViewerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of private chat content.
+        SecureWindow.protect(this)
         binding = ActivityVideoViewerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

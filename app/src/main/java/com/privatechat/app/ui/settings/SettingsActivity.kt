@@ -18,6 +18,7 @@ import com.privatechat.app.BuildConfig
 import com.privatechat.app.R
 import com.privatechat.app.data.AccessGate
 import com.privatechat.app.data.Session
+import com.privatechat.app.notes.ui.SecureWindow
 import com.privatechat.app.ui.login.LoginActivity
 
 /**
@@ -34,6 +35,8 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of private chat content.
+        SecureWindow.protect(this)
         setContentView(R.layout.activity_settings)
 
         findViewById<ImageButton>(R.id.settingsBackButton).setOnClickListener { finish() }

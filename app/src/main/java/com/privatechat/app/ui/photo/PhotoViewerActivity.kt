@@ -10,6 +10,7 @@ import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
 import com.privatechat.app.databinding.ActivityPhotoViewerBinding
+import com.privatechat.app.notes.ui.SecureWindow
 
 /**
  * "Tapping any avatar opens an Instagram-style full-screen profile
@@ -24,6 +25,8 @@ class PhotoViewerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of private chat content.
+        SecureWindow.protect(this)
         binding = ActivityPhotoViewerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

@@ -17,6 +17,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.privatechat.app.R
 import com.privatechat.app.data.AccessGate
 import com.privatechat.app.data.Session
+import com.privatechat.app.notes.ui.SecureWindow
 import com.privatechat.app.ui.chat.ChatActivity
 import android.view.View
 import android.widget.ImageButton
@@ -60,6 +61,8 @@ class LoginActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Privacy: block screenshots / screen recordings of private chat content.
+        SecureWindow.protect(this)
 
         // Restore gate state across configuration changes within the same
         // process. A fresh process starts locked because AccessGate lives
