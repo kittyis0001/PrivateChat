@@ -143,4 +143,133 @@ object GeminiSummarizer {
                 }
             }
         }
+
+    // ---------------- newer AI features (one shared call) ----------------
+
+    data class CategorySuggestion(val category: String, val tags: List<String>)
+
+    /** One Gemini text call, shared by the newer features. Throws on failure. */
+    private suspend fun generateText(key: String, prompt: String): String =
+        withContext(Dispatchers.IO) {
+            val bodyJson = JSONObject()
+                .put(
+                    "contents", JSONArray().put(
+                        JSONObject().put(
+                            "parts", JSONArray().put(
+                                JSONObject().put("text", prompt)
+                            )
+                        )
+                    )
+                ).toString()
+            val client = OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build()
+            val request = Request.Builder()
+                .url(
+                    "https://generativelanguage.googleapis.com/v1beta/models/" +
+                        "$MODEL:generateContent?key=$key"
+                )
+                .post(bodyJson.toRequestBody("application/json".toMediaType()))
+                .build()
+            client.newCall(request).execute().use { response ->
+                val raw = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}")
+                val out = JSONObject(raw)
+                    .getJSONArray("candidates").getJSONObject(0)
+                    .getJSONObject("content").getJSONArray("parts").getJSONObject(0)
+                    .getString("text").trim()
+                if (out.isBlank()) throw IllegalStateException("Empty reply")
+                out
+            }
+        }
+
+    /**
+     * Auto category + tags: picks the best existing category for the
+     * note, or proposes one short new name when none fits, plus 2-4
+     * short tags in the note's language. Never throws — failure is a
+     * Result, and the caller falls back to doing nothing.
+     */
+    suspend fun suggestCategory(
+        context: Context,
+        text: String,
+        existing: List<String>
+    ): Result<CategorySuggestion> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val existingJson = existing.joinToString(", ") { "\"$it\"" }
+                val prompt = "This is a note. Pick the best category for it from this list: " +
+                    "[$existingJson]. If none fits, propose one short new category name " +
+                    "(max 3 words). Also suggest 2-4 short tags in the note's language. " +
+                    "Reply with ONLY this JSON, no other words: " +
+                    "{\"category\": \"...\", \"tags\": [\"...\", \"...\"]}\n\n" + text.take(3000)
+                val raw = generateText(key, prompt)
+                    .removePrefix("```json").removePrefix("```")
+                    .removeSuffix("```").trim()
+                val obj = JSONObject(raw)
+                val category = obj.optString("category").trim()
+                if (category.isBlank()) throw IllegalStateException("Empty category")
+                val tags = mutableListOf<String>()
+                val tagsArr = obj.optJSONArray("tags")
+                if (tagsArr != null) {
+                    for (i in 0 until tagsArr.length()) {
+                        val t = tagsArr.optString(i).trim().removePrefix("#")
+                        if (t.isNotBlank() && !t.contains(",")) tags.add(t)
+                        if (tags.size >= 4) break
+                    }
+                }
+                CategorySuggestion(category.take(30), tags)
+            }
+        }
+
+    /**
+     * Writes a whole note from one line of idea. Returns title + body;
+     * the caller opens the editor with them (nothing is saved silently).
+     */
+    suspend fun writeFromIdea(
+        context: Context,
+        idea: String,
+        lang: String = "bn"
+    ): Result<Pair<String, String>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val langName = if (lang == "en") "English" else "Bengali"
+                val prompt = "Write a complete, well-organized note in $langName from this " +
+                    "one-line idea. Reply with the note only: the title on the first line, " +
+                    "then a blank line, then the note body. No extra commentary, no quotes " +
+                    "around the title.\n\nIdea: " + idea.take(500)
+                val out = generateText(key, prompt)
+                val lines = out.lineSequence().filter { it.isNotBlank() }.toList()
+                if (lines.isEmpty()) throw IllegalStateException("Empty reply")
+                val title = lines.first().trim().removeSurrounding("\"").take(60)
+                val body = out.substringAfter("\n\n", "").trim().ifBlank {
+                    lines.drop(1).joinToString("\n").trim()
+                }
+                if (body.isBlank()) throw IllegalStateException("Empty body")
+                title to body
+            }
+        }
+
+    /**
+     * Fixes obvious OCR misreads (wrong letters, split or joined words,
+     * stray symbols) without changing the wording, capitalization,
+     * numbers or line breaks — and keeps any **bold markers** exactly
+     * where they are. Returns the input unchanged when it is already
+     * clean. Never throws; the caller falls back to the raw OCR text.
+     */
+    suspend fun cleanOcrText(context: Context, text: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val prompt = "Fix obvious OCR misreads in this scanned text (wrong letters, " +
+                    "split or joined words, stray symbols). Keep the exact wording, " +
+                    "capitalization, numbers and line breaks — do not add, remove or " +
+                    "rephrase anything. Keep any **bold markers** exactly where they are. " +
+                    "If the text is already clean, return it unchanged. Reply with only " +
+                    "the corrected text:\n\n" + text.take(6000)
+                generateText(key, prompt)
+            }
+        }
 }

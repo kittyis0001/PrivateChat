@@ -12,8 +12,10 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.text.Layout
+import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.util.DisplayMetrics
 import android.util.TypedValue
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
@@ -26,12 +28,33 @@ import java.io.FileOutputStream
  * The shared PNG lives in cacheDir/shared_notes via FileProvider. */
 object NoteImageShare {
 
-    /** Draws the note image: pink header, body text, Kitty Notes footer. */
+    /**
+     * Draws the note image: pink header, body text, Kitty Notes footer.
+     * The body text AUTO-FITS: it starts at 26sp and shrinks until the
+     * whole note fits the page, so a long note is never cut off. If
+     * even the 16sp floor is not enough, the canvas grows taller
+     * (still ONE image) instead of clipping — capped at 6000px so a
+     * giant note cannot exhaust memory.
+     */
     fun renderNoteImage(context: Context, title: String, body: String, colorHex: String): Bitmap {
         val w = 1080
-        val h = 1350
         val dm = context.resources.displayMetrics
         val safeBody = body.ifBlank { " " }
+        val bodySpanned = RichText.toSpanned(safeBody)
+        val availW = w - 128
+        val availH = 1350 - 320
+        var bodySp = 26f
+        val minSp = 16f
+        var layout = buildBodyLayout(bodySpanned, bodySp, availW, dm)
+        while (layout.height > availH && bodySp > minSp) {
+            bodySp = maxOf(minSp, bodySp * 0.9f)
+            layout = buildBodyLayout(bodySpanned, bodySp, availW, dm)
+        }
+        val h = if (layout.height > availH) {
+            minOf(6000, 320 + layout.height + 70)
+        } else {
+            1350
+        }
         val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val bg = runCatching { Color.parseColor(colorHex) }.getOrNull()
@@ -46,19 +69,7 @@ object NoteImageShare {
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         canvas.drawText(title.ifBlank { "Kitty Notes" }.take(30), 64f, 110f, titlePaint)
-        // Body text.
-        val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = 0xFF333333.toInt()
-            textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 26f, dm)
-        }
-        val bodySpanned = RichText.toSpanned(safeBody)
-        val layout = StaticLayout.Builder.obtain(
-            bodySpanned, 0, bodySpanned.length, bodyPaint, w - 128
-        )
-            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
-            .setLineSpacing(0f, 1.3f)
-            .setIncludePad(false)
-            .build()
+        // Body text (auto-fitted above).
         canvas.save()
         canvas.translate(64f, 250f)
         canvas.clipRect(0f, 0f, (w - 128).toFloat(), (h - 320).toFloat())
@@ -72,6 +83,23 @@ object NoteImageShare {
         }
         canvas.drawText("Kitty Notes", 64f, (h - 64).toFloat(), footerPaint)
         return bitmap
+    }
+
+    private fun buildBodyLayout(
+        text: Spanned,
+        sp: Float,
+        width: Int,
+        dm: DisplayMetrics
+    ): StaticLayout {
+        val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFF333333.toInt()
+            textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, dm)
+        }
+        return StaticLayout.Builder.obtain(text, 0, text.length, bodyPaint, width)
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setLineSpacing(0f, 1.3f)
+            .setIncludePad(false)
+            .build()
     }
 
     suspend fun shareNoteAsImage(

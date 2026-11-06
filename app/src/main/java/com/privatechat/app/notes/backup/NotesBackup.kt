@@ -45,6 +45,9 @@ object NotesBackup {
                     .put("isChecklist", n.isChecklist)
                     .put("reminderAt", n.reminderAt ?: JSONObject.NULL)
                     .put("reminderRepeat", n.reminderRepeat)
+                    // v4 field — additive; older parsers ignore it,
+                    // and this parser reads it optionally below.
+                    .put("tags", n.tags)
             )
         }
         root.put("notes", noteArr)
@@ -96,7 +99,8 @@ object NotesBackup {
                     color = o.optString("color", ""),
                     isChecklist = o.optBoolean("isChecklist", false),
                     reminderAt = if (o.isNull("reminderAt")) null else o.optLong("reminderAt"),
-                    reminderRepeat = o.optString("reminderRepeat", "NONE")
+                    reminderRepeat = o.optString("reminderRepeat", "NONE"),
+                    tags = o.optString("tags", "")
                 )
             )
         }

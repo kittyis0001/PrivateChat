@@ -16,10 +16,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * checklist-item tables. The migration is purely additive — no
  * existing row, column, or user note is touched or dropped.
  * v3 adds a reminderRepeat column plus habit and voice-note tables.
+ * v4 adds a tags column.
  */
 @Database(
     entities = [Note::class, Category::class, StickyNote::class, NoteImage::class, ChecklistItem::class, Habit::class, HabitTick::class, VoiceNote::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class NotesDatabase : RoomDatabase() {
@@ -93,13 +94,20 @@ abstract class NotesDatabase : RoomDatabase() {
             }
         }
 
+        /** Additive v3 -> v4 migration (one new column). */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun get(context: Context): NotesDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     NotesDatabase::class.java,
                     "kitty_notes.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
         }
     }

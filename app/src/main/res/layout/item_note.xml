@@ -45,6 +45,15 @@
         android:layout_marginTop="4dp" />
 
     <TextView
+        android:id="@+id/noteTags"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="@color/primary"
+        android:layout_marginTop="4dp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/noteDate"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

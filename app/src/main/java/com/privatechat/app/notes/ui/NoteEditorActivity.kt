@@ -123,6 +123,8 @@ class NoteEditorActivity : AppCompatActivity() {
     private val checklist = mutableListOf<ChecklistItem>()
     private var reminderAt: Long? = null
     private var reminderRepeat: String = "NONE"
+    /** AI-suggested tags, comma-separated, "" = none. */
+    private var currentTags: String = ""
     private var imagesJob: Job? = null
 
     // ---- Smart pack state ----
@@ -203,13 +205,24 @@ class NoteEditorActivity : AppCompatActivity() {
             val scanned = withContext(Dispatchers.IO) {
                 TextScanner.recognizeUris(this@NoteEditorActivity, pageUris)
             }
-            progress.dismiss()
             scanned.onSuccess { text ->
-                val title = GeminiSummarizer.smartTitle(this@NoteEditorActivity, text.plainText)
+                // AI cleanup (best-effort, only with a saved key): fixes
+                // OCR misreads, keeps wording/case/line breaks and the
+                // ** bold markers. Falls back to the raw OCR text.
+                var plain = text.plainText
+                var md = text.markdownText
+                if (GeminiSummarizer.getApiKey(this@NoteEditorActivity) != null) {
+                    GeminiSummarizer.cleanOcrText(this@NoteEditorActivity, md).onSuccess { cleaned ->
+                        md = cleaned
+                        plain = cleaned.replace("**", "")
+                    }
+                }
+                val title = GeminiSummarizer.smartTitle(this@NoteEditorActivity, plain)
+                progress.dismiss()
                 startActivity(
                     Intent(this@NoteEditorActivity, NoteEditorActivity::class.java)
                         .putExtra(EXTRA_TEMPLATE_TITLE, title)
-                        .putExtra(EXTRA_TEMPLATE_CONTENT, text.markdownText)
+                        .putExtra(EXTRA_TEMPLATE_CONTENT, md)
                 )
                 Toast.makeText(
                     this@NoteEditorActivity,
@@ -217,6 +230,7 @@ class NoteEditorActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
             }.onFailure {
+                progress.dismiss()
                 Toast.makeText(
                     this@NoteEditorActivity,
                     getString(R.string.notes_scan_no_text),
@@ -311,6 +325,8 @@ class NoteEditorActivity : AppCompatActivity() {
         findViewById<View>(R.id.editorShareImage).setOnClickListener { shareNoteAsImage() }
         findViewById<View>(R.id.editorSavePdf).setOnClickListener { savePdfToDownloads() }
         findViewById<View>(R.id.editorSaveImage).setOnClickListener { saveNoteAsImage() }
+        findViewById<View>(R.id.editorAutoCategory).setOnClickListener { suggestCategory() }
+        findViewById<View>(R.id.editorFixText).setOnClickListener { fixTextWithAi() }
         imagesAdapter = EditorImagesAdapter(
             onRemove = { image ->
                 lifecycleScope.launch { repo.removeImage(image) }
@@ -325,8 +341,7 @@ class NoteEditorActivity : AppCompatActivity() {
         noteId = intent.getLongExtra(EXTRA_NOTE_ID, 0)
         lifecycleScope.launch {
             categories = repo.observeCategories().first()
-            val names = listOf(getString(R.string.notes_no_tag)) + categories.map { it.name }
-            categorySpinner.adapter = ArrayAdapter(this@NoteEditorActivity, android.R.layout.simple_spinner_dropdown_item, names)
+            bindCategorySpinner()
 
             if (noteId != 0L) {
                 repo.getNote(noteId)?.let { n ->
@@ -337,8 +352,8 @@ class NoteEditorActivity : AppCompatActivity() {
                     noteColor = n.color
                     reminderAt = n.reminderAt
                     reminderRepeat = n.reminderRepeat
-                    val idx = if (n.categoryId == null) 0 else categories.indexOfFirst { it.id == n.categoryId } + 1
-                    if (idx in names.indices) categorySpinner.setSelection(idx)
+                    currentTags = n.tags
+                    bindCategorySpinner(n.categoryId)
                     metaText.text = getString(R.string.notes_last_edited, DATE_FMT.format(Date(n.updatedAt)))
                     if (n.isChecklist) {
                         val items = repo.getChecklistItems(n.id)
@@ -359,6 +374,7 @@ class NoteEditorActivity : AppCompatActivity() {
                 intent.getStringExtra(EXTRA_TEMPLATE_CONTENT)?.let { contentInput.setText(it) }
                 metaText.text = getString(R.string.notes_new_note)
             }
+            updateTagsView()
             applyBoldMarkersIfPresent()
             buildColorPalette()
             observeImages()
@@ -371,6 +387,24 @@ class NoteEditorActivity : AppCompatActivity() {
     private fun selectedCategoryId(): Long? {
         val pos = categorySpinner.selectedItemPosition
         return if (pos <= 0) null else categories.getOrNull(pos - 1)?.id
+    }
+
+    /** Rebuilds the category spinner and selects the given category (null = none). */
+    private fun bindCategorySpinner(selectId: Long? = null) {
+        val names = listOf(getString(R.string.notes_no_tag)) + categories.map { it.name }
+        categorySpinner.adapter =
+            ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, names)
+        val idx = if (selectId == null) 0 else categories.indexOfFirst { it.id == selectId } + 1
+        if (idx in names.indices) categorySpinner.setSelection(idx)
+    }
+
+    /** Shows the AI tags under the category spinner; hidden when there are none. */
+    private fun updateTagsView() {
+        val tags = currentTags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        findViewById<TextView>(R.id.editorTags).apply {
+            text = tags.joinToString(" ") { "#$it" }
+            visibility = if (tags.isEmpty()) View.GONE else View.VISIBLE
+        }
     }
 
     private fun scheduleSave() {
@@ -436,7 +470,8 @@ class NoteEditorActivity : AppCompatActivity() {
             color = noteColor,
             isChecklist = checklistMode,
             reminderAt = reminderAt,
-            reminderRepeat = reminderRepeat
+            reminderRepeat = reminderRepeat,
+            tags = currentTags
         )
         noteId = repo.saveNote(note)
         if (checklistMode) {
@@ -1232,6 +1267,131 @@ class NoteEditorActivity : AppCompatActivity() {
                     .show()
             }.onFailure {
                 Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_summary_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ---------------- AI category/tags + fix text ----------------
+
+    /** Shared "no Gemini key" dialog (same destination as the summary flow). */
+    private fun showAiNoKeyDialog(titleRes: Int) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(titleRes))
+            .setMessage(getString(R.string.notes_ai_no_key))
+            .setPositiveButton(getString(R.string.notes_settings_title)) { _, _ ->
+                startActivity(Intent(this, NotesSettingsActivity::class.java))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /**
+     * Auto category + tags: Gemini reads the note and suggests the best
+     * existing category (or a short new one) plus a few tags. Nothing
+     * is applied silently — the suggestion is shown first, and Apply
+     * sets it (creating the category when it is new).
+     */
+    private fun suggestCategory() {
+        val text = (titleInput.text.toString() + "\n" + currentBodyText()).trim()
+        if (text.length < 20) {
+            Toast.makeText(this, getString(R.string.notes_ai_too_short), Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (GeminiSummarizer.getApiKey(this) == null) {
+            showAiNoKeyDialog(R.string.notes_ai_category_title)
+            return
+        }
+        val loading = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_ai_category_title))
+            .setMessage("…")
+            .setCancelable(false)
+            .create()
+        loading.show()
+        lifecycleScope.launch {
+            val result = GeminiSummarizer.suggestCategory(
+                this@NoteEditorActivity, text, categories.map { it.name }
+            )
+            loading.dismiss()
+            result.onSuccess { suggestion ->
+                val tagsText = suggestion.tags.joinToString(", ") { "#$it" }
+                val message = getString(R.string.notes_ai_suggests_category, suggestion.category) +
+                    if (tagsText.isEmpty()) "" else "\n" + getString(R.string.notes_ai_suggests_tags, tagsText)
+                AlertDialog.Builder(this@NoteEditorActivity)
+                    .setTitle(getString(R.string.notes_ai_category_title))
+                    .setMessage(message)
+                    .setPositiveButton(getString(R.string.notes_ai_apply)) { _, _ ->
+                        applyCategoryAndTags(suggestion)
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            }.onFailure {
+                Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun applyCategoryAndTags(suggestion: GeminiSummarizer.CategorySuggestion) {
+        lifecycleScope.launch {
+            val match = categories.firstOrNull { it.name.equals(suggestion.category, ignoreCase = true) }
+            val categoryId = match?.id ?: run {
+                val newId = repo.addCategory(suggestion.category)
+                categories = repo.getCategoriesOnce()
+                newId
+            }
+            currentTags = suggestion.tags.joinToString(",")
+            bindCategorySpinner(categoryId)
+            updateTagsView()
+            scheduleSave()
+            Toast.makeText(
+                this@NoteEditorActivity,
+                getString(R.string.notes_ai_category_applied), Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    /**
+     * Fixes the current note's text with AI (OCR misreads, split words,
+     * stray symbols) — same cleanup the scan flow runs automatically.
+     * Wording, case and line breaks are kept; ** bold markers are
+     * re-rendered bold afterwards.
+     */
+    private fun fixTextWithAi() {
+        val text = currentBodyText().trim()
+        if (text.length < 20) {
+            Toast.makeText(this, getString(R.string.notes_ai_too_short), Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (GeminiSummarizer.getApiKey(this) == null) {
+            showAiNoKeyDialog(R.string.notes_ai_fix_text)
+            return
+        }
+        val loading = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_ai_fix_text))
+            .setMessage("…")
+            .setCancelable(false)
+            .create()
+        loading.show()
+        lifecycleScope.launch {
+            val result = GeminiSummarizer.cleanOcrText(this@NoteEditorActivity, text)
+            loading.dismiss()
+            result.onSuccess { cleaned ->
+                if (cleaned == text) {
+                    Toast.makeText(
+                        this@NoteEditorActivity,
+                        getString(R.string.notes_ai_text_clean), Toast.LENGTH_SHORT
+                    ).show()
+                    return@onSuccess
+                }
+                boldMarkersPresent = false
+                contentInput.setText(cleaned)
+                applyBoldMarkersIfPresent()
+                scheduleSave()
+                Toast.makeText(
+                    this@NoteEditorActivity,
+                    getString(R.string.notes_ai_text_fixed), Toast.LENGTH_SHORT
+                ).show()
+            }.onFailure {
+                Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT).show()
             }
         }
     }
