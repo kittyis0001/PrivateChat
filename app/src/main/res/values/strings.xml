@@ -275,7 +275,6 @@ Remember:</string>
     <string name="notes_gemini_key_not_set">Not set</string>
     <string name="notes_voice_missing">Voice note file not found</string>
     <string name="notes_qr_part">Part %1$d of %2$d</string>
-    <string name="notes_backup_done">Backup saved</string>
     <string name="notes_backup_now">Back up now</string>
     <string name="notes_gemini_key">Gemini API key</string>
     <string name="notes_gemini_key_hint">Paste your Gemini API key</string>
