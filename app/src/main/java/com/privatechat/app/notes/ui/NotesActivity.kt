@@ -9,6 +9,8 @@ import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -820,26 +822,50 @@ class NotesActivity : AppCompatActivity() {
      * last chose for AI summary (Bengali by default).
      */
     private fun promptAiWrite() {
-        val input = EditText(this).apply {
-            hint = getString(R.string.notes_ai_write_hint)
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(48, 32, 48, 32)
         }
+        val input = EditText(this).apply {
+            hint = getString(R.string.notes_ai_write_hint)
+        }
+        // Language choice in the same dialog (last used language
+        // pre-selected and remembered for next time, like AI summary).
+        val langs = RadioGroup(this).apply {
+            orientation = RadioGroup.HORIZONTAL
+            setPadding(0, 24, 0, 0)
+        }
+        val bnButton = RadioButton(this).apply {
+            id = View.generateViewId()
+            text = "বাংলা"
+        }
+        val enButton = RadioButton(this).apply {
+            id = View.generateViewId()
+            text = "English"
+        }
+        langs.addView(bnButton)
+        langs.addView(enButton)
+        langs.check(if (GeminiSummarizer.getSummaryLang(this) == "en") enButton.id else bnButton.id)
+        container.addView(input)
+        container.addView(langs)
         AlertDialog.Builder(this)
             .setTitle(getString(R.string.notes_ai_write))
-            .setView(input)
+            .setView(container)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 val idea = input.text.toString().trim()
                 if (idea.isBlank()) {
                     Toast.makeText(this, getString(R.string.notes_ai_too_short), Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
-                runAiWrite(idea)
+                val lang = if (langs.checkedRadioButtonId == enButton.id) "en" else "bn"
+                GeminiSummarizer.saveSummaryLang(this, lang)
+                runAiWrite(idea, lang)
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
-    private fun runAiWrite(idea: String) {
+    private fun runAiWrite(idea: String, lang: String) {
         if (GeminiSummarizer.getApiKey(this) == null) {
             AlertDialog.Builder(this)
                 .setTitle(getString(R.string.notes_ai_write))
@@ -859,7 +885,7 @@ class NotesActivity : AppCompatActivity() {
         loading.show()
         lifecycleScope.launch {
             val result = GeminiSummarizer.writeFromIdea(
-                this@NotesActivity, idea, GeminiSummarizer.getSummaryLang(this@NotesActivity)
+                this@NotesActivity, idea, lang
             )
             loading.dismiss()
             result.onSuccess { (title, body) ->
