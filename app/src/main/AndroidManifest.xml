@@ -23,6 +23,10 @@
         android:maxSdkVersion="32" />
     <!-- Voice messages -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Kitty Notes voice notes, document scan and QR scan (camera
+         is only used when the user taps those actions). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <!-- Exact note reminders (Kitty Notes). On Android 13/14 this is
          NOT auto-granted; the Notes editor offers the system grant
          screen and reminders fall back to near-exact timing without
@@ -50,6 +54,14 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Share-in: other apps (browser, YouTube, …) can send
+                 text/links to Kitty Notes, which opens a new note
+                 prefilled with the shared text. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
 
@@ -91,6 +103,16 @@
         <activity
             android:name=".notes.ui.AboutActivity"
             android:exported="false" />
+
+        <!-- Kitty Notes smart pack (additive). -->
+        <activity
+            android:name=".notes.ui.HabitActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".notes.ui.PdfViewerActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <activity
             android:name=".ui.chat.ChatActivity"
@@ -148,6 +170,19 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Lets Kitty Notes share a generated file (note-as-image,
+             scanned PDF, …) with another app without exposing a
+             raw file path. Only cacheDir/shared_notes is shared. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"

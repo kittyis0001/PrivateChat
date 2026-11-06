@@ -48,6 +48,10 @@ interface NotesDao {
     @Query("UPDATE notes SET reminderAt = NULL WHERE id = :id")
     suspend fun clearReminder(id: Long)
 
+    /** Moves a repeating reminder to its next fire time (updatedAt untouched). */
+    @Query("UPDATE notes SET reminderAt = :at WHERE id = :id")
+    suspend fun setReminderAt(id: Long, at: Long)
+
     /** Trash entries deleted before [cutoff] (30-day auto-clean). */
     @Query("SELECT * FROM notes WHERE deletedAt IS NOT NULL AND deletedAt < :cutoff")
     suspend fun getTrashedBefore(cutoff: Long): List<Note>

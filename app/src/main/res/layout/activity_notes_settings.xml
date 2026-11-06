@@ -186,6 +186,22 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <TextView style="@style/NotesSectionLabel" android:text="@string/notes_section_smart" android:layout_marginTop="20dp" />
+
+            <LinearLayout style="@style/NotesCard">
+
+                <LinearLayout android:id="@+id/rowGeminiKey" style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_gemini_key" />
+                    <TextView android:id="@+id/geminiKeyValue" style="@style/NotesRowValue" />
+                </LinearLayout>
+
+                <View style="@style/SettingsDivider" />
+
+                <LinearLayout android:id="@+id/rowBackupNow" style="@style/NotesRow">
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_backup_now" />
+                </LinearLayout>
+            </LinearLayout>
+
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

@@ -44,6 +44,7 @@ object NotesBackup {
                     .put("color", n.color)
                     .put("isChecklist", n.isChecklist)
                     .put("reminderAt", n.reminderAt ?: JSONObject.NULL)
+                    .put("reminderRepeat", n.reminderRepeat)
             )
         }
         root.put("notes", noteArr)
@@ -94,7 +95,8 @@ object NotesBackup {
                     updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
                     color = o.optString("color", ""),
                     isChecklist = o.optBoolean("isChecklist", false),
-                    reminderAt = if (o.isNull("reminderAt")) null else o.optLong("reminderAt")
+                    reminderAt = if (o.isNull("reminderAt")) null else o.optLong("reminderAt"),
+                    reminderRepeat = o.optString("reminderRepeat", "NONE")
                 )
             )
         }

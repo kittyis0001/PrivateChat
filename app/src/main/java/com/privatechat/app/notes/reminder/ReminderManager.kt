@@ -58,14 +58,32 @@ object ReminderManager {
         )
     }
 
+    /** Next fire time for a repeating reminder, or null for one-shot. */
+    fun nextTrigger(after: Long, repeat: String): Long? = when (repeat) {
+        "DAILY" -> after + 24L * 60 * 60 * 1000
+        "WEEKLY" -> after + 7L * 24 * 60 * 60 * 1000
+        else -> null
+    }
+
     /** Schedules (or re-schedules) the alarm for a note's reminder. */
     fun schedule(context: Context, note: Note) {
-        val trigger = note.reminderAt ?: return cancel(context, note.id)
+        var trigger = note.reminderAt ?: return cancel(context, note.id)
         // A past-due trigger (missed while the phone was off, clock change, …)
         // must not arm an alarm that fires instantly — that wakes the device
-        // for a stale reminder on every boot/resume. Just clear any pending
-        // alarm; the note keeps its data and the UI is untouched.
-        if (trigger <= System.currentTimeMillis()) return cancel(context, note.id)
+        // for a stale reminder on every boot/resume. For a repeating
+        // reminder the trigger is advanced to the next future slot instead.
+        if (trigger <= System.currentTimeMillis()) {
+            if (note.reminderRepeat == "NONE") return cancel(context, note.id)
+            var advanced = trigger
+            var guard = 0
+            while (advanced <= System.currentTimeMillis() && guard < 400) {
+                advanced = nextTrigger(advanced, note.reminderRepeat)
+                    ?: return cancel(context, note.id)
+                guard++
+            }
+            if (advanced <= System.currentTimeMillis()) return cancel(context, note.id)
+            trigger = advanced
+        }
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val pi = pendingIntent(context, note.id, note.title)
         runCatching {

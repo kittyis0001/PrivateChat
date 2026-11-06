@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared only for files Kitty Notes itself generates for sharing
+     (note-as-image PNG, scanned PDF). Nothing else is exposed. -->
+<paths>
+    <cache-path name="shared_notes" path="shared_notes/" />
+</paths>

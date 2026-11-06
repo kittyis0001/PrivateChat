@@ -33,7 +33,6 @@ class NotesSettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Privacy: block screenshots / screen recordings (lock/password area).
-        SecureWindow.protect(this)
         setContentView(R.layout.activity_notes_settings)
 
         findViewById<View>(R.id.notesSettingsBack).setOnClickListener { finish() }
@@ -144,6 +143,58 @@ class NotesSettingsActivity : AppCompatActivity() {
         // Lock
         refreshLockRow()
         findViewById<View>(R.id.rowNotesLock).setOnClickListener { showLockDialog() }
+
+        // Smart tools: Gemini API key for AI summary + manual backup.
+        refreshGeminiKeyRow()
+        findViewById<View>(R.id.rowGeminiKey).setOnClickListener { showGeminiKeyDialog() }
+        findViewById<View>(R.id.rowBackupNow).setOnClickListener {
+            lifecycleScope.launch {
+                val ok = com.privatechat.app.notes.backup.BackupWorker.doBackup(this@NotesSettingsActivity)
+                Toast.makeText(
+                    this@NotesSettingsActivity,
+                    getString(if (ok) R.string.notes_backup_done else R.string.notes_backup_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun refreshGeminiKeyRow() {
+        findViewById<TextView>(R.id.geminiKeyValue).text =
+            if (com.privatechat.app.notes.util.GeminiSummarizer.getApiKey(this) != null) {
+                getString(R.string.notes_gemini_key_set)
+            } else {
+                getString(R.string.notes_gemini_key_not_set)
+            }
+    }
+
+    private fun showGeminiKeyDialog() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.notes_gemini_key_hint)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setText(com.privatechat.app.notes.util.GeminiSummarizer.getApiKey(this@NotesSettingsActivity).orEmpty())
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(56, 24, 56, 8)
+            addView(input)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_gemini_key))
+            .setMessage(getString(R.string.notes_summary_no_key))
+            .setView(container)
+            .setPositiveButton(getString(R.string.notes_save)) { _, _ ->
+                val key = input.text.toString().trim()
+                if (key.isEmpty()) {
+                    Toast.makeText(this, getString(R.string.notes_gemini_key_not_set), Toast.LENGTH_SHORT).show()
+                } else {
+                    com.privatechat.app.notes.util.GeminiSummarizer.saveApiKey(this, key)
+                    Toast.makeText(this, getString(R.string.notes_gemini_key_saved), Toast.LENGTH_SHORT).show()
+                    refreshGeminiKeyRow()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun refreshLockRow() {

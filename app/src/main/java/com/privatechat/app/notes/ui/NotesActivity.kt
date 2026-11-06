@@ -21,14 +21,18 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.navigation.NavigationView
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.privatechat.app.R
 import com.privatechat.app.data.AccessGate
+import com.privatechat.app.notes.backup.BackupWorker
 import com.privatechat.app.notes.backup.NotesBackup
 import com.privatechat.app.notes.data.Category
 import com.privatechat.app.notes.data.Note
 import com.privatechat.app.notes.data.NotesRepository
 import com.privatechat.app.notes.reminder.ReminderManager
 import com.privatechat.app.notes.security.NotesLockManager
+import com.privatechat.app.notes.util.QrShare
 import com.privatechat.app.ui.login.LoginActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -66,6 +70,11 @@ class NotesActivity : AppCompatActivity() {
     /** Guards observeData(): re-collecting on every onResume must not
      *  stack duplicate Flow collectors — the previous set is cancelled first. */
     private var observeJob: Job? = null
+    /** A text shared from another app while the Notes lock is on. */
+    private var pendingSharedText: String? = null
+    private var pendingSharedTitle: String? = null
+    /** QR parts collected across scans of one multi-part note. */
+    private val qrCollected = mutableListOf<String>()
 
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -122,10 +131,42 @@ class NotesActivity : AppCompatActivity() {
         }
     }
 
+    private val qrScanLauncher = registerForActivityResult(ScanContract()) { result ->
+        val contents = result.contents ?: return@registerForActivityResult
+        val header = QrShare.parsePartHeader(contents)
+        val assembled = QrShare.tryAssemble(contents, qrCollected)
+        if (assembled == null) {
+            // Multi-part note: keep scanning until every part arrives.
+            val total = header?.second ?: 0
+            val done = qrCollected.count { it.isNotEmpty() }
+            Toast.makeText(
+                this,
+                if (total > 0) getString(R.string.notes_qr_part, done, total)
+                else getString(R.string.notes_qr_scan),
+                Toast.LENGTH_SHORT
+            ).show()
+            qrScanLauncher.launch(
+                ScanOptions()
+                    .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                    .setPrompt(getString(R.string.notes_qr_scan))
+            )
+            return@registerForActivityResult
+        }
+        qrCollected.clear()
+        openEditorWithTemplate("", assembled)
+        Toast.makeText(this, getString(R.string.notes_qr_received), Toast.LENGTH_SHORT).show()
+    }
+
+    private val openPdfLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        startActivity(
+            Intent(this, PdfViewerActivity::class.java)
+                .putExtra(PdfViewerActivity.EXTRA_PDF_URI, uri.toString())
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Privacy: block screenshots / screen recordings of note content.
-        SecureWindow.protect(this)
         // Restore the persisted Notes theme before the first frame is
         // drawn, so Dark Mode survives relaunch without flicker. This
         // only applies the Notes choice; the chat theme preference
@@ -180,6 +221,11 @@ class NotesActivity : AppCompatActivity() {
 
         setupDrawer()
         setupLock()
+
+        // Smart pack: daily auto-backup + handle a text shared from
+        // another app (browser, YouTube, …) into a new note.
+        BackupWorker.scheduleDaily(this)
+        handleShareIntent()
 
         // Kitty Notes Plus housekeeping (Notes data only): permanently
         // remove Trash entries older than 30 days, and re-arm any note
@@ -237,6 +283,7 @@ class NotesActivity : AppCompatActivity() {
                     mainContent.visibility = View.VISIBLE
                     findViewById<View>(R.id.notesFab).visibility = View.VISIBLE
                     error.visibility = View.GONE
+                    openPendingShare()
                 } else {
                     error.visibility = View.VISIBLE
                     input.text.clear()
@@ -279,6 +326,7 @@ class NotesActivity : AppCompatActivity() {
                         mainContent.visibility = View.VISIBLE
                         findViewById<View>(R.id.notesFab).visibility = View.VISIBLE
                         error.visibility = View.GONE
+                        openPendingShare()
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
@@ -313,6 +361,18 @@ class NotesActivity : AppCompatActivity() {
                 R.id.nav_settings -> { startActivity(Intent(this, NotesSettingsActivity::class.java)); true }
                 R.id.nav_archive -> { startActivity(SimpleNotesActivity.intent(this, SimpleNotesActivity.MODE_ARCHIVE)); true }
                 R.id.nav_trash -> { startActivity(SimpleNotesActivity.intent(this, SimpleNotesActivity.MODE_TRASH)); true }
+                R.id.nav_habit -> { startActivity(Intent(this, HabitActivity::class.java)); true }
+                R.id.nav_qr_scan -> {
+                    qrCollected.clear()
+                    qrScanLauncher.launch(
+                        ScanOptions()
+                            .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                            .setPrompt(getString(R.string.notes_qr_scan))
+                    )
+                    true
+                }
+                R.id.nav_open_pdf -> { openPdfLauncher.launch(arrayOf("application/pdf")); true }
+                R.id.nav_backup_now -> { runBackupNow(); true }
                 else -> false
             }
         }
@@ -641,6 +701,51 @@ class NotesActivity : AppCompatActivity() {
             putExtra(Intent.EXTRA_SUBJECT, note.title)
         }
         startActivity(Intent.createChooser(intent, getString(R.string.notes_share_note)))
+    }
+
+    /** A text shared from another app becomes a new note. */
+    private fun handleShareIntent() {
+        if (intent?.action != Intent.ACTION_SEND) return
+        if (intent.type != "text/plain") return
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+        val subject = intent.getStringExtra(Intent.EXTRA_SUBJECT)
+        if (NotesLockManager.isLockEnabled(this) && !NotesLockManager.unlockedThisProcess) {
+            // Locked: hold it until the user unlocks, so a share-in
+            // never bypasses the Notes lock.
+            pendingSharedText = text
+            pendingSharedTitle = subject
+            return
+        }
+        openEditorWithTemplate(subject, text)
+    }
+
+    private fun openPendingShare() {
+        val text = pendingSharedText ?: return
+        pendingSharedText = null
+        val title = pendingSharedTitle
+        pendingSharedTitle = null
+        openEditorWithTemplate(title, text)
+    }
+
+    private fun openEditorWithTemplate(title: String?, content: String) {
+        val editorIntent = Intent(this, NoteEditorActivity::class.java)
+            .putExtra(NoteEditorActivity.EXTRA_TEMPLATE_CONTENT, content)
+        if (!title.isNullOrBlank()) {
+            editorIntent.putExtra(NoteEditorActivity.EXTRA_TEMPLATE_TITLE, title)
+        }
+        startActivity(editorIntent)
+    }
+
+    /** Runs one auto-backup right now (same file format as the daily one). */
+    private fun runBackupNow() {
+        lifecycleScope.launch {
+            val ok = BackupWorker.doBackup(this@NotesActivity)
+            Toast.makeText(
+                this@NotesActivity,
+                getString(if (ok) R.string.notes_backup_done else R.string.notes_backup_failed),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     private fun openEditor(noteId: Long) {

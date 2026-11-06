@@ -259,6 +259,130 @@
                     android:textColor="@color/primary"
                     android:padding="9dp" />
             </LinearLayout>
+
+            <!-- Smart pack (additive; everything above is unchanged) -->
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/notes_smart_tools_title"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/textPrimary"
+                android:layout_marginTop="20dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+
+                <TextView
+                    android:id="@+id/editorVoice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_voice_record"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorSummary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_summary"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorQrShare"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_qr_show"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/editorScanDoc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_scan_doc"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorShareImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_share_image"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorSavePdf"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_pdf_save"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/editorVoiceBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/editorCalcTotal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/editorLinkCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@color/surface"
+                android:padding="10dp"
+                android:layout_marginTop="8dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/editorLinkImage"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:scaleType="centerCrop" />
+
+                <TextView
+                    android:id="@+id/editorLinkTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textColor="@color/textPrimary"
+                    android:layout_marginStart="10dp"
+                    android:maxLines="2"
+                    android:ellipsize="end" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 
