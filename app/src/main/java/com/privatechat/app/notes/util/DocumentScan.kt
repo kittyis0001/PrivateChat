@@ -58,4 +58,10 @@ object DocumentScan {
     fun pdfUriFromResult(data: Intent?): Uri? = runCatching {
         GmsDocumentScanningResult.fromActivityResultIntent(data)?.pdf?.uri
     }.getOrNull()
+
+    /** The scanned pages' JPEG Uris (one per page), for OCR. Empty when cancelled/failed. */
+    fun pageUrisFromResult(data: Intent?): List<Uri> = runCatching {
+        GmsDocumentScanningResult.fromActivityResultIntent(data)?.pages
+            ?.mapNotNull { it.imageUri } ?: emptyList()
+    }.getOrDefault(emptyList())
 }

@@ -17,6 +17,7 @@ object NoteSmart {
         val first = content.lineSequence()
             .map {
                 it.trim()
+                    .replace("**", "")
                     .removePrefix("✓").removePrefix("☐")
                     .removePrefix("[x]").removePrefix("[ ]")
                     .trim()

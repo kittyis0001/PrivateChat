@@ -1,9 +1,20 @@
 package com.privatechat.app.notes.util
 
+import android.content.ContentValues
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * QR share: a small note fits in one QR; a big note is split into
@@ -42,6 +53,40 @@ object QrShare {
             i++
         }
         return parts
+    }
+
+    /** Saves the QR bitmap to Pictures/Kitty Notes so it shows in the Gallery (Android 10+). */
+    suspend fun saveToGallery(context: Context, bitmap: Bitmap, part: Int, total: Int): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    throw UnsupportedOperationException("API 29+ required")
+                }
+                val fileName = if (total > 1) "kitty-note-qr-$part.png" else "kitty-note-qr.png"
+                val values = ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                    put(
+                        MediaStore.MediaColumns.RELATIVE_PATH,
+                        Environment.DIRECTORY_PICTURES + "/Kitty Notes"
+                    )
+                }
+                val resolver = context.contentResolver
+                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                    ?: throw IllegalStateException("MediaStore insert failed")
+                resolver.openOutputStream(uri)?.use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                } ?: throw IllegalStateException("Could not open Gallery")
+                fileName
+            }
+        }
+
+    /** Writes the QR bitmap to the shared cache dir and returns its FileProvider Uri. */
+    suspend fun shareBitmap(context: Context, bitmap: Bitmap): Uri = withContext(Dispatchers.IO) {
+        val dir = File(context.cacheDir, "shared_notes").apply { mkdirs() }
+        val file = File(dir, "qr-" + System.currentTimeMillis() + ".png")
+        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
     }
 
     fun isQrPart(s: String): Boolean = s.startsWith("$PREFIX|")

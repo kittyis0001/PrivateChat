@@ -2,9 +2,11 @@ package com.privatechat.app.notes.ui
 
 import android.Manifest
 import android.app.DatePickerDialog
+import android.app.Dialog
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.media.MediaPlayer
 import android.media.MediaRecorder
@@ -14,6 +16,8 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
@@ -53,13 +57,17 @@ import com.privatechat.app.notes.util.NoteImageShare
 import com.privatechat.app.notes.util.NoteSmart
 import com.privatechat.app.notes.util.PdfExporter
 import com.privatechat.app.notes.util.QrShare
+import com.privatechat.app.notes.util.RichText
 import com.privatechat.app.notes.util.SmartReminderDetector
+import com.privatechat.app.notes.util.TextScanner
 import com.privatechat.app.notes.util.VoiceNoteStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -121,12 +129,28 @@ class NoteEditorActivity : AppCompatActivity() {
     private var voiceRecorder: MediaRecorder? = null
     private var voicePlayer: MediaPlayer? = null
     private var voiceFile: java.io.File? = null
-    private var voiceStartMs: Long = 0
     private var voiceTranscript: String = ""
+    // WhatsApp-style recording bar state (pause-aware elapsed time).
+    private var voicePaused = false
+    private var voiceRecordedMs: Long = 0
+    private var voiceSegmentStartMs: Long = 0
+    private var voiceTimerView: TextView? = null
+    private var voicePauseView: TextView? = null
+    private val voiceTimerHandler = Handler(Looper.getMainLooper())
+    private val voiceTimerTick = object : Runnable {
+        override fun run() {
+            updateVoiceTimer()
+            if (voiceRecorder != null && !voicePaused) {
+                voiceTimerHandler.postDelayed(this, 250)
+            }
+        }
+    }
     private var speechRecognizer: SpeechRecognizer? = null
     private var voiceJob: Job? = null
     private var lastReminderOffer: Long? = null
     private var lastLinkUrl: String? = null
+    /** True when the loaded note stores **bold** markers (e.g. a scanned note). */
+    private var boldMarkersPresent = false
     private lateinit var imagesAdapter: EditorImagesAdapter
 
     private val pickPhoto = registerForActivityResult(
@@ -152,18 +176,53 @@ class NoteEditorActivity : AppCompatActivity() {
         else Toast.makeText(this, getString(R.string.notes_voice_no_mic), Toast.LENGTH_SHORT).show()
     }
 
+    /**
+     * Scan document (Smart tools): the document scanner captures the
+     * page, OCR reads the text out of the photo, and a NEW note
+     * opens with that text and an auto title. The old flow only
+     * opened the scanned PDF, and pulling text out of that PDF gave
+     * binary gibberish for scanned pages — OCR reads the photo
+     * itself, so the note gets the real words.
+     */
     private val scanLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         if (result.resultCode != RESULT_OK) return@registerForActivityResult
-        val uri = DocumentScan.pdfUriFromResult(result.data)
-        if (uri == null) {
+        val pageUris = DocumentScan.pageUrisFromResult(result.data)
+        if (pageUris.isEmpty()) {
             Toast.makeText(this, getString(R.string.notes_scan_failed), Toast.LENGTH_SHORT).show()
-        } else {
-            startActivity(
-                Intent(this, PdfViewerActivity::class.java)
-                    .putExtra(PdfViewerActivity.EXTRA_PDF_URI, uri.toString())
-            )
+            return@registerForActivityResult
+        }
+        val progress = AlertDialog.Builder(this)
+            .setMessage(getString(R.string.notes_scan_reading))
+            .setCancelable(false)
+            .create()
+        progress.show()
+        lifecycleScope.launch {
+            persistNow() // save the note being edited before opening the new one
+            val scanned = withContext(Dispatchers.IO) {
+                TextScanner.recognizeUris(this@NoteEditorActivity, pageUris)
+            }
+            progress.dismiss()
+            scanned.onSuccess { text ->
+                val title = GeminiSummarizer.smartTitle(this@NoteEditorActivity, text.plainText)
+                startActivity(
+                    Intent(this@NoteEditorActivity, NoteEditorActivity::class.java)
+                        .putExtra(EXTRA_TEMPLATE_TITLE, title)
+                        .putExtra(EXTRA_TEMPLATE_CONTENT, text.markdownText)
+                )
+                Toast.makeText(
+                    this@NoteEditorActivity,
+                    getString(R.string.notes_scan_text_saved),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }.onFailure {
+                Toast.makeText(
+                    this@NoteEditorActivity,
+                    getString(R.string.notes_scan_no_text),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
@@ -251,6 +310,7 @@ class NoteEditorActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.editorShareImage).setOnClickListener { shareNoteAsImage() }
         findViewById<View>(R.id.editorSavePdf).setOnClickListener { savePdfToDownloads() }
+        findViewById<View>(R.id.editorSaveImage).setOnClickListener { saveNoteAsImage() }
         imagesAdapter = EditorImagesAdapter(
             onRemove = { image ->
                 lifecycleScope.launch { repo.removeImage(image) }
@@ -299,6 +359,7 @@ class NoteEditorActivity : AppCompatActivity() {
                 intent.getStringExtra(EXTRA_TEMPLATE_CONTENT)?.let { contentInput.setText(it) }
                 metaText.text = getString(R.string.notes_new_note)
             }
+            applyBoldMarkersIfPresent()
             buildColorPalette()
             observeImages()
             loaded = true
@@ -320,9 +381,25 @@ class NoteEditorActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Bold in the editor: a note that stores **markers** (a scanned
+     * note) shows the words bold, with the markers hidden. Saving
+     * converts the bold spans back to markers (see [currentBodyText]),
+     * so the round-trip is stable. Notes without markers are
+     * untouched — their save path is byte-identical to before.
+     */
+    private fun applyBoldMarkersIfPresent() {
+        val text = contentInput.text.toString()
+        if (!RichText.hasBoldMarkers(text)) return
+        boldMarkersPresent = true
+        contentInput.setText(RichText.toSpanned(text))
+    }
+
     /** The note body as stored/searched/shared (checklist-aware). */
     private fun currentBodyText(): String =
-        if (checklistMode) renderChecklistText() else contentInput.text.toString()
+        if (checklistMode) renderChecklistText()
+        else if (boldMarkersPresent) RichText.toMarkdown(contentInput.text)
+        else contentInput.text.toString()
 
     private fun renderChecklistText(): String =
         checklist.filter { it.text.isNotBlank() }
@@ -708,19 +785,37 @@ class NoteEditorActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Full-screen photo viewer. The old version put the ImageView in an
+     * AlertDialog with no layout params: the dialog measured it before
+     * Glide finished loading, so it stayed 0-size and the dialog showed
+     * blank white. A full-screen dialog with MATCH_PARENT params (tap
+     * anywhere to close) shows the photo properly.
+     */
     private fun showPhoto(image: NoteImage) {
         val imageView = ImageView(this).apply {
             setBackgroundColor(Color.BLACK)
-            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
         }
         Glide.with(this)
             .load(NoteImageStore.file(this, image.fileName))
             .fitCenter()
             .into(imageView)
-        AlertDialog.Builder(this)
-            .setView(imageView)
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
+        Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
+            setContentView(imageView)
+            setCancelable(true)
+            setCanceledOnTouchOutside(true)
+            imageView.setOnClickListener { dismiss() }
+            window?.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            show()
+        }
     }
 
     // ---------------- duplicate & export ----------------
@@ -751,7 +846,7 @@ class NoteEditorActivity : AppCompatActivity() {
             checklist.filter { it.text.isNotBlank() }
                 .joinToString("\n") { (if (it.checked) "[x] " else "[ ] ") + it.text.trim() }
         } else {
-            contentInput.text.toString().trim()
+            currentBodyText().trim()
         }
         return if (title.isEmpty()) body else "$title\n\n$body"
     }
@@ -760,11 +855,9 @@ class NoteEditorActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val ok = runCatching {
                 if (asPdf) {
-                    // StaticLayout rendering: Bengali text keeps its
-                    // correct shaping (the old breakText split broke it).
                     PdfExporter.writeToUri(
                         this@NoteEditorActivity, uri,
-                        titleInput.text.toString().trim(), exportText()
+                        titleInput.text.toString().trim(), currentBodyText()
                     )
                 } else {
                     contentResolver.openOutputStream(uri)?.use {
@@ -772,11 +865,25 @@ class NoteEditorActivity : AppCompatActivity() {
                     } ?: error("no stream")
                 }
             }.isSuccess
-            Toast.makeText(
-                this@NoteEditorActivity,
-                getString(if (ok) R.string.notes_exported else R.string.notes_export_failed),
-                Toast.LENGTH_SHORT
-            ).show()
+            if (asPdf && ok) {
+                AlertDialog.Builder(this@NoteEditorActivity)
+                    .setTitle(getString(R.string.notes_pdf_saved_title))
+                    .setMessage(uri.lastPathSegment ?: getString(R.string.notes_exported))
+                    .setPositiveButton(getString(R.string.notes_pdf_open)) { _, _ ->
+                        startActivity(
+                            Intent(this@NoteEditorActivity, PdfViewerActivity::class.java)
+                                .putExtra(PdfViewerActivity.EXTRA_PDF_URI, uri.toString())
+                        )
+                    }
+                    .setNegativeButton(android.R.string.ok, null)
+                    .show()
+            } else {
+                Toast.makeText(
+                    this@NoteEditorActivity,
+                    getString(if (ok) R.string.notes_exported else R.string.notes_export_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
@@ -784,7 +891,9 @@ class NoteEditorActivity : AppCompatActivity() {
 
     private fun onVoiceButton() {
         if (voiceRecorder != null) {
-            stopVoiceRecording()
+            // The recording bar (pause / ✓ save / ✕ discard) is the
+            // control while recording; tapping again does nothing.
+            Toast.makeText(this, getString(R.string.notes_voice_recording), Toast.LENGTH_SHORT).show()
             return
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
@@ -804,7 +913,9 @@ class NoteEditorActivity : AppCompatActivity() {
             }
             val file = VoiceNoteStore.newFile(this@NoteEditorActivity, noteId)
             voiceFile = file
-            voiceStartMs = System.currentTimeMillis()
+            voiceRecordedMs = 0
+            voiceSegmentStartMs = System.currentTimeMillis()
+            voicePaused = false
             voiceTranscript = ""
             runCatching {
                 voiceRecorder = VoiceNoteStore.createRecorder(this@NoteEditorActivity, file).apply {
@@ -812,7 +923,8 @@ class NoteEditorActivity : AppCompatActivity() {
                     start()
                 }
                 startLiveTranscription()
-                findViewById<TextView>(R.id.editorVoice).text = getString(R.string.notes_voice_stop)
+                showVoiceRecBar()
+                voiceTimerHandler.post(voiceTimerTick)
             }.onFailure {
                 voiceRecorder = null
                 file.delete()
@@ -821,16 +933,21 @@ class NoteEditorActivity : AppCompatActivity() {
         }
     }
 
-    private fun stopVoiceRecording() {
+    /** ✓ on the recording bar: stop and save the recording as a voice note. */
+    private fun saveVoiceRecording() {
         val recorder = voiceRecorder ?: return
         val file = voiceFile
+        if (!voicePaused) voiceRecordedMs += System.currentTimeMillis() - voiceSegmentStartMs
         voiceRecorder = null
+        voicePaused = false
+        voiceTimerHandler.removeCallbacks(voiceTimerTick)
+        hideVoiceRecBar()
         speechRecognizer?.stopListening()
         runCatching { recorder.stop() }
         runCatching { recorder.release() }
-        findViewById<TextView>(R.id.editorVoice).text = getString(R.string.notes_voice_record)
         if (file == null || !file.exists()) return
-        val duration = System.currentTimeMillis() - voiceStartMs
+        val duration = voiceRecordedMs
+        voiceRecordedMs = 0
         val transcript = voiceTranscript.trim()
         lifecycleScope.launch {
             repo.addVoiceNote(
@@ -841,6 +958,112 @@ class NoteEditorActivity : AppCompatActivity() {
             observeVoiceNotes()
             Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_voice_saved), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /** ✕ on the recording bar: stop and throw the recording away. */
+    private fun discardVoiceRecording() {
+        val recorder = voiceRecorder ?: return
+        val file = voiceFile
+        voiceRecorder = null
+        voicePaused = false
+        voiceTimerHandler.removeCallbacks(voiceTimerTick)
+        hideVoiceRecBar()
+        speechRecognizer?.stopListening()
+        runCatching { recorder.stop() }
+        runCatching { recorder.release() }
+        runCatching { file?.delete() }
+        voiceRecordedMs = 0
+        Toast.makeText(this, getString(R.string.notes_voice_discarded), Toast.LENGTH_SHORT).show()
+    }
+
+    /** ⏸ / ▶ on the recording bar. MediaRecorder.pause needs API 24+ (minSdk is 24). */
+    private fun togglePauseVoiceRecording() {
+        val recorder = voiceRecorder ?: return
+        if (!voicePaused) {
+            if (runCatching { recorder.pause() }.isFailure) return
+            voiceRecordedMs += System.currentTimeMillis() - voiceSegmentStartMs
+            voicePaused = true
+            voicePauseView?.text = "▶"
+            voiceTimerHandler.removeCallbacks(voiceTimerTick)
+            updateVoiceTimer()
+        } else {
+            if (runCatching { recorder.resume() }.isFailure) return
+            voiceSegmentStartMs = System.currentTimeMillis()
+            voicePaused = false
+            voicePauseView?.text = "⏸"
+            voiceTimerHandler.post(voiceTimerTick)
+        }
+    }
+
+    private fun currentRecordedMs(): Long =
+        if (voiceRecorder == null || voicePaused) voiceRecordedMs
+        else voiceRecordedMs + (System.currentTimeMillis() - voiceSegmentStartMs)
+
+    private fun updateVoiceTimer() {
+        voiceTimerView?.text = VoiceNoteStore.formatDuration(currentRecordedMs())
+    }
+
+    /**
+     * WhatsApp-style recording bar: red dot + live timer, pause/resume,
+     * ✓ to save as a voice note, ✕ to discard. Built in code so the
+     * saved-rows list in editorVoiceBox is never disturbed.
+     */
+    private fun showVoiceRecBar() {
+        val bar = findViewById<LinearLayout>(R.id.editorVoiceRecBar)
+        bar.removeAllViews()
+        val density = resources.displayMetrics.density
+        val pad = (9 * density).toInt()
+        val dot = TextView(this).apply {
+            text = "●"
+            textSize = 14f
+            setTextColor(getColor(R.color.kittyError))
+            setPadding((12 * density).toInt(), pad, (4 * density).toInt(), pad)
+        }
+        val timer = TextView(this).apply {
+            text = VoiceNoteStore.formatDuration(0)
+            textSize = 14f
+            setTextColor(getColor(R.color.textPrimary))
+            setPadding((4 * density).toInt(), pad, (4 * density).toInt(), pad)
+        }
+        voiceTimerView = timer
+        val spacer = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val pause = TextView(this).apply {
+            text = "⏸"
+            textSize = 20f
+            setTextColor(getColor(R.color.primary))
+            setPadding((12 * density).toInt(), pad, (12 * density).toInt(), pad)
+            setOnClickListener { togglePauseVoiceRecording() }
+        }
+        voicePauseView = pause
+        val save = TextView(this).apply {
+            text = "✓"
+            textSize = 20f
+            setTextColor(getColor(R.color.primary))
+            setPadding((12 * density).toInt(), pad, (12 * density).toInt(), pad)
+            setOnClickListener { saveVoiceRecording() }
+        }
+        val discard = TextView(this).apply {
+            text = "✕"
+            textSize = 20f
+            setTextColor(getColor(R.color.kittyError))
+            setPadding((12 * density).toInt(), pad, (12 * density).toInt(), pad)
+            setOnClickListener { discardVoiceRecording() }
+        }
+        bar.addView(dot)
+        bar.addView(timer)
+        bar.addView(spacer)
+        bar.addView(pause)
+        bar.addView(save)
+        bar.addView(discard)
+        bar.visibility = View.VISIBLE
+    }
+
+    private fun hideVoiceRecBar() {
+        findViewById<LinearLayout>(R.id.editorVoiceRecBar).visibility = View.GONE
+        voiceTimerView = null
+        voicePauseView = null
     }
 
     /**
@@ -971,6 +1194,23 @@ class NoteEditorActivity : AppCompatActivity() {
                 .show()
             return
         }
+        // Language choice (last used language pre-selected, remembered
+        // for next time). Tapping a language runs the summary at once.
+        val langs = arrayOf("বাংলা", "English")
+        val checked = if (GeminiSummarizer.getSummaryLang(this) == "en") 1 else 0
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_summary_language))
+            .setSingleChoiceItems(langs, checked) { dialog, which ->
+                val lang = if (which == 1) "en" else "bn"
+                GeminiSummarizer.saveSummaryLang(this, lang)
+                dialog.dismiss()
+                runSummary(text, lang)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun runSummary(text: String, lang: String) {
         val loading = AlertDialog.Builder(this)
             .setTitle(getString(R.string.notes_summary_title))
             .setMessage("…")
@@ -978,7 +1218,7 @@ class NoteEditorActivity : AppCompatActivity() {
             .create()
         loading.show()
         lifecycleScope.launch {
-            val result = GeminiSummarizer.summarize(this@NoteEditorActivity, text)
+            val result = GeminiSummarizer.summarize(this@NoteEditorActivity, text, lang)
             loading.dismiss()
             result.onSuccess { summary ->
                 AlertDialog.Builder(this@NoteEditorActivity)
@@ -1007,6 +1247,7 @@ class NoteEditorActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.notes_qr_too_big), Toast.LENGTH_SHORT).show()
         }
         var index = 0
+        var currentBitmap: Bitmap? = null
         val image = ImageView(this).apply {
             layoutParams = LinearLayout.LayoutParams(600, 600)
             scaleType = ImageView.ScaleType.FIT_CENTER
@@ -1020,7 +1261,8 @@ class NoteEditorActivity : AppCompatActivity() {
         val prev = Button(this).apply { this.text = "←" }
         val next = Button(this).apply { this.text = "→" }
         fun render() {
-            image.setImageBitmap(QrShare.encodeToBitmap(parts[index], 600))
+            currentBitmap = QrShare.encodeToBitmap(parts[index], 600)
+            image.setImageBitmap(currentBitmap)
             label.text = if (parts.size > 1) "${index + 1} / ${parts.size}" else ""
         }
         prev.setOnClickListener { if (index > 0) { index--; render() } }
@@ -1031,12 +1273,35 @@ class NoteEditorActivity : AppCompatActivity() {
             addView(prev)
             addView(next)
         }
+        // Download (saves the shown QR to Downloads) and Share (sends
+        // the shown QR image to any app) — both act on the part that
+        // is currently displayed.
+        val download = Button(this).apply {
+            text = getString(R.string.notes_qr_download)
+            setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.stat_sys_download, 0, 0, 0)
+            compoundDrawablePadding = 16
+        }
+        val share = Button(this).apply {
+            text = getString(R.string.notes_share_short)
+            setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_share, 0, 0, 0)
+            compoundDrawablePadding = 16
+        }
+        download.setOnClickListener { downloadQr(currentBitmap, index + 1, parts.size) }
+        share.setOnClickListener { shareQr(currentBitmap) }
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 24, 0, 0)
+            addView(download)
+            addView(share)
+        }
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = android.view.Gravity.CENTER_HORIZONTAL
             setPadding(48, 24, 48, 8)
             addView(image)
             addView(label)
+            addView(actions)
             if (parts.size > 1) addView(nav)
         }
         render()
@@ -1045,6 +1310,63 @@ class NoteEditorActivity : AppCompatActivity() {
             .setView(container)
             .setPositiveButton(android.R.string.ok, null)
             .show()
+    }
+
+    private fun downloadQr(bitmap: Bitmap?, part: Int, total: Int) {
+        if (bitmap == null) {
+            Toast.makeText(this, getString(R.string.notes_export_failed), Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            val result = QrShare.saveToGallery(this@NoteEditorActivity, bitmap, part, total)
+            result.onSuccess { name ->
+                Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_qr_saved, name), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_export_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun shareQr(bitmap: Bitmap?) {
+        if (bitmap == null) {
+            Toast.makeText(this, getString(R.string.notes_export_failed), Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            runCatching {
+                val uri = QrShare.shareBitmap(this@NoteEditorActivity, bitmap)
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(intent, getString(R.string.notes_share_note)))
+            }.onFailure {
+                Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_export_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /** Saves the same image "Share as image" sends, to Pictures/Kitty Notes (Gallery). */
+    private fun saveNoteAsImage() {
+        val text = buildShareText()
+        if (text.isBlank()) {
+            Toast.makeText(this, getString(R.string.notes_nothing_to_share), Toast.LENGTH_SHORT).show()
+            return
+        }
+        lifecycleScope.launch {
+            val result = NoteImageShare.saveNoteImageToGallery(
+                this@NoteEditorActivity,
+                titleInput.text.toString().trim(),
+                currentBodyText(),
+                noteColor
+            )
+            result.onSuccess { name ->
+                Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_image_saved, name), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_export_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun shareNoteAsImage() {
@@ -1078,13 +1400,20 @@ class NoteEditorActivity : AppCompatActivity() {
             val result = PdfExporter.saveToDownloads(
                 this@NoteEditorActivity,
                 titleInput.text.toString().trim(),
-                exportText()
+                currentBodyText()
             )
-            result.onSuccess { name ->
-                Toast.makeText(
-                    this@NoteEditorActivity,
-                    getString(R.string.notes_pdf_saved, name), Toast.LENGTH_SHORT
-                ).show()
+            result.onSuccess { (name, uri) ->
+                AlertDialog.Builder(this@NoteEditorActivity)
+                    .setTitle(getString(R.string.notes_pdf_saved_title))
+                    .setMessage(getString(R.string.notes_pdf_saved, name))
+                    .setPositiveButton(getString(R.string.notes_pdf_open)) { _, _ ->
+                        startActivity(
+                            Intent(this@NoteEditorActivity, PdfViewerActivity::class.java)
+                                .putExtra(PdfViewerActivity.EXTRA_PDF_URI, uri.toString())
+                        )
+                    }
+                    .setNegativeButton(android.R.string.ok, null)
+                    .show()
             }.onFailure {
                 // Older phones (API < 29) cannot use MediaStore
                 // Downloads: fall back to the file picker instead.
@@ -1170,6 +1499,10 @@ class NoteEditorActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        // Leaving mid-recording: stop the timer, release the recorder
+        // and drop the unfinished file (nothing is saved).
+        voiceTimerHandler.removeCallbacks(voiceTimerTick)
+        if (voiceRecorder != null) runCatching { voiceFile?.delete() }
         runCatching { voiceRecorder?.release() }
         runCatching { voicePlayer?.release() }
         speechRecognizer?.destroy()

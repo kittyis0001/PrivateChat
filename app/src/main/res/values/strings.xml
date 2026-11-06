@@ -236,10 +236,11 @@ Remember:</string>
     <!-- Google Drive backup (Notes only) -->
 
     <!-- Kitty Notes smart pack (additive) -->
-    <string name="notes_voice_record">Record voice</string>
-    <string name="notes_voice_stop">Stop</string>
+    <string name="notes_voice_record">Voice note</string>
     <string name="notes_voice_play">Play</string>
     <string name="notes_voice_saved">Voice note saved</string>
+    <string name="notes_voice_recording">Recording… tap ✓ to save it</string>
+    <string name="notes_voice_discarded">Voice recording discarded</string>
     <string name="notes_voice_transcript">Transcribe</string>
     <string name="notes_voice_no_mic">Microphone permission is needed to record</string>
     <string name="notes_summary">AI summary</string>
@@ -247,6 +248,7 @@ Remember:</string>
     <string name="notes_summary_no_key">Add your Gemini API key in Settings to use AI summary</string>
     <string name="notes_summary_failed">Summary failed — check internet and your API key</string>
     <string name="notes_summary_title">Summary</string>
+    <string name="notes_summary_language">Summary language</string>
     <string name="notes_reminder_repeat">Repeat</string>
     <string name="notes_reminder_none_repeat">Does not repeat</string>
     <string name="notes_reminder_daily">Daily</string>
@@ -258,10 +260,19 @@ Remember:</string>
     <string name="notes_qr_scan">Scan QR</string>
     <string name="notes_qr_received">Note received from QR</string>
     <string name="notes_qr_too_big">Note is too big for one QR — it will be split into parts</string>
+    <string name="notes_qr_download">Download QR</string>
+    <string name="notes_qr_saved">QR saved to Gallery: %1$s</string>
     <string name="notes_scan_doc">Scan document</string>
+    <string name="notes_scan_text">Scan text</string>
+    <string name="notes_scan_reading">Reading text…</string>
+    <string name="notes_scan_no_text">No text found in the scan</string>
+    <string name="notes_scan_text_saved">Text scanned into a new note</string>
     <string name="notes_scan_saved">Scanned PDF saved</string>
     <string name="notes_scan_failed">Scan failed — try again</string>
     <string name="notes_pdf_saved">PDF saved to Downloads: %1$s</string>
+    <string name="notes_pdf_saved_title">PDF saved</string>
+    <string name="notes_pdf_open">Open</string>
+    <string name="notes_image_saved">Image saved to Gallery: %1$s</string>
     <string name="notes_pdf_viewer">Open PDF</string>
     <string name="notes_pdf_no_text">No readable text found in this PDF</string>
     <string name="notes_pdf_open_failed">Could not open this PDF</string>
@@ -270,6 +281,7 @@ Remember:</string>
     <string name="notes_section_smart">Smart tools</string>
     <string name="notes_smart_tools_title">Smart tools</string>
     <string name="notes_share_image">Share as image</string>
+    <string name="notes_save_image">Save as image</string>
     <string name="notes_pdf_save">Save PDF</string>
     <string name="notes_gemini_key_set">Set</string>
     <string name="notes_gemini_key_not_set">Not set</string>

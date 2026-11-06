@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
@@ -64,6 +65,18 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+
+        <!-- QR scan orientation fix: the ZXing library declares its
+             CaptureActivity as sensorLandscape, so tapping Scan QR
+             flipped the scanner sideways even when the phone is held
+             upright — and its orientation lock then froze it there.
+             fullSensor lets the scanner open in the orientation the
+             phone is held in (see setOrientationLocked(false) at the
+             two ScanOptions launch sites in NotesActivity). -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="fullSensor"
+            tools:replace="screenOrientation" />
 
         <activity
             android:name=".ui.login.LoginActivity"
