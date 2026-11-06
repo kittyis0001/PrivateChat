@@ -241,9 +241,11 @@ class NoteEditorActivity : AppCompatActivity() {
         findViewById<View>(R.id.editorSummary).setOnClickListener { summarizeNote() }
         findViewById<View>(R.id.editorQrShare).setOnClickListener { showQrShare() }
         findViewById<View>(R.id.editorScanDoc).setOnClickListener {
-            runCatching {
-                DocumentScan.launch(this, DocumentScan.createScanner(this), scanLauncher)
-            }.onFailure {
+            DocumentScan.launch(
+                this,
+                DocumentScan.createScanner(this),
+                scanLauncher
+            ) {
                 Toast.makeText(this, getString(R.string.notes_scan_failed), Toast.LENGTH_SHORT).show()
             }
         }

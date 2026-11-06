@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -131,7 +132,11 @@ class NotesActivity : AppCompatActivity() {
         }
     }
 
-    private val qrScanLauncher = registerForActivityResult(ScanContract()) { result ->
+    // Explicit type: the callback re-launches this launcher for the next
+    // QR part, and without the type the compiler reports a recursive
+    // type-checking problem at the self-reference.
+    private val qrScanLauncher: ActivityResultLauncher<ScanOptions> =
+        registerForActivityResult(ScanContract()) { result ->
         val contents = result.contents ?: return@registerForActivityResult
         val header = QrShare.parsePartHeader(contents)
         val assembled = QrShare.tryAssemble(contents, qrCollected)

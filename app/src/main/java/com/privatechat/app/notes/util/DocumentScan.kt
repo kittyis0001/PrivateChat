@@ -8,9 +8,19 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.appcompat.app.AppCompatActivity
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanner
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
-import com.google.mlkit.vision.documentscanner.GmsDocumentScannerResult
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 
-/** ML Kit document scanner (Play-services based, no model in the APK). */
+/**
+ * ML Kit document scanner (Play-services based, no model in the APK).
+ *
+ * API verified against Google's ML Kit docs
+ * (developers.google.com/ml-kit/vision/doc-scanner/android):
+ * the client comes from [GmsDocumentScanning.getClient], the result from
+ * [GmsDocumentScanningResult.fromActivityResultIntent], and
+ * [GmsDocumentScanner.getStartScanIntent] returns a Task — the scanner
+ * intent is launched from its success listener, never synchronously.
+ */
 object DocumentScan {
 
     fun createScanner(activity: AppCompatActivity): GmsDocumentScanner {
@@ -23,21 +33,29 @@ object DocumentScan {
             )
             .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
             .build()
-        return GmsDocumentScanner.getClient(options)
+        return GmsDocumentScanning.getClient(options)
     }
 
+    /**
+     * Starts the scanner UI. The scan result arrives through [launcher];
+     * [onError] runs when the scanner cannot start (e.g. the Play
+     * services model is not ready yet) — the caller shows a toast then.
+     */
     fun launch(
         activity: Activity,
         scanner: GmsDocumentScanner,
-        launcher: ActivityResultLauncher<IntentSenderRequest>
+        launcher: ActivityResultLauncher<IntentSenderRequest>,
+        onError: (Exception) -> Unit
     ) {
-        launcher.launch(
-            IntentSenderRequest.Builder(scanner.getStartScanIntent(activity)).build()
-        )
+        scanner.getStartScanIntent(activity)
+            .addOnSuccessListener { intentSender ->
+                launcher.launch(IntentSenderRequest.Builder(intentSender).build())
+            }
+            .addOnFailureListener { e -> onError(e) }
     }
 
     /** The scanned PDF's Uri, or null when the scan was cancelled/failed. */
     fun pdfUriFromResult(data: Intent?): Uri? = runCatching {
-        GmsDocumentScannerResult.fromActivityResultIntent(data)?.pdf?.uri
+        GmsDocumentScanningResult.fromActivityResultIntent(data)?.pdf?.uri
     }.getOrNull()
 }
