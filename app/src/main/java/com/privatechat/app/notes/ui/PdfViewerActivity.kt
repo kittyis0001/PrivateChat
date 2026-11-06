@@ -125,12 +125,11 @@ class PdfViewerActivity : AppCompatActivity() {
                 ).show()
                 return@launch
             }
+            val fallbackTitle = uri.lastPathSegment
+                ?.substringBeforeLast(".")
+                ?.takeIf { it.isNotBlank() } ?: "PDF"
             val title = GeminiSummarizer.smartTitle(this@PdfViewerActivity, text)
-                .ifBlank {
-                    uri.lastPathSegment
-                        ?.substringBeforeLast(".")
-                        ?.ifBlank { null } ?: "PDF"
-                }
+                .ifBlank { fallbackTitle }
             val intent = Intent(this@PdfViewerActivity, NoteEditorActivity::class.java)
                 .putExtra(NoteEditorActivity.EXTRA_TEMPLATE_TITLE, title)
                 .putExtra(NoteEditorActivity.EXTRA_TEMPLATE_CONTENT, markdown ?: text)
