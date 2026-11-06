@@ -1277,12 +1277,12 @@ class NoteEditorActivity : AppCompatActivity() {
         // the shown QR image to any app) — both act on the part that
         // is currently displayed.
         val download = Button(this).apply {
-            text = getString(R.string.notes_qr_download)
+            this.text = getString(R.string.notes_qr_download)
             setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.stat_sys_download, 0, 0, 0)
             compoundDrawablePadding = 16
         }
         val share = Button(this).apply {
-            text = getString(R.string.notes_share_short)
+            this.text = getString(R.string.notes_share_short)
             setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_share, 0, 0, 0)
             compoundDrawablePadding = 16
         }
