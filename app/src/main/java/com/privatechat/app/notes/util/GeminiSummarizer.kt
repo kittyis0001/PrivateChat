@@ -20,7 +20,10 @@ import java.util.concurrent.TimeUnit
 object GeminiSummarizer {
     private const val PREFS = "kitty_notes_ai"
     private const val KEY_API_KEY = "gemini_api_key"
-    private const val MODEL = "gemini-2.0-flash"
+    // gemini-2.0-flash was shut down by Google on 2026-06-01, so it
+    // 404s for every key. gemini-3.5-flash-lite is the current GA
+    // replacement (free tier: 500 requests/day).
+    private const val MODEL = "gemini-3.5-flash-lite"
 
     fun getApiKey(context: Context): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
