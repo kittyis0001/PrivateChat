@@ -33,5 +33,9 @@ data class Note(
     // Added in kitty_notes.db v3 (additive; default keeps old rows valid):
     /** Reminder repeat: "NONE", "DAILY" or "WEEKLY". */
     @ColumnInfo(defaultValue = "'NONE'")
-    val reminderRepeat: String = "NONE"
+    val reminderRepeat: String = "NONE",
+    // Added in kitty_notes.db v4 (additive; default keeps old rows valid):
+    /** AI-suggested tags, comma-separated, "" = none. */
+    @ColumnInfo(defaultValue = "''")
+    val tags: String = ""
 )

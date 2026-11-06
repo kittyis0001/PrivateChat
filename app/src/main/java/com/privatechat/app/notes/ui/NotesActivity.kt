@@ -179,16 +179,28 @@ class NotesActivity : AppCompatActivity() {
             val scanned = withContext(Dispatchers.IO) {
                 TextScanner.recognizeUris(this@NotesActivity, pageUris)
             }
-            progress.dismiss()
             scanned.onSuccess { text ->
-                val title = GeminiSummarizer.smartTitle(this@NotesActivity, text.plainText)
-                openEditorWithTemplate(title, text.markdownText)
+                // AI cleanup (best-effort, only with a saved key): fixes
+                // OCR misreads, keeps wording/case/line breaks and the
+                // ** bold markers. Falls back to the raw OCR text.
+                var plain = text.plainText
+                var md = text.markdownText
+                if (GeminiSummarizer.getApiKey(this@NotesActivity) != null) {
+                    GeminiSummarizer.cleanOcrText(this@NotesActivity, md).onSuccess { cleaned ->
+                        md = cleaned
+                        plain = cleaned.replace("**", "")
+                    }
+                }
+                val title = GeminiSummarizer.smartTitle(this@NotesActivity, plain)
+                progress.dismiss()
+                openEditorWithTemplate(title, md)
                 Toast.makeText(
                     this@NotesActivity,
                     getString(R.string.notes_scan_text_saved),
                     Toast.LENGTH_SHORT
                 ).show()
             }.onFailure {
+                progress.dismiss()
                 Toast.makeText(
                     this@NotesActivity,
                     getString(R.string.notes_scan_no_text),
@@ -445,6 +457,7 @@ class NotesActivity : AppCompatActivity() {
                     true
                 }
                 R.id.nav_open_pdf -> { openPdfLauncher.launch(arrayOf("application/pdf")); true }
+                R.id.nav_ai_write -> { promptAiWrite(); true }
                 R.id.nav_backup_now -> { runBackupNow(); true }
                 else -> false
             }
@@ -798,6 +811,64 @@ class NotesActivity : AppCompatActivity() {
         val title = pendingSharedTitle
         pendingSharedTitle = null
         openEditorWithTemplate(title, text)
+    }
+
+    /**
+     * Write with AI: one line of idea in, a whole note out. The
+     * generated title + body open in the editor — nothing is saved
+     * silently, and the note is written in the language the user
+     * last chose for AI summary (Bengali by default).
+     */
+    private fun promptAiWrite() {
+        val input = EditText(this).apply {
+            hint = getString(R.string.notes_ai_write_hint)
+            setPadding(48, 32, 48, 32)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_ai_write))
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val idea = input.text.toString().trim()
+                if (idea.isBlank()) {
+                    Toast.makeText(this, getString(R.string.notes_ai_too_short), Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                runAiWrite(idea)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun runAiWrite(idea: String) {
+        if (GeminiSummarizer.getApiKey(this) == null) {
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.notes_ai_write))
+                .setMessage(getString(R.string.notes_ai_no_key))
+                .setPositiveButton(getString(R.string.notes_settings_title)) { _, _ ->
+                    startActivity(Intent(this, NotesSettingsActivity::class.java))
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            return
+        }
+        val loading = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_ai_write))
+            .setMessage("…")
+            .setCancelable(false)
+            .create()
+        loading.show()
+        lifecycleScope.launch {
+            val result = GeminiSummarizer.writeFromIdea(
+                this@NotesActivity, idea, GeminiSummarizer.getSummaryLang(this@NotesActivity)
+            )
+            loading.dismiss()
+            result.onSuccess { (title, body) ->
+                openEditorWithTemplate(title, body)
+                Toast.makeText(this@NotesActivity, getString(R.string.notes_ai_write_done), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(this@NotesActivity, getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun openEditorWithTemplate(title: String?, content: String) {

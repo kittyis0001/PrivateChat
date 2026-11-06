@@ -31,6 +31,9 @@ class NotesAdapter(
         holder.title.text = note.title.ifBlank { holder.itemView.context.getString(R.string.notes_untitled) }
         holder.date.text = DATE_FMT.format(Date(note.updatedAt))
         holder.pin.visibility = if (note.pinned) View.VISIBLE else View.GONE
+        val tags = note.tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        holder.tags.text = tags.joinToString(" ") { "#$it" }
+        holder.tags.visibility = if (tags.isEmpty()) View.GONE else View.VISIBLE
         NoteCardStyle.bind(
             holder.itemView, holder.title, holder.preview, holder.date,
             note, imageCounts[note.id] ?: 0
@@ -43,6 +46,7 @@ class NotesAdapter(
         val title: TextView = v.findViewById(R.id.noteTitle)
         val preview: TextView = v.findViewById(R.id.notePreview)
         val date: TextView = v.findViewById(R.id.noteDate)
+        val tags: TextView = v.findViewById(R.id.noteTags)
         val pin: TextView = v.findViewById(R.id.notePin)
     }
 
