@@ -132,35 +132,11 @@ class NotesActivity : AppCompatActivity() {
         }
     }
 
-    // Explicit type: the callback re-launches this launcher for the next
-    // QR part, and without the type the compiler reports a recursive
-    // type-checking problem at the self-reference.
-    private val qrScanLauncher: ActivityResultLauncher<ScanOptions> =
-        registerForActivityResult(ScanContract()) { result ->
-        val contents = result.contents ?: return@registerForActivityResult
-        val header = QrShare.parsePartHeader(contents)
-        val assembled = QrShare.tryAssemble(contents, qrCollected)
-        if (assembled == null) {
-            // Multi-part note: keep scanning until every part arrives.
-            val total = header?.second ?: 0
-            val done = qrCollected.count { it.isNotEmpty() }
-            Toast.makeText(
-                this,
-                if (total > 0) getString(R.string.notes_qr_part, done, total)
-                else getString(R.string.notes_qr_scan),
-                Toast.LENGTH_SHORT
-            ).show()
-            qrScanLauncher.launch(
-                ScanOptions()
-                    .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-                    .setPrompt(getString(R.string.notes_qr_scan))
-            )
-            return@registerForActivityResult
-        }
-        qrCollected.clear()
-        openEditorWithTemplate("", assembled)
-        Toast.makeText(this, getString(R.string.notes_qr_received), Toast.LENGTH_SHORT).show()
-    }
+    // lateinit: the callback re-launches this launcher for the next QR
+    // part, so it cannot be a val initialised with its own callback —
+    // the compiler rejects the self-reference ("must be initialized").
+    // It is registered in onCreate, before any scan can run.
+    private lateinit var qrScanLauncher: ActivityResultLauncher<ScanOptions>
 
     private val openPdfLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -172,6 +148,34 @@ class NotesActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Register the QR scanner here (not as a property initializer):
+        // its callback re-launches itself for the next part of a
+        // multi-part note, and a val cannot reference itself.
+        qrScanLauncher = registerForActivityResult(ScanContract()) { result ->
+            val contents = result.contents ?: return@registerForActivityResult
+            val header = QrShare.parsePartHeader(contents)
+            val assembled = QrShare.tryAssemble(contents, qrCollected)
+            if (assembled == null) {
+                // Multi-part note: keep scanning until every part arrives.
+                val total = header?.second ?: 0
+                val done = qrCollected.count { it.isNotEmpty() }
+                Toast.makeText(
+                    this,
+                    if (total > 0) getString(R.string.notes_qr_part, done, total)
+                    else getString(R.string.notes_qr_scan),
+                    Toast.LENGTH_SHORT
+                ).show()
+                qrScanLauncher.launch(
+                    ScanOptions()
+                        .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                        .setPrompt(getString(R.string.notes_qr_scan))
+                )
+                return@registerForActivityResult
+            }
+            qrCollected.clear()
+            openEditorWithTemplate("", assembled)
+            Toast.makeText(this, getString(R.string.notes_qr_received), Toast.LENGTH_SHORT).show()
+        }
         // Restore the persisted Notes theme before the first frame is
         // drawn, so Dark Mode survives relaunch without flicker. This
         // only applies the Notes choice; the chat theme preference
