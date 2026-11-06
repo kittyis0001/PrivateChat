@@ -1,5 +1,6 @@
 package com.privatechat.app.notes.util
 
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -7,6 +8,9 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -17,16 +21,13 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-/** Renders a note as a pretty 1080x1350 image for sharing. The PNG
- * lives in cacheDir/shared_notes and is shared via FileProvider. */
+/** Renders a note as a pretty 1080x1350 image (the same image that
+ * "Share as image" sends and "Save as image" stores in the Gallery).
+ * The shared PNG lives in cacheDir/shared_notes via FileProvider. */
 object NoteImageShare {
 
-    suspend fun shareNoteAsImage(
-        context: Context,
-        title: String,
-        body: String,
-        colorHex: String
-    ): Uri = withContext(Dispatchers.IO) {
+    /** Draws the note image: pink header, body text, Kitty Notes footer. */
+    fun renderNoteImage(context: Context, title: String, body: String, colorHex: String): Bitmap {
         val w = 1080
         val h = 1350
         val dm = context.resources.displayMetrics
@@ -50,7 +51,10 @@ object NoteImageShare {
             color = 0xFF333333.toInt()
             textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 26f, dm)
         }
-        val layout = StaticLayout.Builder.obtain(safeBody, 0, safeBody.length, bodyPaint, w - 128)
+        val bodySpanned = RichText.toSpanned(safeBody)
+        val layout = StaticLayout.Builder.obtain(
+            bodySpanned, 0, bodySpanned.length, bodyPaint, w - 128
+        )
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
             .setLineSpacing(0f, 1.3f)
             .setIncludePad(false)
@@ -67,9 +71,51 @@ object NoteImageShare {
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         canvas.drawText("Kitty Notes", 64f, (h - 64).toFloat(), footerPaint)
+        return bitmap
+    }
+
+    suspend fun shareNoteAsImage(
+        context: Context,
+        title: String,
+        body: String,
+        colorHex: String
+    ): Uri = withContext(Dispatchers.IO) {
+        val bitmap = renderNoteImage(context, title, body, colorHex)
         val dir = File(context.cacheDir, "shared_notes").apply { mkdirs() }
         val file = File(dir, "note-" + System.currentTimeMillis() + ".png")
         FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+    }
+
+    /** Saves the same rendered image to Pictures/Kitty Notes so it shows in the Gallery. */
+    suspend fun saveNoteImageToGallery(
+        context: Context,
+        title: String,
+        body: String,
+        colorHex: String
+    ): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                throw UnsupportedOperationException("API 29+ required")
+            }
+            val bitmap = renderNoteImage(context, title, body, colorHex)
+            val fileName = title.ifBlank { "Kitty Note" }.trim().take(40)
+                .replace(Regex("[\\\\/:*?\"<>|]"), " ") + ".png"
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                put(
+                    MediaStore.MediaColumns.RELATIVE_PATH,
+                    Environment.DIRECTORY_PICTURES + "/Kitty Notes"
+                )
+            }
+            val resolver = context.contentResolver
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("MediaStore insert failed")
+            resolver.openOutputStream(uri)?.use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            } ?: throw IllegalStateException("Could not open Gallery")
+            fileName
+        }
     }
 }

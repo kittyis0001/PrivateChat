@@ -11,6 +11,15 @@ import java.util.zip.Inflater
  * objects, inflates FlateDecode streams, and pulls text from
  * (...) literal strings, treating Td/T* as line breaks. Returns ""
  * when nothing readable is found — never throws.
+ *
+ * Two guards against the gibberish bug (a scanned, image-only PDF
+ * used to save a note full of binary junk): only streams that look
+ * like real text-drawing content (BT … Tj/TJ operators) are read —
+ * image XObjects, font files and XMP metadata never contain those,
+ * so they contribute nothing — and the result is rejected when its
+ * words are implausibly long on average (binary soup has no spaces).
+ * An image-only PDF therefore honestly returns "", and the caller
+ * falls back to OCR instead of saving garbage.
  */
 object PdfTextExtractor {
 
@@ -31,16 +40,31 @@ object PdfTextExtractor {
             if (e < 0) break
             val raw = text.substring(dataStart, e).toByteArray(Charsets.ISO_8859_1)
             val decoded = inflate(raw) ?: raw
-            extractFromStream(decoded, out)
+            if (isTextStream(decoded)) extractFromStream(decoded, out)
             out.append('\n')
             searchFrom = e + "endstream".length
         }
-        out.toString()
+        val cleaned = out.toString()
             .replace(Regex("[ \\t]+"), " ")
             .replace(Regex("\n{3,}"), "\n\n")
             .trim()
             .take(20000)
+        if (cleaned.isEmpty()) return ""
+        // Binary soup has almost no spaces: reject it rather than
+        // saving it as a note. Real text averages ~5 letters a word.
+        val words = cleaned.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val avgWord = if (words.isEmpty()) 0.0
+            else words.sumOf { it.length }.toDouble() / words.size
+        if (words.size >= 10 && avgWord > 12.0) return ""
+        cleaned
     }.getOrElse { "" }
+
+    /** True only for a content stream that draws text (not an image, font or metadata stream). */
+    private fun isTextStream(decoded: ByteArray): Boolean {
+        if (decoded.isEmpty() || decoded.contains(0)) return false
+        val s = String(decoded, Charsets.ISO_8859_1)
+        return s.contains("BT") && (s.contains("Tj") || s.contains("TJ"))
+    }
 
     private fun inflate(data: ByteArray): ByteArray? = runCatching {
         val inflater = Inflater(true)

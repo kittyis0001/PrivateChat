@@ -110,10 +110,12 @@ dependencies {
     // Kitty Notes smart pack (additive, lightweight by design):
     // ZXing core + embedded scanner for QR share/scan, ML Kit
     // document scanner (Play-services based, no model in the APK)
-    // for scan-to-PDF. No Lottie, no ML Kit text recognition.
+    // for scan-to-PDF, and ML Kit text recognition (also
+    // Play-services based) so Scan text can OCR a photo/document.
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
+    implementation("com.google.mlkit:text-recognition:16.0.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

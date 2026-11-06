@@ -33,12 +33,17 @@ import com.privatechat.app.notes.data.Note
 import com.privatechat.app.notes.data.NotesRepository
 import com.privatechat.app.notes.reminder.ReminderManager
 import com.privatechat.app.notes.security.NotesLockManager
+import com.privatechat.app.notes.util.DocumentScan
+import com.privatechat.app.notes.util.GeminiSummarizer
 import com.privatechat.app.notes.util.QrShare
+import com.privatechat.app.notes.util.TextScanner
 import com.privatechat.app.ui.login.LoginActivity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -146,6 +151,53 @@ class NotesActivity : AppCompatActivity() {
         )
     }
 
+    /**
+     * Scan text — the same flow as Scan QR, one tap in the drawer:
+     * the document scanner (camera or gallery) captures the page,
+     * OCR reads the text out of the photo, and a new note opens
+     * with that text and an auto title. No PDF, no gibberish.
+     */
+    private val scanTextLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+        val pageUris = DocumentScan.pageUrisFromResult(result.data)
+        if (pageUris.isEmpty()) {
+            Toast.makeText(this, getString(R.string.notes_scan_failed), Toast.LENGTH_SHORT).show()
+            return@registerForActivityResult
+        }
+        scanPagesToNote(pageUris)
+    }
+
+    private fun scanPagesToNote(pageUris: List<android.net.Uri>) {
+        val progress = AlertDialog.Builder(this)
+            .setMessage(getString(R.string.notes_scan_reading))
+            .setCancelable(false)
+            .create()
+        progress.show()
+        lifecycleScope.launch {
+            val scanned = withContext(Dispatchers.IO) {
+                TextScanner.recognizeUris(this@NotesActivity, pageUris)
+            }
+            progress.dismiss()
+            scanned.onSuccess { text ->
+                val title = GeminiSummarizer.smartTitle(this@NotesActivity, text.plainText)
+                openEditorWithTemplate(title, text.markdownText)
+                Toast.makeText(
+                    this@NotesActivity,
+                    getString(R.string.notes_scan_text_saved),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }.onFailure {
+                Toast.makeText(
+                    this@NotesActivity,
+                    getString(R.string.notes_scan_no_text),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Register the QR scanner here (not as a property initializer):
@@ -168,6 +220,7 @@ class NotesActivity : AppCompatActivity() {
                 qrScanLauncher.launch(
                     ScanOptions()
                         .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                        .setOrientationLocked(false)
                         .setPrompt(getString(R.string.notes_qr_scan))
                 )
                 return@registerForActivityResult
@@ -376,8 +429,19 @@ class NotesActivity : AppCompatActivity() {
                     qrScanLauncher.launch(
                         ScanOptions()
                             .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                            .setOrientationLocked(false)
                             .setPrompt(getString(R.string.notes_qr_scan))
                     )
+                    true
+                }
+                R.id.nav_scan_text -> {
+                    DocumentScan.launch(
+                        this,
+                        DocumentScan.createScanner(this),
+                        scanTextLauncher
+                    ) {
+                        Toast.makeText(this, getString(R.string.notes_scan_failed), Toast.LENGTH_SHORT).show()
+                    }
                     true
                 }
                 R.id.nav_open_pdf -> { openPdfLauncher.launch(arrayOf("application/pdf")); true }

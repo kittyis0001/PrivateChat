@@ -11,10 +11,13 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.privatechat.app.R
+import com.privatechat.app.notes.util.GeminiSummarizer
 import com.privatechat.app.notes.util.PdfTextExtractor
+import com.privatechat.app.notes.util.TextScanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -83,12 +86,38 @@ class PdfViewerActivity : AppCompatActivity() {
             getString(R.string.notes_pdf_page_of, index + 1, pageCount)
     }
 
+    /**
+     * Pulls the PDF's text into a new note. Embedded text first
+     * (exact, when the PDF has any); for a scanned, image-only PDF
+     * the extractor now honestly returns "" instead of binary
+     * gibberish, so this falls back to OCR: each page is rendered
+     * and read, and the recognised text becomes the note. The title
+     * is an AI/local auto title from the text — never the raw file
+     * name (that is how "911018545234675.pdf" became a note title).
+     */
     private fun extractToNote() {
         val uri = pdfUri ?: return
+        val progress = AlertDialog.Builder(this)
+            .setMessage(getString(R.string.notes_scan_reading))
+            .setCancelable(false)
+            .create()
+        progress.show()
         lifecycleScope.launch {
-            val text = withContext(Dispatchers.IO) {
+            var text = withContext(Dispatchers.IO) {
                 PdfTextExtractor.extractText(this@PdfViewerActivity, uri)
             }
+            var markdown: String? = null
+            if (text.isBlank()) {
+                // Image-only PDF: OCR the rendered pages instead.
+                // The progress dialog is modal, so no page button can
+                // touch the renderer while this runs on IO.
+                val ocr = withContext(Dispatchers.IO) { ocrPdfPages() }
+                ocr.onSuccess {
+                    text = it.plainText
+                    markdown = it.markdownText
+                }
+            }
+            progress.dismiss()
             if (text.isBlank()) {
                 Toast.makeText(
                     this@PdfViewerActivity,
@@ -96,14 +125,44 @@ class PdfViewerActivity : AppCompatActivity() {
                 ).show()
                 return@launch
             }
+            val title = GeminiSummarizer.smartTitle(this@PdfViewerActivity, text)
+                .ifBlank {
+                    uri.lastPathSegment
+                        ?.substringBeforeLast(".")
+                        ?.ifBlank { null } ?: "PDF"
+                }
             val intent = Intent(this@PdfViewerActivity, NoteEditorActivity::class.java)
-                .putExtra(
-                    NoteEditorActivity.EXTRA_TEMPLATE_TITLE,
-                    uri.lastPathSegment ?: "PDF"
-                )
-                .putExtra(NoteEditorActivity.EXTRA_TEMPLATE_CONTENT, text)
+                .putExtra(NoteEditorActivity.EXTRA_TEMPLATE_TITLE, title)
+                .putExtra(NoteEditorActivity.EXTRA_TEMPLATE_CONTENT, markdown ?: text)
             startActivity(intent)
             finish()
+        }
+    }
+
+    /** Renders every page and OCRs it; failure when nothing is readable. */
+    private suspend fun ocrPdfPages(): Result<TextScanner.ScannedText> {
+        val r = renderer ?: return Result.failure(IllegalStateException("no renderer"))
+        return try {
+            val parts = mutableListOf<TextScanner.ScannedText>()
+            for (index in 0 until pageCount) {
+                r.openPage(index).use { page ->
+                    val bitmap = Bitmap.createBitmap(
+                        page.width * 2, page.height * 2, Bitmap.Config.ARGB_8888
+                    )
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    try {
+                        TextScanner.recognizeBitmap(bitmap).onSuccess { parts.add(it) }
+                    } finally {
+                        bitmap.recycle()
+                    }
+                }
+            }
+            val plain = parts.joinToString("\n\n") { it.plainText }.trim()
+            val markdown = parts.joinToString("\n\n") { it.markdownText }.trim()
+            if (plain.isBlank()) Result.failure(IllegalStateException("NO_TEXT"))
+            else Result.success(TextScanner.ScannedText(plain, markdown))
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
