@@ -15,10 +15,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v2 adds per-note color/checklist/reminder columns plus photo and
  * checklist-item tables. The migration is purely additive — no
  * existing row, column, or user note is touched or dropped.
+ * v3 adds a reminderRepeat column plus habit and voice-note tables.
  */
 @Database(
-    entities = [Note::class, Category::class, StickyNote::class, NoteImage::class, ChecklistItem::class],
-    version = 2,
+    entities = [Note::class, Category::class, StickyNote::class, NoteImage::class, ChecklistItem::class, Habit::class, HabitTick::class, VoiceNote::class],
+    version = 3,
     exportSchema = false
 )
 abstract class NotesDatabase : RoomDatabase() {
@@ -26,6 +27,8 @@ abstract class NotesDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun stickyDao(): StickyDao
     abstract fun noteExtrasDao(): NoteExtrasDao
+    abstract fun habitDao(): HabitDao
+    abstract fun voiceNoteDao(): VoiceNoteDao
 
     companion object {
         @Volatile
@@ -55,13 +58,48 @@ abstract class NotesDatabase : RoomDatabase() {
             }
         }
 
+        /** Additive v2 -> v3 migration (new tables + one new column). */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notes ADD COLUMN reminderRepeat TEXT NOT NULL DEFAULT 'NONE'")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS habits (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "name TEXT NOT NULL, " +
+                        "color TEXT NOT NULL, " +
+                        "targetPerDay INTEGER NOT NULL, " +
+                        "createdAt INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS habit_ticks (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "habitId INTEGER NOT NULL, " +
+                        "dayStartMs INTEGER NOT NULL, " +
+                        "done INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_habit_ticks_habitId_dayStartMs " +
+                        "ON habit_ticks (habitId, dayStartMs)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS voice_notes (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "noteId INTEGER NOT NULL, " +
+                        "fileName TEXT NOT NULL, " +
+                        "durationMs INTEGER NOT NULL, " +
+                        "transcript TEXT NOT NULL, " +
+                        "createdAt INTEGER NOT NULL)"
+                )
+            }
+        }
+
         fun get(context: Context): NotesDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     NotesDatabase::class.java,
                     "kitty_notes.db"
-                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
             }
         }
     }

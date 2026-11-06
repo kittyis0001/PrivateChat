@@ -29,5 +29,9 @@ data class Note(
     @ColumnInfo(defaultValue = "0")
     val isChecklist: Boolean = false,
     /** One-shot reminder time (epoch millis), null = no reminder. */
-    val reminderAt: Long? = null
+    val reminderAt: Long? = null,
+    // Added in kitty_notes.db v3 (additive; default keeps old rows valid):
+    /** Reminder repeat: "NONE", "DAILY" or "WEEKLY". */
+    @ColumnInfo(defaultValue = "'NONE'")
+    val reminderRepeat: String = "NONE"
 )

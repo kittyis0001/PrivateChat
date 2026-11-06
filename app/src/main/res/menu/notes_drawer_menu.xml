@@ -19,4 +19,10 @@
         <item android:id="@+id/nav_archive" android:icon="@drawable/ic_drv_archive" android:title="@string/notes_archive_title" />
         <item android:id="@+id/nav_trash" android:icon="@drawable/ic_drv_trash" android:title="@string/notes_trash_title" />
     </group>
+    <group android:checkableBehavior="none">
+        <item android:id="@+id/nav_habit" android:icon="@drawable/ic_menu_check_circle" android:title="@string/notes_habit_title" />
+        <item android:id="@+id/nav_qr_scan" android:icon="@drawable/ic_camera" android:title="@string/notes_qr_scan" />
+        <item android:id="@+id/nav_open_pdf" android:icon="@drawable/ic_menu_edit" android:title="@string/notes_pdf_viewer" />
+        <item android:id="@+id/nav_backup_now" android:icon="@drawable/ic_drv_backup" android:title="@string/notes_backup_now" />
+    </group>
 </menu>

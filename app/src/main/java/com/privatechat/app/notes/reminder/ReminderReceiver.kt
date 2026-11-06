@@ -17,7 +17,8 @@ import kotlinx.coroutines.launch
 
 /**
  * Fires a note reminder. Shows a notification on the dedicated Notes
- * reminders channel, then clears the one-shot reminder in the DB.
+ * reminders channel, then clears a one-shot reminder in the DB.
+ * Repeating reminders are moved to their next fire time instead.
  * If the Notes lock is on, tapping opens the locked Notes home
  * instead of the note, so a reminder never bypasses the lock.
  */
@@ -33,9 +34,21 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 val repo = NotesRepository(context)
                 val note = repo.getNote(noteId)
-                // One-shot: clear regardless of what happens below, so
-                // a fired reminder never repeats on the next reschedule.
-                repo.clearReminder(noteId)
+                if (note != null && note.reminderRepeat != "NONE" && note.reminderAt != null) {
+                    // Repeating reminder: move it to the next fire time
+                    // and re-arm the alarm instead of clearing it.
+                    val next = ReminderManager.nextTrigger(note.reminderAt, note.reminderRepeat)
+                    if (next != null) {
+                        repo.setReminderAt(noteId, next)
+                        ReminderManager.schedule(context, note.copy(reminderAt = next))
+                    } else {
+                        repo.clearReminder(noteId)
+                    }
+                } else {
+                    // One-shot: clear regardless of what happens below, so
+                    // a fired reminder never repeats on the next reschedule.
+                    repo.clearReminder(noteId)
+                }
                 if (note != null && note.deletedAt == null && !note.archived) {
                     showNotification(context, note.id, note.title, note.content)
                 }

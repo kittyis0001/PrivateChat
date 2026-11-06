@@ -19,6 +19,8 @@ class NotesRepository(context: Context) {
     private val categories = db.categoryDao()
     private val stickies = db.stickyDao()
     private val extras = db.noteExtrasDao()
+    private val habits = db.habitDao()
+    private val voice = db.voiceNoteDao()
 
     companion object {
         val DEFAULT_CATEGORIES = listOf("Personal", "Study", "Work", "Shopping List", "Important")
@@ -120,6 +122,7 @@ class NotesRepository(context: Context) {
                 archived = false,
                 deletedAt = null,
                 reminderAt = null,
+                reminderRepeat = "NONE",
                 createdAt = now,
                 updatedAt = now
             )
@@ -167,13 +170,17 @@ class NotesRepository(context: Context) {
         old.size
     }
 
-    /** Removes photo files/rows and checklist rows belonging to a note. */
+    /** Removes photo/voice files and checklist rows belonging to a note. */
     private suspend fun deleteNoteArtifacts(noteId: Long) {
         extras.imagesFor(noteId).forEach { image ->
             NoteImageStore.file(appContext, image.fileName).delete()
         }
         extras.deleteImagesFor(noteId)
         extras.deleteItemsFor(noteId)
+        voice.allForNote(noteId).forEach { v ->
+            File(File(appContext.filesDir, "voice_notes"), v.fileName).delete()
+        }
+        voice.deleteForNote(noteId)
     }
 
     // ---- categories ----
@@ -223,5 +230,51 @@ class NotesRepository(context: Context) {
 
     suspend fun importCategory(category: Category) = withContext(Dispatchers.IO) {
         categories.insert(category.copy(id = 0))
+    }
+
+    // ---- v3: habits / voice notes / repeating reminders ----
+
+    /** Moves a repeating reminder to its next fire time (updatedAt untouched). */
+    suspend fun setReminderAt(noteId: Long, at: Long) = withContext(Dispatchers.IO) {
+        notes.setReminderAt(noteId, at)
+    }
+
+    fun observeHabits(): Flow<List<Habit>> = habits.observeAll()
+
+    suspend fun saveHabit(habit: Habit): Long = withContext(Dispatchers.IO) {
+        if (habit.id == 0L) habits.insert(habit)
+        else { habits.update(habit); habit.id }
+    }
+
+    suspend fun deleteHabit(habit: Habit) = withContext(Dispatchers.IO) {
+        habits.deleteTicksForHabit(habit.id)
+        habits.delete(habit)
+    }
+
+    fun observeTicks(habitId: Long): Flow<List<HabitTick>> = habits.observeTicks(habitId)
+
+    /** Toggles today's tick; returns the new done state. */
+    suspend fun toggleTick(habitId: Long, dayStartMs: Long): Boolean = withContext(Dispatchers.IO) {
+        val existing = habits.tickForDay(habitId, dayStartMs)
+        if (existing == null) {
+            habits.insertTick(HabitTick(habitId = habitId, dayStartMs = dayStartMs, done = true))
+            true
+        } else {
+            habits.deleteTick(habitId, dayStartMs)
+            false
+        }
+    }
+
+    fun observeVoiceNotes(noteId: Long): Flow<List<VoiceNote>> = voice.observeForNote(noteId)
+
+    suspend fun addVoiceNote(v: VoiceNote): Long = withContext(Dispatchers.IO) { voice.insert(v) }
+
+    suspend fun deleteVoiceNote(v: VoiceNote) = withContext(Dispatchers.IO) {
+        File(File(appContext.filesDir, "voice_notes"), v.fileName).delete()
+        voice.delete(v)
+    }
+
+    suspend fun updateVoiceTranscript(id: Long, transcript: String) = withContext(Dispatchers.IO) {
+        voice.updateTranscript(id, transcript)
     }
 }
