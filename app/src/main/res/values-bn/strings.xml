@@ -77,6 +77,7 @@
     <string name="notes_ai_write">AI দিয়ে লেখো</string>
     <string name="notes_ai_write_hint">এক লাইনে আইডিয়া লেখো, যেমন: জন্মদিনের প্ল্যান</string>
     <string name="notes_ai_write_done">AI নোট তৈরি</string>
+    <string name="notes_ai_writing">AI লিখছে</string>
     <string name="notes_ai_category">AI ক্যাটাগরি</string>
     <string name="notes_ai_category_title">AI ক্যাটাগরি ও ট্যাগ</string>
     <string name="notes_ai_category_applied">ক্যাটাগরি বসানো হয়েছে</string>
