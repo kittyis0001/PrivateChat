@@ -384,6 +384,13 @@ class NotesActivity : AppCompatActivity() {
         val error = findViewById<TextView>(R.id.lockError)
         findViewById<View>(R.id.lockUnlockButton).setOnClickListener {
             val pw = input.text.toString()
+            if (pw.isEmpty()) {
+                // Empty input never reaches PBKDF2: Android rejects an
+                // empty password with an exception, and there is nothing
+                // to check — show the error right away.
+                error.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
             // PBKDF2 hashing takes ~100-300ms: keep the tap responsive by
             // verifying off the UI thread, then applying the same UI result.
             // The loading dialog shows while it verifies, so the button

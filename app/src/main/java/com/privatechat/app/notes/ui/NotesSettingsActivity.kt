@@ -254,6 +254,12 @@ class NotesSettingsActivity : AppCompatActivity() {
                 .setTitle(getString(R.string.notes_lock_manage_title))
                 .setView(container)
                 .setPositiveButton(getString(R.string.notes_lock_disable)) { _, _ ->
+                    if (current.text.toString().isEmpty()) {
+                        // Empty input never reaches PBKDF2: Android rejects
+                        // an empty password with an exception.
+                        Toast.makeText(this@NotesSettingsActivity, getString(R.string.notes_lock_wrong), Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
                     val progress = LoadingDialog.show(this@NotesSettingsActivity)
                     lifecycleScope.launch {
                         if (NotesLockManager.verify(this@NotesSettingsActivity, current.text.toString())) {

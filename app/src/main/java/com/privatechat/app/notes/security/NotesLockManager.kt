@@ -75,16 +75,25 @@ object NotesLockManager {
         unlockedThisProcess = false
     }
 
-    /** 120k PBKDF2 iterations take ~100-300ms: always run off the UI thread. */
+    /**
+     * 120k PBKDF2 iterations take ~100-300ms: always run off the UI thread.
+     * Never throws: a failed check returns false (fail closed). An empty
+     * password is rejected up front — Android's PBEKeySpec throws
+     * IllegalArgumentException for an empty password, which used to
+     * crash the app on a wrong/empty OK tap.
+     */
     suspend fun verify(context: Context, password: String): Boolean = withContext(Dispatchers.IO) {
-        val p = prefs(context)
-        val hashB64 = p.getString(KEY_HASH, null) ?: return@withContext false
-        val saltB64 = p.getString(KEY_SALT, null) ?: return@withContext false
-        val expected = Base64.decode(hashB64, Base64.NO_WRAP)
-        val actual = hash(password, Base64.decode(saltB64, Base64.NO_WRAP))
-        val ok = expected.contentEquals(actual)
-        if (ok) unlockedThisProcess = true
-        ok
+        if (password.isEmpty()) return@withContext false
+        runCatching {
+            val p = prefs(context)
+            val hashB64 = p.getString(KEY_HASH, null) ?: return@runCatching false
+            val saltB64 = p.getString(KEY_SALT, null) ?: return@runCatching false
+            val expected = Base64.decode(hashB64, Base64.NO_WRAP)
+            val actual = hash(password, Base64.decode(saltB64, Base64.NO_WRAP))
+            val ok = expected.contentEquals(actual)
+            if (ok) unlockedThisProcess = true
+            ok
+        }.getOrDefault(false)
     }
 
     private fun hash(password: String, salt: ByteArray): ByteArray {
