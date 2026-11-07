@@ -146,6 +146,13 @@ object NoteLockAuth {
         dialog.show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
             val pw = password.text.toString()
+            if (pw.isEmpty()) {
+                // Empty input never reaches PBKDF2: Android rejects an
+                // empty password with an exception — show the error instead.
+                error.text = activity.getString(R.string.notes_lock_wrong_password)
+                error.visibility = View.VISIBLE
+                return@setOnClickListener
+            }
             val progress = LoadingDialog.show(activity)
             activity.lifecycleScope.launch {
                 if (NotesLockManager.verify(activity, pw)) {
