@@ -1,14 +1,19 @@
 package com.privatechat.app.notes.ui
 
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.PopupMenu
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -816,30 +821,137 @@ class NotesActivity : AppCompatActivity() {
     /**
      * Write with AI: one line of idea in, a whole note out. The
      * generated title + body open in the editor — nothing is saved
-     * silently, and the note is written in the language the user
-     * last chose for AI summary (Bengali by default).
+     * silently. The language choice sits in the button row, right
+     * of Cancel (last used language pre-selected and remembered
+     * for next time, like AI summary).
      */
     private fun promptAiWrite() {
+        val dp = resources.displayMetrics.density
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 16)
+        }
         val input = EditText(this).apply {
             hint = getString(R.string.notes_ai_write_hint)
-            setPadding(48, 32, 48, 32)
         }
-        AlertDialog.Builder(this)
+        // Button row: Cancel | বাংলা/English | OK.
+        val buttonRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, (24 * dp).toInt(), 0, 0)
+        }
+        val styled = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+        // Two separate instances: one shared drawable would carry the
+        // pressed state from one button to the other.
+        val cancelRipple = styled.getDrawable(0)
+        val okRipple = styled.getDrawable(0)
+        styled.recycle()
+        val primary = ContextCompat.getColor(this, R.color.primary)
+        val buttonPaddingH = (16 * dp).toInt()
+        val buttonPaddingV = (12 * dp).toInt()
+        val cancel = TextView(this).apply {
+            text = getString(android.R.string.cancel)
+            setTextColor(primary)
+            textSize = 15f
+            setPadding(buttonPaddingH, buttonPaddingV, buttonPaddingH, buttonPaddingV)
+            background = cancelRipple
+        }
+        val langs = RadioGroup(this).apply {
+            orientation = RadioGroup.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val bnButton = RadioButton(this).apply {
+            id = View.generateViewId()
+            text = "বাংলা"
+        }
+        val enButton = RadioButton(this).apply {
+            id = View.generateViewId()
+            text = "English"
+        }
+        langs.addView(bnButton)
+        langs.addView(enButton)
+        langs.check(if (GeminiSummarizer.getSummaryLang(this) == "en") enButton.id else bnButton.id)
+        val ok = TextView(this).apply {
+            text = getString(android.R.string.ok)
+            setTextColor(primary)
+            textSize = 15f
+            setPadding(buttonPaddingH, buttonPaddingV, buttonPaddingH, buttonPaddingV)
+            background = okRipple
+        }
+        buttonRow.addView(cancel)
+        buttonRow.addView(langs)
+        buttonRow.addView(ok)
+        container.addView(input)
+        container.addView(buttonRow)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(getString(R.string.notes_ai_write))
-            .setView(input)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val idea = input.text.toString().trim()
-                if (idea.isBlank()) {
-                    Toast.makeText(this, getString(R.string.notes_ai_too_short), Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                runAiWrite(idea)
+            .setView(container)
+            .create()
+        cancel.setOnClickListener { dialog.dismiss() }
+        ok.setOnClickListener {
+            val idea = input.text.toString().trim()
+            if (idea.isBlank()) {
+                Toast.makeText(this, getString(R.string.notes_ai_too_short), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            val lang = if (langs.checkedRadioButtonId == enButton.id) "en" else "bn"
+            GeminiSummarizer.saveSummaryLang(this, lang)
+            dialog.dismiss()
+            runAiWrite(idea, lang)
+        }
+        dialog.show()
     }
 
-    private fun runAiWrite(idea: String) {
+    /**
+     * AI loading dialog: a pulsing ✨ and an "AI লিখছে..." label whose
+     * dots cycle while Gemini writes. The animation stops itself when
+     * the dialog is dismissed, so nothing keeps running afterwards.
+     */
+    private fun showAiLoadingDialog(): AlertDialog {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(48, 40, 48, 40)
+        }
+        val sparkle = TextView(this).apply {
+            text = "✨"
+            textSize = 36f
+            gravity = Gravity.CENTER
+        }
+        val label = TextView(this).apply {
+            text = getString(R.string.notes_ai_writing)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(0, (16 * resources.displayMetrics.density).toInt(), 0, 0)
+        }
+        container.addView(sparkle)
+        container.addView(label)
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_ai_write))
+            .setView(container)
+            .setCancelable(false)
+            .create()
+        val pulse = ObjectAnimator.ofFloat(sparkle, "alpha", 1f, 0.25f, 1f).apply {
+            duration = 1200
+            repeatCount = ObjectAnimator.INFINITE
+        }
+        val dots = arrayOf("", ".", "..", "...")
+        var dotIndex = 0
+        val handler = Handler(Looper.getMainLooper())
+        val dotTask = object : Runnable {
+            override fun run() {
+                label.text = getString(R.string.notes_ai_writing) + dots[dotIndex % dots.size]
+                dotIndex++
+                handler.postDelayed(this, 400)
+            }
+        }
+        dialog.setOnShowListener { pulse.start(); handler.post(dotTask) }
+        dialog.setOnDismissListener { pulse.cancel(); handler.removeCallbacks(dotTask) }
+        return dialog
+    }
+
+    private fun runAiWrite(idea: String, lang: String) {
         if (GeminiSummarizer.getApiKey(this) == null) {
             AlertDialog.Builder(this)
                 .setTitle(getString(R.string.notes_ai_write))
@@ -851,15 +963,11 @@ class NotesActivity : AppCompatActivity() {
                 .show()
             return
         }
-        val loading = AlertDialog.Builder(this)
-            .setTitle(getString(R.string.notes_ai_write))
-            .setMessage("…")
-            .setCancelable(false)
-            .create()
+        val loading = showAiLoadingDialog()
         loading.show()
         lifecycleScope.launch {
             val result = GeminiSummarizer.writeFromIdea(
-                this@NotesActivity, idea, GeminiSummarizer.getSummaryLang(this@NotesActivity)
+                this@NotesActivity, idea, lang
             )
             loading.dismiss()
             result.onSuccess { (title, body) ->

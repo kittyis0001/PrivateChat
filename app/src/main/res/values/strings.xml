@@ -251,6 +251,7 @@ Remember:</string>
     <string name="notes_ai_write">Write with AI</string>
     <string name="notes_ai_write_hint">One-line idea, e.g. birthday plan</string>
     <string name="notes_ai_write_done">AI note is ready</string>
+    <string name="notes_ai_writing">AI is writing</string>
     <string name="notes_ai_category">AI category</string>
     <string name="notes_ai_category_title">AI category &amp; tags</string>
     <string name="notes_ai_category_applied">Category set</string>
