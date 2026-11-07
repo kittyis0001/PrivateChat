@@ -434,6 +434,15 @@
                     android:textSize="13sp"
                     android:textColor="@color/primary"
                     android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorCountdown"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_countdown"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
             </LinearLayout>
 
             <LinearLayout

@@ -55,9 +55,11 @@ import com.privatechat.app.notes.data.NotesRepository
 import com.privatechat.app.notes.data.VoiceNote
 import com.privatechat.app.notes.reminder.ReminderManager
 import com.privatechat.app.notes.security.NoteLockAuth
+import com.privatechat.app.notes.util.Countdown
 import com.privatechat.app.notes.util.DocumentScan
 import com.privatechat.app.notes.util.GeminiSummarizer
 import com.privatechat.app.notes.util.LinkPreviewFetcher
+import com.privatechat.app.notes.util.LoadingDialog
 import com.privatechat.app.notes.util.NoteImageShare
 import com.privatechat.app.notes.util.NoteSmart
 import com.privatechat.app.notes.util.PdfExporter
@@ -137,6 +139,8 @@ class NoteEditorActivity : AppCompatActivity() {
     private var noteLocked: Boolean = false
     /** Self-destruct time (epoch millis), null = never expires. */
     private var noteExpiresAt: Long? = null
+    /** Countdown target date (epoch millis, local midnight), null = no countdown. */
+    private var noteCountdownAt: Long? = null
     /** Read aloud (TextToSpeech). */
     private var tts: TextToSpeech? = null
     private var ttsReady: Boolean = false
@@ -348,6 +352,7 @@ class NoteEditorActivity : AppCompatActivity() {
         findViewById<View>(R.id.editorFont).setOnClickListener { showFontDialog() }
         findViewById<View>(R.id.editorLock).setOnClickListener { toggleNoteLock() }
         findViewById<View>(R.id.editorSelfDestruct).setOnClickListener { showSelfDestructDialog() }
+        findViewById<View>(R.id.editorCountdown).setOnClickListener { showCountdownDialog() }
         imagesAdapter = EditorImagesAdapter(
             onRemove = { image ->
                 lifecycleScope.launch { repo.removeImage(image) }
@@ -376,8 +381,10 @@ class NoteEditorActivity : AppCompatActivity() {
                     currentTags = n.tags
                     noteLocked = n.locked
                     noteExpiresAt = n.expiresAt
+                    noteCountdownAt = n.countdownAt
                     updateLockLabel()
                     updateSelfDestructLabel()
+                    updateCountdownLabel()
                     bindCategorySpinner(n.categoryId)
                     metaText.text = getString(R.string.notes_last_edited, DATE_FMT.format(Date(n.updatedAt)))
                     if (n.isChecklist) {
@@ -499,7 +506,8 @@ class NoteEditorActivity : AppCompatActivity() {
             reminderRepeat = reminderRepeat,
             tags = currentTags,
             locked = noteLocked,
-            expiresAt = noteExpiresAt
+            expiresAt = noteExpiresAt,
+            countdownAt = noteCountdownAt
         )
         noteId = repo.saveNote(note)
         if (checklistMode) {
@@ -595,6 +603,7 @@ class NoteEditorActivity : AppCompatActivity() {
     private fun updateReadAloudLabel() {
         findViewById<TextView>(R.id.editorReadAloud).text =
             getString(if (readingAloud) R.string.notes_read_stop else R.string.notes_read_aloud)
+        refreshToolStates()
     }
 
     // ---------------- study pack: font ----------------
@@ -670,6 +679,7 @@ class NoteEditorActivity : AppCompatActivity() {
     private fun updateLockLabel() {
         findViewById<TextView>(R.id.editorLock).text =
             getString(if (noteLocked) R.string.notes_unlock_note else R.string.notes_lock_note)
+        refreshToolStates()
     }
 
     /** Lock/unlock this note. Locking needs a Notes password (created here if none exists). */
@@ -703,6 +713,85 @@ class NoteEditorActivity : AppCompatActivity() {
                 else getString(R.string.notes_self_destruct_today)
             }
         }
+        refreshToolStates()
+    }
+
+    // ---------------- countdown note ----------------
+
+    private fun updateCountdownLabel() {
+        val label = findViewById<TextView>(R.id.editorCountdown)
+        val at = noteCountdownAt
+        label.text = when {
+            at == null -> getString(R.string.notes_countdown)
+            else -> {
+                val days = Countdown.daysUntil(at)
+                when {
+                    days > 0 -> getString(R.string.notes_countdown_days_left, days)
+                    days == 0 -> getString(R.string.notes_countdown_today)
+                    else -> getString(R.string.notes_countdown_days_ago, -days)
+                }
+            }
+        }
+        refreshToolStates()
+    }
+
+    /** Countdown: pick a target date; the card counts the days left. No alarm, no deletion. */
+    private fun showCountdownDialog() {
+        ensureSavedNote {
+            val cal = java.util.Calendar.getInstance()
+            noteCountdownAt?.let { cal.timeInMillis = it }
+            val dialog = DatePickerDialog(
+                this,
+                { _, year, month, day ->
+                    val picked = java.util.Calendar.getInstance().apply {
+                        set(year, month, day, 0, 0, 0)
+                        set(java.util.Calendar.MILLISECOND, 0)
+                    }.timeInMillis
+                    noteCountdownAt = picked
+                    updateCountdownLabel()
+                    scheduleSave()
+                },
+                cal.get(java.util.Calendar.YEAR),
+                cal.get(java.util.Calendar.MONTH),
+                cal.get(java.util.Calendar.DAY_OF_MONTH)
+            )
+            dialog.datePicker.minDate = Countdown.startOfDay(System.currentTimeMillis())
+            dialog.setTitle(getString(R.string.notes_countdown_title))
+            dialog.setButton(
+                android.content.DialogInterface.BUTTON_NEUTRAL,
+                getString(R.string.notes_self_destruct_off)
+            ) { _, _ ->
+                noteCountdownAt = null
+                updateCountdownLabel()
+                scheduleSave()
+            }
+            dialog.show()
+        }
+    }
+
+    /**
+     * Selected-state tint: a tool that is ON right now shows red text,
+     * everything else keeps the normal purple. Tap again to turn it off.
+     * One-tap tools (Add photo, Scan document, Save PDF…) open something
+     * immediately, so they have no ON state to show.
+     */
+    private fun refreshToolStates() {
+        val red = ContextCompat.getColor(this, R.color.kittyError)
+        val normal = ContextCompat.getColor(this, R.color.primary)
+        findViewById<TextView>(R.id.editorChecklistToggle)
+            .setTextColor(if (checklistMode) red else normal)
+        findViewById<TextView>(R.id.editorVoice)
+            .setTextColor(if (voiceRecorder != null) red else normal)
+        findViewById<TextView>(R.id.editorReadAloud)
+            .setTextColor(if (readingAloud) red else normal)
+        findViewById<TextView>(R.id.editorReminderSet)
+            .setTextColor(if (reminderAt != null) red else normal)
+        findViewById<TextView>(R.id.editorCountdown)
+            .setTextColor(if (noteCountdownAt != null) red else normal)
+        findViewById<TextView>(R.id.editorSelfDestruct)
+            .setTextColor(if (noteExpiresAt != null) red else normal)
+        findViewById<TextView>(R.id.editorLock)
+            .setTextColor(if (noteLocked) red else normal)
     }
 
     /** Self-destruct: 7 / 30 / 90 days, or off. Expired notes go to Trash, never deleted outright. */
@@ -845,6 +934,7 @@ class NoteEditorActivity : AppCompatActivity() {
 
     private fun updateChecklistToggleLabel() {
         checklistToggle.text = (if (checklistMode) "☑ " else "☐ ") + getString(R.string.notes_checklist)
+        refreshToolStates()
     }
 
     private fun setChecklistMode(on: Boolean) {
@@ -946,6 +1036,7 @@ class NoteEditorActivity : AppCompatActivity() {
             base + repeat
         } ?: getString(R.string.notes_reminder_none)
         reminderClear.visibility = if (reminderAt != null) View.VISIBLE else View.GONE
+        refreshToolStates()
     }
 
     private fun startReminderFlow() {
@@ -1355,12 +1446,14 @@ class NoteEditorActivity : AppCompatActivity() {
         bar.addView(save)
         bar.addView(discard)
         bar.visibility = View.VISIBLE
+        refreshToolStates()
     }
 
     private fun hideVoiceRecBar() {
         findViewById<LinearLayout>(R.id.editorVoiceRecBar).visibility = View.GONE
         voiceTimerView = null
         voicePauseView = null
+        refreshToolStates()
     }
 
     /**
@@ -1776,6 +1869,7 @@ class NoteEditorActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.notes_nothing_to_share), Toast.LENGTH_SHORT).show()
             return
         }
+        val progress = LoadingDialog.show(this)
         lifecycleScope.launch {
             val result = NoteImageShare.saveNoteImageToGallery(
                 this@NoteEditorActivity,
@@ -1783,6 +1877,7 @@ class NoteEditorActivity : AppCompatActivity() {
                 currentBodyText(),
                 noteColor
             )
+            progress.dismiss()
             result.onSuccess { name ->
                 Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_image_saved, name), Toast.LENGTH_SHORT).show()
             }.onFailure {
@@ -1797,6 +1892,7 @@ class NoteEditorActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.notes_nothing_to_share), Toast.LENGTH_SHORT).show()
             return
         }
+        val progress = LoadingDialog.show(this)
         lifecycleScope.launch {
             runCatching {
                 val uri = NoteImageShare.shareNoteAsImage(
@@ -1812,18 +1908,24 @@ class NoteEditorActivity : AppCompatActivity() {
                 }
                 startActivity(Intent.createChooser(intent, getString(R.string.notes_share_note)))
             }.onFailure {
+                progress.dismiss()
                 Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_export_failed), Toast.LENGTH_SHORT).show()
             }
+            // Success path opens the share sheet above; dismiss here so
+            // the dialog never lingers behind the chooser.
+            if (progress.isShowing) progress.dismiss()
         }
     }
 
     private fun savePdfToDownloads() {
+        val progress = LoadingDialog.show(this)
         lifecycleScope.launch {
             val result = PdfExporter.saveToDownloads(
                 this@NoteEditorActivity,
                 titleInput.text.toString().trim(),
                 currentBodyText()
             )
+            progress.dismiss()
             result.onSuccess { (name, uri) ->
                 AlertDialog.Builder(this@NoteEditorActivity)
                     .setTitle(getString(R.string.notes_pdf_saved_title))

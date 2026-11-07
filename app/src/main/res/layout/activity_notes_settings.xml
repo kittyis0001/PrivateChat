@@ -181,7 +181,7 @@
             <LinearLayout style="@style/NotesCard">
 
                 <LinearLayout android:id="@+id/rowNotesLock" style="@style/NotesRow">
-                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_lock_password_label" />
+                    <TextView style="@style/NotesRowLabel" android:text="@string/notes_app_lock_label" />
                     <TextView android:id="@+id/notesLockValue" style="@style/NotesRowValue" />
                 </LinearLayout>
             </LinearLayout>

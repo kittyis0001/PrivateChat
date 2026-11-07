@@ -18,10 +18,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v3 adds a reminderRepeat column plus habit and voice-note tables.
  * v4 adds a tags column.
  * v5 adds locked and expiresAt columns (per-note lock, self-destruct).
+ * v6 adds a countdownAt column (countdown note).
  */
 @Database(
     entities = [Note::class, Category::class, StickyNote::class, NoteImage::class, ChecklistItem::class, Habit::class, HabitTick::class, VoiceNote::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class NotesDatabase : RoomDatabase() {
@@ -110,13 +111,20 @@ abstract class NotesDatabase : RoomDatabase() {
             }
         }
 
+        /** Additive v5 -> v6 migration (one new column). */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notes ADD COLUMN countdownAt INTEGER")
+            }
+        }
+
         fun get(context: Context): NotesDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     NotesDatabase::class.java,
                     "kitty_notes.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
             }
         }
     }

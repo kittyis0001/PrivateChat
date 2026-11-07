@@ -66,6 +66,14 @@ class NotesRepository(context: Context) {
         notes.update(note.copy(expiresAt = expiresAt, updatedAt = System.currentTimeMillis()))
     }
 
+    /** Countdown target date (null = no countdown). */
+    suspend fun setCountdownAt(note: Note, countdownAt: Long?) = withContext(Dispatchers.IO) {
+        notes.update(note.copy(countdownAt = countdownAt, updatedAt = System.currentTimeMillis()))
+    }
+
+    /** Locked notes that are not in Trash (they still need the Notes password). */
+    suspend fun countLockedNotes(): Int = withContext(Dispatchers.IO) { notes.countLocked() }
+
     /**
      * Moves notes past their self-destruct time into Trash (recoverable,
      * never a permanent delete — Trash auto-cleans after 30 days).
@@ -150,6 +158,7 @@ class NotesRepository(context: Context) {
                 // A copy starts fresh: unlocked, and never expires.
                 locked = false,
                 expiresAt = null,
+                countdownAt = null,
                 createdAt = now,
                 updatedAt = now
             )

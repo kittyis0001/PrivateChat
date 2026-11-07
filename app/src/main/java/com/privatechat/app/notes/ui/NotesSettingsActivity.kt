@@ -20,6 +20,7 @@ import com.privatechat.app.BuildConfig
 import com.privatechat.app.R
 import com.privatechat.app.data.Session
 import com.privatechat.app.notes.security.NotesLockManager
+import com.privatechat.app.notes.util.LoadingDialog
 
 /**
  * Notes settings. Notes-scoped choices (accent, lock, language) live
@@ -253,12 +254,25 @@ class NotesSettingsActivity : AppCompatActivity() {
                 .setTitle(getString(R.string.notes_lock_manage_title))
                 .setView(container)
                 .setPositiveButton(getString(R.string.notes_lock_disable)) { _, _ ->
+                    val progress = LoadingDialog.show(this@NotesSettingsActivity)
                     lifecycleScope.launch {
                         if (NotesLockManager.verify(this@NotesSettingsActivity, current.text.toString())) {
-                            NotesLockManager.disableLock(this@NotesSettingsActivity)
-                            Toast.makeText(this@NotesSettingsActivity, getString(R.string.notes_lock_disabled), Toast.LENGTH_SHORT).show()
+                            // Turning the app lock off must never strand
+                            // locked notes: the password stays so they can
+                            // still be opened. Only when no note is locked
+                            // is the password removed as well.
+                            val lockedCount = com.privatechat.app.notes.data.NotesRepository(this@NotesSettingsActivity).countLockedNotes()
+                            if (lockedCount > 0) {
+                                NotesLockManager.setAppLockEnabled(this@NotesSettingsActivity, false)
+                                Toast.makeText(this@NotesSettingsActivity, getString(R.string.notes_lock_app_off_kept), Toast.LENGTH_LONG).show()
+                            } else {
+                                NotesLockManager.disableLock(this@NotesSettingsActivity)
+                                Toast.makeText(this@NotesSettingsActivity, getString(R.string.notes_lock_disabled), Toast.LENGTH_SHORT).show()
+                            }
+                            progress.dismiss()
                             refreshLockRow()
                         } else {
+                            progress.dismiss()
                             Toast.makeText(this@NotesSettingsActivity, getString(R.string.notes_lock_wrong), Toast.LENGTH_SHORT).show()
                         }
                     }

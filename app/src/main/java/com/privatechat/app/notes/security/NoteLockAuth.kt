@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.privatechat.app.R
+import com.privatechat.app.notes.util.LoadingDialog
 import kotlinx.coroutines.launch
 
 /**
@@ -41,7 +42,7 @@ object NoteLockAuth {
      * The dialog stays open until the password is valid.
      */
     fun ensurePassword(activity: AppCompatActivity, onReady: () -> Unit) {
-        if (NotesLockManager.isLockEnabled(activity)) {
+        if (NotesLockManager.hasPassword(activity)) {
             onReady()
             return
         }
@@ -69,6 +70,7 @@ object NoteLockAuth {
         container.addView(error)
         val dialog = AlertDialog.Builder(activity)
             .setTitle(activity.getString(R.string.notes_lock_set_password_title))
+            .setMessage(activity.getString(R.string.notes_lock_note_only))
             .setView(container)
             .setPositiveButton(android.R.string.ok, null)
             .setNegativeButton(android.R.string.cancel, null)
@@ -86,10 +88,16 @@ object NoteLockAuth {
                     error.text = activity.getString(R.string.notes_lock_password_mismatch)
                     error.visibility = View.VISIBLE
                 }
-                else -> activity.lifecycleScope.launch {
-                    NotesLockManager.setPassword(activity, pw)
-                    dialog.dismiss()
-                    onReady()
+                else -> {
+                    // Creating a password here locks notes only — the
+                    // whole-app lock stays off (enableAppLock = false).
+                    val progress = LoadingDialog.show(activity)
+                    activity.lifecycleScope.launch {
+                        NotesLockManager.setPassword(activity, pw, enableAppLock = false)
+                        progress.dismiss()
+                        dialog.dismiss()
+                        onReady()
+                    }
                 }
             }
         }
@@ -138,11 +146,14 @@ object NoteLockAuth {
         dialog.show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
             val pw = password.text.toString()
+            val progress = LoadingDialog.show(activity)
             activity.lifecycleScope.launch {
                 if (NotesLockManager.verify(activity, pw)) {
+                    progress.dismiss()
                     dialog.dismiss()
                     onSuccess()
                 } else {
+                    progress.dismiss()
                     error.text = activity.getString(R.string.notes_lock_wrong_password)
                     error.visibility = View.VISIBLE
                     password.text.clear()

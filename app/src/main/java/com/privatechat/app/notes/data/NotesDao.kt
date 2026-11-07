@@ -60,6 +60,10 @@ interface NotesDao {
     @Query("SELECT * FROM notes WHERE expiresAt IS NOT NULL AND expiresAt < :now AND deletedAt IS NULL")
     suspend fun getExpired(now: Long): List<Note>
 
+    /** Locked notes that are not in Trash (they still need the Notes password). */
+    @Query("SELECT COUNT(*) FROM notes WHERE locked = 1 AND deletedAt IS NULL")
+    suspend fun countLocked(): Int
+
     @Insert
     suspend fun insert(note: Note): Long
 
