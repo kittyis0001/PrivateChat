@@ -14,6 +14,8 @@ import android.net.Uri
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -27,6 +29,8 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.Spinner
 import android.widget.Button
 import android.widget.TextView
@@ -50,6 +54,7 @@ import com.privatechat.app.notes.data.NoteImageStore
 import com.privatechat.app.notes.data.NotesRepository
 import com.privatechat.app.notes.data.VoiceNote
 import com.privatechat.app.notes.reminder.ReminderManager
+import com.privatechat.app.notes.security.NoteLockAuth
 import com.privatechat.app.notes.util.DocumentScan
 import com.privatechat.app.notes.util.GeminiSummarizer
 import com.privatechat.app.notes.util.LinkPreviewFetcher
@@ -126,6 +131,16 @@ class NoteEditorActivity : AppCompatActivity() {
     /** AI-suggested tags, comma-separated, "" = none. */
     private var currentTags: String = ""
     private var imagesJob: Job? = null
+
+    // ---- Study pack state ----
+    /** Per-note lock (Notes password / fingerprint). */
+    private var noteLocked: Boolean = false
+    /** Self-destruct time (epoch millis), null = never expires. */
+    private var noteExpiresAt: Long? = null
+    /** Read aloud (TextToSpeech). */
+    private var tts: TextToSpeech? = null
+    private var ttsReady: Boolean = false
+    private var readingAloud: Boolean = false
 
     // ---- Smart pack state ----
     private var voiceRecorder: MediaRecorder? = null
@@ -327,6 +342,12 @@ class NoteEditorActivity : AppCompatActivity() {
         findViewById<View>(R.id.editorSaveImage).setOnClickListener { saveNoteAsImage() }
         findViewById<View>(R.id.editorAutoCategory).setOnClickListener { suggestCategory() }
         findViewById<View>(R.id.editorFixText).setOnClickListener { fixTextWithAi() }
+
+        // ---- Study pack wiring (new controls only) ----
+        findViewById<View>(R.id.editorReadAloud).setOnClickListener { toggleReadAloud() }
+        findViewById<View>(R.id.editorFont).setOnClickListener { showFontDialog() }
+        findViewById<View>(R.id.editorLock).setOnClickListener { toggleNoteLock() }
+        findViewById<View>(R.id.editorSelfDestruct).setOnClickListener { showSelfDestructDialog() }
         imagesAdapter = EditorImagesAdapter(
             onRemove = { image ->
                 lifecycleScope.launch { repo.removeImage(image) }
@@ -353,6 +374,10 @@ class NoteEditorActivity : AppCompatActivity() {
                     reminderAt = n.reminderAt
                     reminderRepeat = n.reminderRepeat
                     currentTags = n.tags
+                    noteLocked = n.locked
+                    noteExpiresAt = n.expiresAt
+                    updateLockLabel()
+                    updateSelfDestructLabel()
                     bindCategorySpinner(n.categoryId)
                     metaText.text = getString(R.string.notes_last_edited, DATE_FMT.format(Date(n.updatedAt)))
                     if (n.isChecklist) {
@@ -376,6 +401,7 @@ class NoteEditorActivity : AppCompatActivity() {
             }
             updateTagsView()
             applyBoldMarkersIfPresent()
+            applyEditorFont()
             buildColorPalette()
             observeImages()
             loaded = true
@@ -471,7 +497,9 @@ class NoteEditorActivity : AppCompatActivity() {
             isChecklist = checklistMode,
             reminderAt = reminderAt,
             reminderRepeat = reminderRepeat,
-            tags = currentTags
+            tags = currentTags,
+            locked = noteLocked,
+            expiresAt = noteExpiresAt
         )
         noteId = repo.saveNote(note)
         if (checklistMode) {
@@ -490,6 +518,240 @@ class NoteEditorActivity : AppCompatActivity() {
                 Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_saved), Toast.LENGTH_SHORT).show()
             }
             checkSmartFeatures()
+        }
+    }
+
+    // ---------------- study pack: read aloud ----------------
+
+    /** Applies the saved editor font (size to the body, family to both fields). */
+    private fun applyEditorFont() {
+        EditorFont.applyTo(this, contentInput, applySize = true)
+        EditorFont.applyTo(this, titleInput, applySize = false)
+    }
+
+    /** The note as speech: title + body, without **bold** markers and checklist glyphs. */
+    private fun buildSpeechText(): String {
+        val title = titleInput.text.toString().trim()
+        val body = currentBodyText()
+            .replace("**", "")
+            .replace("✓ ", "").replace("☐ ", "")
+            .trim()
+        return listOf(title, body).filter { it.isNotBlank() }.joinToString(". ")
+    }
+
+    private fun toggleReadAloud() {
+        if (readingAloud) {
+            stopReading()
+            return
+        }
+        val text = buildSpeechText()
+        if (text.isBlank()) {
+            Toast.makeText(this, getString(R.string.notes_read_nothing), Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (tts == null) {
+            tts = TextToSpeech(this) { status ->
+                ttsReady = status == TextToSpeech.SUCCESS
+                if (ttsReady) startReading(text)
+                else Toast.makeText(this, getString(R.string.notes_read_no_tts), Toast.LENGTH_SHORT).show()
+            }
+        } else if (ttsReady) {
+            startReading(text)
+        }
+    }
+
+    private fun startReading(text: String) {
+        // Bengali text -> Bengali voice, otherwise English. When the
+        // phone has no Bengali voice data installed, say so honestly
+        // instead of reading Bengali in an English voice.
+        // (Bengali Unicode block U+0980..U+09FF, as code points.)
+        val locale = if (text.any { it.code in 0x0980..0x09FF }) Locale("bn") else Locale.ENGLISH
+        val result = tts?.setLanguage(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+        if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+            Toast.makeText(this, getString(R.string.notes_read_lang_missing), Toast.LENGTH_LONG).show()
+            return
+        }
+        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                runOnUiThread { stopReading() }
+            }
+
+            override fun onError(utteranceId: String?) {
+                runOnUiThread { stopReading() }
+            }
+        })
+        readingAloud = true
+        updateReadAloudLabel()
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "kitty_note_read")
+    }
+
+    private fun stopReading() {
+        tts?.stop()
+        readingAloud = false
+        updateReadAloudLabel()
+    }
+
+    private fun updateReadAloudLabel() {
+        findViewById<TextView>(R.id.editorReadAloud).text =
+            getString(if (readingAloud) R.string.notes_read_stop else R.string.notes_read_aloud)
+    }
+
+    // ---------------- study pack: font ----------------
+
+    /** Font dialog: size (13/15/19sp) + family (default/sans/serif/mono). Applies live. */
+    private fun showFontDialog() {
+        val dp = resources.displayMetrics.density
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((24 * dp).toInt(), (8 * dp).toInt(), (24 * dp).toInt(), 0)
+        }
+        val sizeLabel = TextView(this).apply {
+            text = getString(R.string.notes_font_size)
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@NoteEditorActivity, R.color.textSecondary))
+        }
+        val sizeGroup = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
+        val sizeValues = listOf(EditorFont.SIZE_SMALL, EditorFont.SIZE_MEDIUM, EditorFont.SIZE_LARGE)
+        val sizeNames = listOf(
+            getString(R.string.notes_font_size_small),
+            getString(R.string.notes_font_size_medium),
+            getString(R.string.notes_font_size_large)
+        )
+        val sizeButtons = sizeValues.mapIndexed { index, size ->
+            RadioButton(this).apply {
+                id = View.generateViewId()
+                text = sizeNames[index]
+                setOnClickListener {
+                    EditorFont.setSize(this@NoteEditorActivity, size)
+                    applyEditorFont()
+                }
+            }.also { sizeGroup.addView(it) }
+        }
+        sizeGroup.check(sizeButtons[sizeValues.indexOf(EditorFont.getSize(this)).coerceIn(sizeValues.indices)].id)
+        val familyLabel = TextView(this).apply {
+            text = getString(R.string.notes_font_family)
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@NoteEditorActivity, R.color.textSecondary))
+            setPadding(0, (16 * dp).toInt(), 0, 0)
+        }
+        val familyGroup = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
+        val familyValues = listOf("default", "sans", "serif", "mono")
+        val familyNames = listOf(
+            getString(R.string.notes_font_family_default),
+            getString(R.string.notes_font_family_sans),
+            getString(R.string.notes_font_family_serif),
+            getString(R.string.notes_font_family_mono)
+        )
+        val familyButtons = familyValues.mapIndexed { index, family ->
+            RadioButton(this).apply {
+                id = View.generateViewId()
+                text = familyNames[index]
+                setOnClickListener {
+                    EditorFont.setFamily(this@NoteEditorActivity, family)
+                    applyEditorFont()
+                }
+            }.also { familyGroup.addView(it) }
+        }
+        familyGroup.check(familyButtons[familyValues.indexOf(EditorFont.getFamily(this)).coerceIn(familyValues.indices)].id)
+        container.addView(sizeLabel)
+        container.addView(sizeGroup)
+        container.addView(familyLabel)
+        container.addView(familyGroup)
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_font_title))
+            .setView(container)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    // ---------------- study pack: per-note lock ----------------
+
+    private fun updateLockLabel() {
+        findViewById<TextView>(R.id.editorLock).text =
+            getString(if (noteLocked) R.string.notes_unlock_note else R.string.notes_lock_note)
+    }
+
+    /** Lock/unlock this note. Locking needs a Notes password (created here if none exists). */
+    private fun toggleNoteLock() {
+        if (noteLocked) {
+            noteLocked = false
+            NoteLockAuth.markLocked(noteId)
+            updateLockLabel()
+            scheduleSave()
+            Toast.makeText(this, getString(R.string.notes_note_unlocked_toast), Toast.LENGTH_SHORT).show()
+            return
+        }
+        ensureSavedNote {
+            NoteLockAuth.ensurePassword(this) {
+                noteLocked = true
+                updateLockLabel()
+                scheduleSave()
+                Toast.makeText(this, getString(R.string.notes_note_locked_toast), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // ---------------- study pack: self-destruct ----------------
+
+    private fun updateSelfDestructLabel() {
+        findViewById<TextView>(R.id.editorSelfDestruct).text = when (val at = noteExpiresAt) {
+            null -> getString(R.string.notes_self_destruct)
+            else -> {
+                val days = ((at - System.currentTimeMillis()) / 86_400_000L).toInt()
+                if (days >= 1) getString(R.string.notes_self_destruct_days_left, days)
+                else getString(R.string.notes_self_destruct_today)
+            }
+        }
+    }
+
+    /** Self-destruct: 7 / 30 / 90 days, or off. Expired notes go to Trash, never deleted outright. */
+    private fun showSelfDestructDialog() {
+        ensureSavedNote {
+            val dayOptions = listOf(7, 30, 90)
+            val labels = arrayOf(
+                getString(R.string.notes_self_destruct_7),
+                getString(R.string.notes_self_destruct_30),
+                getString(R.string.notes_self_destruct_90),
+                getString(R.string.notes_self_destruct_off)
+            )
+            val checked = when (val at = noteExpiresAt) {
+                null -> 3
+                else -> {
+                    val days = ((at - System.currentTimeMillis()) / 86_400_000L).toInt()
+                    dayOptions.indices.minByOrNull { kotlin.math.abs(dayOptions[it] - days) } ?: 1
+                }
+            }
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.notes_self_destruct_title))
+                .setSingleChoiceItems(labels, checked) { dialog, which ->
+                    noteExpiresAt = if (which == 3) null
+                    else System.currentTimeMillis() + dayOptions[which] * 86_400_000L
+                    updateSelfDestructLabel()
+                    scheduleSave()
+                    Toast.makeText(
+                        this,
+                        if (noteExpiresAt == null) getString(R.string.notes_self_destruct_off_toast)
+                        else getString(R.string.notes_self_destruct_set, dayOptions[which]),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    dialog.dismiss()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
+    /** Lock and self-destruct need a saved row: persist a new note first. */
+    private fun ensureSavedNote(onReady: () -> Unit) {
+        if (noteId != 0L) {
+            onReady()
+            return
+        }
+        lifecycleScope.launch {
+            persistNow()
+            if (noteId != 0L) onReady()
+            else Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_save_first), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -1649,6 +1911,9 @@ class NoteEditorActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        // Stop reading when leaving the editor (a dialog opening does
+        // not pause the activity, so the font/lock dialogs keep playing).
+        if (readingAloud) stopReading()
         // Final safety save when leaving; persist() is a no-op for empty notes.
         if (loaded) persist(showToast = false)
     }
@@ -1666,6 +1931,9 @@ class NoteEditorActivity : AppCompatActivity() {
         runCatching { voiceRecorder?.release() }
         runCatching { voicePlayer?.release() }
         speechRecognizer?.destroy()
+        // Read aloud: release the speech engine.
+        runCatching { tts?.stop() }
+        runCatching { tts?.shutdown() }
         super.onDestroy()
     }
 

@@ -56,6 +56,10 @@ interface NotesDao {
     @Query("SELECT * FROM notes WHERE deletedAt IS NOT NULL AND deletedAt < :cutoff")
     suspend fun getTrashedBefore(cutoff: Long): List<Note>
 
+    /** Notes past their self-destruct time (still out of Trash). */
+    @Query("SELECT * FROM notes WHERE expiresAt IS NOT NULL AND expiresAt < :now AND deletedAt IS NULL")
+    suspend fun getExpired(now: Long): List<Note>
+
     @Insert
     suspend fun insert(note: Note): Long
 

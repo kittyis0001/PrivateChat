@@ -252,6 +252,67 @@ Remember:</string>
     <string name="notes_ai_write_hint">One-line idea, e.g. birthday plan</string>
     <string name="notes_ai_write_done">AI note is ready</string>
     <string name="notes_ai_writing">AI is writing</string>
+    <!-- Study pack: read aloud, study helper, per-note lock, bulk select, font, self-destruct -->
+    <string name="notes_read_aloud">🔊 Read aloud</string>
+    <string name="notes_read_stop">■ Stop</string>
+    <string name="notes_read_nothing">Nothing to read yet</string>
+    <string name="notes_read_no_tts">Voice reading is not available on this phone</string>
+    <string name="notes_read_lang_missing">Bengali voice is not installed on this phone — install it in the phone\'s Text-to-speech settings, or write the note in English</string>
+    <string name="notes_study_helper">Study helper</string>
+    <string name="notes_study_hint">Topic — e.g. Honesty, My School, A Rainy Day</string>
+    <string name="notes_study_type">Type</string>
+    <string name="notes_study_done">Study note is ready</string>
+    <string name="notes_locked_preview">🔒 Locked — tap to unlock and read</string>
+    <string name="notes_lock_note">🔒 Lock note</string>
+    <string name="notes_unlock_note">🔓 Unlock note</string>
+    <string name="notes_note_locked_toast">Note locked</string>
+    <string name="notes_note_unlocked_toast">Note unlocked</string>
+    <string name="notes_lock_set_password_title">Set a Notes password</string>
+    <string name="notes_lock_password_short">Password must be at least 4 characters</string>
+    <string name="notes_lock_password_mismatch">Passwords do not match</string>
+    <string name="notes_lock_wrong_password">Wrong password</string>
+    <string name="notes_lock_unlock_title">Locked note</string>
+    <string name="notes_lock_unlock_hint">Enter your Notes password</string>
+    <string name="notes_lock_fingerprint">Use fingerprint</string>
+    <string name="notes_font">Font</string>
+    <string name="notes_font_title">Note font</string>
+    <string name="notes_font_size">Size</string>
+    <string name="notes_font_size_small">Small</string>
+    <string name="notes_font_size_medium">Medium</string>
+    <string name="notes_font_size_large">Large</string>
+    <string name="notes_font_family">Style</string>
+    <string name="notes_font_family_default">Default</string>
+    <string name="notes_font_family_sans">Sans</string>
+    <string name="notes_font_family_serif">Serif</string>
+    <string name="notes_font_family_mono">Mono</string>
+    <string name="notes_self_destruct">⏳ Self-destruct</string>
+    <string name="notes_self_destruct_title">Delete this note after</string>
+    <string name="notes_self_destruct_7">7 days</string>
+    <string name="notes_self_destruct_30">30 days</string>
+    <string name="notes_self_destruct_90">90 days</string>
+    <string name="notes_self_destruct_off">Turn off</string>
+    <string name="notes_self_destruct_days_left">⏳ %1$d days left</string>
+    <string name="notes_self_destruct_today">⏳ Expires today</string>
+    <string name="notes_self_destruct_set">Note will move to Trash in %1$d days</string>
+    <string name="notes_self_destruct_off_toast">Self-destruct turned off</string>
+    <string name="notes_save_first">Save the note first</string>
+    <string name="notes_select_title">Select notes</string>
+    <string name="notes_selected_count">%1$d selected</string>
+    <string name="notes_no_category">No category</string>
+    <string name="notes_bulk_category">Category</string>
+    <string name="notes_bulk_deleted">%1$d notes moved to Trash</string>
+    <string name="notes_bulk_archived">%1$d notes archived</string>
+    <string name="notes_bulk_categorized">%1$d notes moved</string>
+    <string-array name="study_types">
+        <item>Paragraph</item>
+        <item>Letter</item>
+        <item>Email</item>
+        <item>Dialogue</item>
+        <item>Story</item>
+        <item>Composition</item>
+        <item>Summary</item>
+        <item>Expansion of an idea</item>
+    </string-array>
     <string name="notes_ai_category">AI category</string>
     <string name="notes_ai_category_title">AI category &amp; tags</string>
     <string name="notes_ai_category_applied">Category set</string>

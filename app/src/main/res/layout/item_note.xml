@@ -15,6 +15,17 @@
         android:gravity="center_vertical">
 
         <TextView
+            android:id="@+id/noteSelected"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✓"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/primary"
+            android:visibility="gone"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
             android:id="@+id/noteTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -32,6 +43,15 @@
             android:text="📌"
             android:textSize="13sp"
             android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/noteLock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔒"
+            android:textSize="13sp"
+            android:visibility="gone"
+            android:layout_marginStart="6dp" />
     </LinearLayout>
 
     <TextView

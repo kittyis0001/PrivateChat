@@ -9,11 +9,13 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -32,11 +34,13 @@ import com.journeyapps.barcodescanner.ScanOptions
 import com.privatechat.app.R
 import com.privatechat.app.data.AccessGate
 import com.privatechat.app.notes.backup.BackupWorker
+import com.privatechat.app.notes.backup.ExpiryWorker
 import com.privatechat.app.notes.backup.NotesBackup
 import com.privatechat.app.notes.data.Category
 import com.privatechat.app.notes.data.Note
 import com.privatechat.app.notes.data.NotesRepository
 import com.privatechat.app.notes.reminder.ReminderManager
+import com.privatechat.app.notes.security.NoteLockAuth
 import com.privatechat.app.notes.security.NotesLockManager
 import com.privatechat.app.notes.util.DocumentScan
 import com.privatechat.app.notes.util.GeminiSummarizer
@@ -86,6 +90,10 @@ class NotesActivity : AppCompatActivity() {
     private var pendingSharedTitle: String? = null
     /** QR parts collected across scans of one multi-part note. */
     private val qrCollected = mutableListOf<String>()
+    /** Bulk select: long-press is kept for the actions menu, selection
+     *  starts from the overflow menu instead. */
+    private var selectionMode: Boolean = false
+    private val selectedIds = mutableSetOf<Long>()
 
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri == null) return@registerForActivityResult
@@ -267,8 +275,12 @@ class NotesActivity : AppCompatActivity() {
         searchInput = findViewById(R.id.notesSearchInput)
 
         adapter = NotesAdapter(
-            onClick = { note -> openEditor(note.id) },
-            onLongClick = { note -> showNoteActions(note) }
+            onClick = { note ->
+                if (selectionMode) toggleSelection(note) else openEditor(note.id)
+            },
+            onLongClick = { note ->
+                if (selectionMode) toggleSelection(note) else showNoteActions(note)
+            }
         )
         notesList.layoutManager = LinearLayoutManager(this)
         notesList.adapter = adapter
@@ -300,10 +312,13 @@ class NotesActivity : AppCompatActivity() {
 
         setupDrawer()
         setupLock()
+        setupSelectionBar()
 
         // Smart pack: daily auto-backup + handle a text shared from
         // another app (browser, YouTube, …) into a new note.
         BackupWorker.scheduleDaily(this)
+        // Study pack: daily self-destruct sweep (expired notes to Trash).
+        ExpiryWorker.scheduleDaily(this)
         handleShareIntent()
 
         // Kitty Notes Plus housekeeping (Notes data only): permanently
@@ -312,6 +327,9 @@ class NotesActivity : AppCompatActivity() {
         lifecycleScope.launch {
             runCatching {
                 repo.autoCleanTrash()
+                // Self-destruct check on every launch, so an expired
+                // note never waits for the daily worker to run.
+                repo.moveExpiredNotesToTrash().forEach { ReminderManager.cancel(this@NotesActivity, it.id) }
                 ReminderManager.ensureChannel(this@NotesActivity)
                 ReminderManager.rescheduleAll(this@NotesActivity)
             }
@@ -463,6 +481,7 @@ class NotesActivity : AppCompatActivity() {
                 }
                 R.id.nav_open_pdf -> { openPdfLauncher.launch(arrayOf("application/pdf")); true }
                 R.id.nav_ai_write -> { promptAiWrite(); true }
+                R.id.nav_study_helper -> { promptStudyMaterial(); true }
                 R.id.nav_backup_now -> { runBackupNow(); true }
                 else -> false
             }
@@ -517,6 +536,7 @@ class NotesActivity : AppCompatActivity() {
             add(0, 3, 2, getString(R.string.notes_about_title))
             add(0, 4, 3, getString(R.string.notes_privacy_title))
             add(0, 5, 4, getString(R.string.notes_sort_title))
+            add(0, 6, 5, getString(R.string.notes_select_title))
         }
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -525,6 +545,7 @@ class NotesActivity : AppCompatActivity() {
                 3 -> { startActivity(Intent(this, AboutActivity::class.java)); true }
                 4 -> { showPrivacy(); true }
                 5 -> { showSortDialog(); true }
+                6 -> { enterSelectionMode(); true }
                 else -> false
             }
         }
@@ -759,7 +780,8 @@ class NotesActivity : AppCompatActivity() {
             getString(R.string.notes_archive_action),
             getString(R.string.notes_share_note),
             getString(R.string.notes_delete),
-            getString(R.string.notes_duplicate)
+            getString(R.string.notes_duplicate),
+            if (note.locked) getString(R.string.notes_unlock_note) else getString(R.string.notes_lock_note)
         )
         AlertDialog.Builder(this)
             .setTitle(note.title.ifBlank { getString(R.string.notes_untitled) })
@@ -779,9 +801,125 @@ class NotesActivity : AppCompatActivity() {
                         repo.duplicateNote(note)
                         Toast.makeText(this@NotesActivity, getString(R.string.notes_duplicated), Toast.LENGTH_SHORT).show()
                     }
+                    5 -> toggleNoteLock(note)
                 }
             }
             .show()
+    }
+
+    // ---------------- bulk select ----------------
+
+    private fun setupSelectionBar() {
+        findViewById<View>(R.id.notesSelectionClose).setOnClickListener { exitSelectionMode() }
+        findViewById<View>(R.id.notesSelectionDelete).setOnClickListener { bulkDelete() }
+        findViewById<View>(R.id.notesSelectionArchive).setOnClickListener { bulkArchive() }
+        findViewById<View>(R.id.notesSelectionCategory).setOnClickListener { bulkCategoryDialog() }
+    }
+
+    private fun enterSelectionMode() {
+        selectionMode = true
+        selectedIds.clear()
+        updateSelectionBar()
+    }
+
+    private fun exitSelectionMode() {
+        if (!selectionMode) return
+        selectionMode = false
+        selectedIds.clear()
+        updateSelectionBar()
+    }
+
+    private fun toggleSelection(note: Note) {
+        if (selectedIds.contains(note.id)) selectedIds.remove(note.id) else selectedIds.add(note.id)
+        updateSelectionBar()
+    }
+
+    private fun updateSelectionBar() {
+        findViewById<View>(R.id.notesSelectionBar).visibility =
+            if (selectionMode) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.notesSelectionCount).text =
+            getString(R.string.notes_selected_count, selectedIds.size)
+        adapter.selectionMode = selectionMode
+        adapter.selectedIds = selectedIds.toSet()
+        adapter.notifyDataSetChanged()
+    }
+
+    private fun selectedNotes(): List<Note> =
+        adapter.currentList.filter { selectedIds.contains(it.id) }
+
+    private fun bulkDelete() {
+        val notes = selectedNotes()
+        if (notes.isEmpty()) {
+            exitSelectionMode()
+            return
+        }
+        lifecycleScope.launch {
+            notes.forEach {
+                repo.moveToTrash(it)
+                ReminderManager.cancel(this@NotesActivity, it.id)
+            }
+            exitSelectionMode()
+            Toast.makeText(this@NotesActivity, getString(R.string.notes_bulk_deleted, notes.size), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun bulkArchive() {
+        val notes = selectedNotes()
+        if (notes.isEmpty()) {
+            exitSelectionMode()
+            return
+        }
+        lifecycleScope.launch {
+            notes.forEach {
+                repo.setArchived(it, true)
+                ReminderManager.cancel(this@NotesActivity, it.id)
+            }
+            exitSelectionMode()
+            Toast.makeText(this@NotesActivity, getString(R.string.notes_bulk_archived, notes.size), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun bulkCategoryDialog() {
+        val notes = selectedNotes()
+        if (notes.isEmpty()) {
+            exitSelectionMode()
+            return
+        }
+        lifecycleScope.launch {
+            val cats = repo.getCategoriesOnce()
+            val labels = arrayOf(getString(R.string.notes_no_category)) +
+                cats.map { it.name }.toTypedArray()
+            AlertDialog.Builder(this@NotesActivity)
+                .setTitle(getString(R.string.notes_bulk_category))
+                .setItems(labels) { _, which ->
+                    val categoryId = if (which == 0) null else cats[which - 1].id
+                    lifecycleScope.launch {
+                        notes.forEach { repo.saveNote(it.copy(categoryId = categoryId)) }
+                        exitSelectionMode()
+                        Toast.makeText(this@NotesActivity, getString(R.string.notes_bulk_categorized, notes.size), Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
+    }
+
+    /** Per-note lock toggle from the home list. */
+    private fun toggleNoteLock(note: Note) {
+        if (note.locked) {
+            lifecycleScope.launch {
+                repo.setLocked(note, false)
+                NoteLockAuth.markLocked(note.id)
+                Toast.makeText(this@NotesActivity, getString(R.string.notes_note_unlocked_toast), Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+        NoteLockAuth.ensurePassword(this) {
+            lifecycleScope.launch {
+                repo.setLocked(note, true)
+                Toast.makeText(this@NotesActivity, getString(R.string.notes_note_locked_toast), Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun shareNote(note: Note) {
@@ -819,21 +957,21 @@ class NotesActivity : AppCompatActivity() {
     }
 
     /**
-     * Write with AI: one line of idea in, a whole note out. The
-     * generated title + body open in the editor — nothing is saved
-     * silently. The language choice sits in the button row, right
-     * of Cancel (last used language pre-selected and remembered
-     * for next time, like AI summary).
+     * Button row shared by the AI dialogs: Cancel | বাংলা/English | OK.
+     * The language is pre-selected from the last AI choice and remembered
+     * for next time (shared with AI summary).
      */
-    private fun promptAiWrite() {
+    private class LangRow(
+        val row: LinearLayout,
+        val langs: RadioGroup,
+        val bnButton: RadioButton,
+        val enButton: RadioButton,
+        val cancel: TextView,
+        val ok: TextView
+    )
+
+    private fun makeLangButtonRow(): LangRow {
         val dp = resources.displayMetrics.density
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 32, 48, 16)
-        }
-        val input = EditText(this).apply {
-            hint = getString(R.string.notes_ai_write_hint)
-        }
         // Button row: Cancel | বাংলা/English | OK.
         val buttonRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -882,23 +1020,103 @@ class NotesActivity : AppCompatActivity() {
         buttonRow.addView(cancel)
         buttonRow.addView(langs)
         buttonRow.addView(ok)
+        return LangRow(buttonRow, langs, bnButton, enButton, cancel, ok)
+    }
+
+    /** Language picked in a [LangRow]: "bn" or "en". */
+    private fun LangRow.pickedLang(): String =
+        if (langs.checkedRadioButtonId == enButton.id) "en" else "bn"
+
+    /**
+     * Write with AI: one line of idea in, a whole note out. The
+     * generated title + body open in the editor — nothing is saved
+     * silently.
+     */
+    private fun promptAiWrite() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 16)
+        }
+        val input = EditText(this).apply {
+            hint = getString(R.string.notes_ai_write_hint)
+        }
+        val langRow = makeLangButtonRow()
         container.addView(input)
-        container.addView(buttonRow)
+        container.addView(langRow.row)
         val dialog = AlertDialog.Builder(this)
             .setTitle(getString(R.string.notes_ai_write))
             .setView(container)
             .create()
-        cancel.setOnClickListener { dialog.dismiss() }
-        ok.setOnClickListener {
+        langRow.cancel.setOnClickListener { dialog.dismiss() }
+        langRow.ok.setOnClickListener {
             val idea = input.text.toString().trim()
             if (idea.isBlank()) {
                 Toast.makeText(this, getString(R.string.notes_ai_too_short), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val lang = if (langs.checkedRadioButtonId == enButton.id) "en" else "bn"
+            val lang = langRow.pickedLang()
             GeminiSummarizer.saveSummaryLang(this, lang)
             dialog.dismiss()
             runAiWrite(idea, lang)
+        }
+        dialog.show()
+    }
+
+    /** Study helper type keys, in the same order as R.array.study_types. */
+    private val STUDY_TYPE_KEYS = listOf(
+        "PARAGRAPH", "LETTER", "EMAIL", "DIALOGUE",
+        "STORY", "COMPOSITION", "SUMMARY", "BHAB"
+    )
+
+    /**
+     * Study helper: a topic + a type (paragraph, letter, email,
+     * dialogue, story, composition, summary, ভাবসম্প্রসারণ) + a
+     * language (বাংলা/English) in, a school-textbook-style answer out.
+     * The generated note opens in the editor — nothing is saved silently.
+     */
+    private fun promptStudyMaterial() {
+        val dp = resources.displayMetrics.density
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 16)
+        }
+        val input = EditText(this).apply {
+            hint = getString(R.string.notes_study_hint)
+        }
+        val typeLabel = TextView(this).apply {
+            text = getString(R.string.notes_study_type)
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@NotesActivity, R.color.textSecondary))
+            setPadding(0, (16 * dp).toInt(), 0, (4 * dp).toInt())
+        }
+        val typeSpinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@NotesActivity,
+                android.R.layout.simple_spinner_item,
+                resources.getStringArray(R.array.study_types)
+            ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        }
+        val langRow = makeLangButtonRow()
+        container.addView(input)
+        container.addView(typeLabel)
+        container.addView(typeSpinner)
+        container.addView(langRow.row)
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_study_helper))
+            .setView(container)
+            .create()
+        langRow.cancel.setOnClickListener { dialog.dismiss() }
+        langRow.ok.setOnClickListener {
+            val topic = input.text.toString().trim()
+            if (topic.isBlank()) {
+                Toast.makeText(this, getString(R.string.notes_ai_too_short), Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val lang = langRow.pickedLang()
+            GeminiSummarizer.saveSummaryLang(this, lang)
+            val typeKey = STUDY_TYPE_KEYS.getOrElse(typeSpinner.selectedItemPosition) { "PARAGRAPH" }
+            dialog.dismiss()
+            runStudyMaterial(topic, typeKey, lang)
         }
         dialog.show()
     }
@@ -908,7 +1126,7 @@ class NotesActivity : AppCompatActivity() {
      * dots cycle while Gemini writes. The animation stops itself when
      * the dialog is dismissed, so nothing keeps running afterwards.
      */
-    private fun showAiLoadingDialog(): AlertDialog {
+    private fun showAiLoadingDialog(titleRes: Int): AlertDialog {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -928,7 +1146,7 @@ class NotesActivity : AppCompatActivity() {
         container.addView(sparkle)
         container.addView(label)
         val dialog = AlertDialog.Builder(this)
-            .setTitle(getString(R.string.notes_ai_write))
+            .setTitle(getString(titleRes))
             .setView(container)
             .setCancelable(false)
             .create()
@@ -951,19 +1169,24 @@ class NotesActivity : AppCompatActivity() {
         return dialog
     }
 
+    /** No API key yet: point at Settings (same for every AI feature). */
+    private fun showAiNoKeyDialog(titleRes: Int) {
+        AlertDialog.Builder(this)
+            .setTitle(getString(titleRes))
+            .setMessage(getString(R.string.notes_ai_no_key))
+            .setPositiveButton(getString(R.string.notes_settings_title)) { _, _ ->
+                startActivity(Intent(this, NotesSettingsActivity::class.java))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     private fun runAiWrite(idea: String, lang: String) {
         if (GeminiSummarizer.getApiKey(this) == null) {
-            AlertDialog.Builder(this)
-                .setTitle(getString(R.string.notes_ai_write))
-                .setMessage(getString(R.string.notes_ai_no_key))
-                .setPositiveButton(getString(R.string.notes_settings_title)) { _, _ ->
-                    startActivity(Intent(this, NotesSettingsActivity::class.java))
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            showAiNoKeyDialog(R.string.notes_ai_write)
             return
         }
-        val loading = showAiLoadingDialog()
+        val loading = showAiLoadingDialog(R.string.notes_ai_write)
         loading.show()
         lifecycleScope.launch {
             val result = GeminiSummarizer.writeFromIdea(
@@ -973,6 +1196,27 @@ class NotesActivity : AppCompatActivity() {
             result.onSuccess { (title, body) ->
                 openEditorWithTemplate(title, body)
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_ai_write_done), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(this@NotesActivity, getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun runStudyMaterial(topic: String, typeKey: String, lang: String) {
+        if (GeminiSummarizer.getApiKey(this) == null) {
+            showAiNoKeyDialog(R.string.notes_study_helper)
+            return
+        }
+        val loading = showAiLoadingDialog(R.string.notes_study_helper)
+        loading.show()
+        lifecycleScope.launch {
+            val result = GeminiSummarizer.writeStudyMaterial(
+                this@NotesActivity, topic, typeKey, lang
+            )
+            loading.dismiss()
+            result.onSuccess { (title, body) ->
+                openEditorWithTemplate(title, body)
+                Toast.makeText(this@NotesActivity, getString(R.string.notes_study_done), Toast.LENGTH_SHORT).show()
             }.onFailure {
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT).show()
             }
@@ -1001,12 +1245,35 @@ class NotesActivity : AppCompatActivity() {
     }
 
     private fun openEditor(noteId: Long) {
+        if (noteId == 0L) {
+            exitSelectionMode()
+            startEditor(0)
+            return
+        }
+        exitSelectionMode()
+        lifecycleScope.launch {
+            val note = repo.getNote(noteId)
+            if (note?.locked == true && !NoteLockAuth.isUnlocked(noteId)) {
+                // Locked note: fingerprint or Notes password first.
+                NoteLockAuth.promptUnlock(this@NotesActivity) {
+                    NoteLockAuth.markUnlocked(noteId)
+                    startEditor(noteId)
+                }
+            } else {
+                startEditor(noteId)
+            }
+        }
+    }
+
+    private fun startEditor(noteId: Long) {
         startActivity(Intent(this, NoteEditorActivity::class.java).putExtra(NoteEditorActivity.EXTRA_NOTE_ID, noteId))
     }
 
     override fun onBackPressed() {
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START)
+        } else if (selectionMode) {
+            exitSelectionMode()
         } else {
             @Suppress("DEPRECATION")
             super.onBackPressed()

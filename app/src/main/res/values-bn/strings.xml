@@ -78,6 +78,67 @@
     <string name="notes_ai_write_hint">এক লাইনে আইডিয়া লেখো, যেমন: জন্মদিনের প্ল্যান</string>
     <string name="notes_ai_write_done">AI নোট তৈরি</string>
     <string name="notes_ai_writing">AI লিখছে</string>
+    <!-- Study pack: read aloud, study helper, per-note lock, bulk select, font, self-destruct -->
+    <string name="notes_read_aloud">🔊 শুনুন</string>
+    <string name="notes_read_stop">■ থামুন</string>
+    <string name="notes_read_nothing">পড়ার মতো কিছু নেই</string>
+    <string name="notes_read_no_tts">এই ফোনে ভয়েস পড়া যাবে না</string>
+    <string name="notes_read_lang_missing">এই ফোনে বাংলা ভয়েস ইনস্টল নেই — ফোনের Text-to-speech সেটিংস থেকে বাংলা ভয়েস ইনস্টল করো, অথবা নোটটা ইংরেজিতে লেখো</string>
+    <string name="notes_study_helper">স্টাডি হেল্পার</string>
+    <string name="notes_study_hint">টপিক — যেমন সততা, আমার বিদ্যালয়, বর্ষার দিন</string>
+    <string name="notes_study_type">ধরন</string>
+    <string name="notes_study_done">স্টাডি নোট তৈরি</string>
+    <string name="notes_locked_preview">🔒 তালা দেওয়া — পড়তে খুলুন</string>
+    <string name="notes_lock_note">🔒 নোটে তালা দাও</string>
+    <string name="notes_unlock_note">🔓 তালা খুলুন</string>
+    <string name="notes_note_locked_toast">নোটে তালা দেওয়া হয়েছে</string>
+    <string name="notes_note_unlocked_toast">নোটের তালা খোলা হয়েছে</string>
+    <string name="notes_lock_set_password_title">নোটের পাসওয়ার্ড দাও</string>
+    <string name="notes_lock_password_short">পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে</string>
+    <string name="notes_lock_password_mismatch">পাসওয়ার্ড মিলছে না</string>
+    <string name="notes_lock_wrong_password">ভুল পাসওয়ার্ড</string>
+    <string name="notes_lock_unlock_title">তালা দেওয়া নোট</string>
+    <string name="notes_lock_unlock_hint">নোটের পাসওয়ার্ড দাও</string>
+    <string name="notes_lock_fingerprint">ফিঙ্গারপ্রিন্ট দাও</string>
+    <string name="notes_font">ফন্ট</string>
+    <string name="notes_font_title">নোটের ফন্ট</string>
+    <string name="notes_font_size">আকার</string>
+    <string name="notes_font_size_small">ছোট</string>
+    <string name="notes_font_size_medium">মাঝারি</string>
+    <string name="notes_font_size_large">বড়</string>
+    <string name="notes_font_family">ধরন</string>
+    <string name="notes_font_family_default">সাধারণ</string>
+    <string name="notes_font_family_sans">স্যান্স</string>
+    <string name="notes_font_family_serif">সেরিফ</string>
+    <string name="notes_font_family_mono">মনো</string>
+    <string name="notes_self_destruct">⏳ নিজে মুছে যাবে</string>
+    <string name="notes_self_destruct_title">এই নোট মুছে যাবে</string>
+    <string name="notes_self_destruct_7">৭ দিন</string>
+    <string name="notes_self_destruct_30">৩০ দিন</string>
+    <string name="notes_self_destruct_90">৯০ দিন</string>
+    <string name="notes_self_destruct_off">বন্ধ করো</string>
+    <string name="notes_self_destruct_days_left">⏳ আর %1$d দিন</string>
+    <string name="notes_self_destruct_today">⏳ আজই মুছে যাবে</string>
+    <string name="notes_self_destruct_set">নোটটি %1$d দিন পর Trash-এ যাবে</string>
+    <string name="notes_self_destruct_off_toast">নিজে মোছা বন্ধ করা হয়েছে</string>
+    <string name="notes_save_first">আগে নোটটা সেভ করো</string>
+    <string name="notes_select_title">নোট বাছো</string>
+    <string name="notes_selected_count">%1$dটি বাছা হয়েছে</string>
+    <string name="notes_no_category">কোনো ক্যাটাগরি নয়</string>
+    <string name="notes_bulk_category">ক্যাটাগরি</string>
+    <string name="notes_bulk_deleted">%1$dটি নোট Trash-এ গেছে</string>
+    <string name="notes_bulk_archived">%1$dটি নোট আর্কাইভ হয়েছে</string>
+    <string name="notes_bulk_categorized">%1$dটি নোট সরানো হয়েছে</string>
+    <string-array name="study_types">
+        <item>অনুচ্ছেদ</item>
+        <item>চিঠি</item>
+        <item>ইমেইল</item>
+        <item>সংলাপ</item>
+        <item>গল্প</item>
+        <item>রচনা</item>
+        <item>সারাংশ</item>
+        <item>ভাবসম্প্রসারণ</item>
+    </string-array>
     <string name="notes_ai_category">AI ক্যাটাগরি</string>
     <string name="notes_ai_category_title">AI ক্যাটাগরি ও ট্যাগ</string>
     <string name="notes_ai_category_applied">ক্যাটাগরি বসানো হয়েছে</string>

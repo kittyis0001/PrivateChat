@@ -21,6 +21,10 @@ class NotesAdapter(
     /** noteId -> photo count, for the small 🖼 badge (0/absent = no badge). */
     var imageCounts: Map<Long, Int> = emptyMap()
 
+    /** Bulk select state, driven by NotesActivity. */
+    var selectionMode: Boolean = false
+    var selectedIds: Set<Long> = emptySet()
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
         val v = LayoutInflater.from(parent.context).inflate(R.layout.item_note, parent, false)
         return VH(v)
@@ -40,6 +44,21 @@ class NotesAdapter(
         )
         holder.itemView.setOnClickListener { onClick(note) }
         holder.itemView.setOnLongClickListener { onLongClick(note); true }
+        // Study pack: selection check, lock badge, hidden preview, expiry.
+        val ctx = holder.itemView.context
+        holder.selected.visibility =
+            if (selectionMode && selectedIds.contains(note.id)) View.VISIBLE else View.GONE
+        holder.lock.visibility = if (note.locked) View.VISIBLE else View.GONE
+        if (note.locked) {
+            // Locked: the content preview never shows on the card.
+            holder.preview.text = ctx.getString(R.string.notes_locked_preview)
+        }
+        if (note.expiresAt != null) {
+            val days = ((note.expiresAt - System.currentTimeMillis()) / 86_400_000L).toInt()
+            val suffix = if (days >= 1) ctx.getString(R.string.notes_self_destruct_days_left, days)
+            else ctx.getString(R.string.notes_self_destruct_today)
+            holder.date.text = "${holder.date.text} · $suffix"
+        }
     }
 
     class VH(v: View) : RecyclerView.ViewHolder(v) {
@@ -48,6 +67,8 @@ class NotesAdapter(
         val date: TextView = v.findViewById(R.id.noteDate)
         val tags: TextView = v.findViewById(R.id.noteTags)
         val pin: TextView = v.findViewById(R.id.notePin)
+        val lock: TextView = v.findViewById(R.id.noteLock)
+        val selected: TextView = v.findViewById(R.id.noteSelected)
     }
 
     companion object {

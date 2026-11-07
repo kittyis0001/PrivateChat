@@ -253,6 +253,69 @@ object GeminiSummarizer {
         }
 
     /**
+     * Study helper: writes a school-style answer in [lang] ("bn"/"en")
+     * for [topic] in the chosen [typeKey] — PARAGRAPH, LETTER, EMAIL,
+     * DIALOGUE, STORY, COMPOSITION, SUMMARY or BHAB (ভাবসম্প্রসারণ).
+     * The prompt asks for the Bangladesh NCTB textbook format for that
+     * type (e.g. a letter with address/date/salutation/closing, a
+     * dialogue with speaker names, a ভাবসম্প্রসারণ in মূলভাব /
+     * সম্প্রসারিত ভাব / মন্তব্য parts), at a class 6–10 level.
+     * Same result shape as [writeFromIdea]: title + body.
+     */
+    suspend fun writeStudyMaterial(
+        context: Context,
+        topic: String,
+        typeKey: String,
+        lang: String = "bn"
+    ): Result<Pair<String, String>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val langName = if (lang == "en") "English" else "Bengali"
+                val format = when (typeKey) {
+                    "LETTER" -> "a letter in $langName, in Bangladesh school textbook format: " +
+                        "sender address, date, salutation, body in 3 short paragraphs, " +
+                        "subscription and name at the end"
+                    "EMAIL" -> "a formal email in $langName: To, Subject, greeting, " +
+                        "body in 2-3 short paragraphs, closing with name"
+                    "DIALOGUE" -> "a dialogue in $langName between two people, in Bangladesh " +
+                        "school textbook format: speaker names before each line, 8-12 short " +
+                        "natural exchanges"
+                    "STORY" -> "a short story in $langName, in Bangladesh school textbook " +
+                        "style: a clear beginning, middle and end, and a moral at the end"
+                    "COMPOSITION" -> "a composition in $langName, in Bangladesh school " +
+                        "textbook format: introduction, 3-4 body paragraphs, conclusion, " +
+                        "about 250-300 words"
+                    "SUMMARY" -> "a summary in $langName of the topic below, in Bangladesh " +
+                        "school textbook style: only the main points, about one third of " +
+                        "the length, in your own words"
+                    "BHAB" -> if (lang == "en") {
+                        "an expansion of the idea below in English, in the style of a " +
+                            "Bangladesh school textbook answer: the main idea, an expanded " +
+                            "explanation with an example, and a concluding remark"
+                    } else {
+                        "নিচের ভাবটির ভাবসম্প্রসারণ, বাংলাদেশের পাঠ্যবইয়ের ধরনে: " +
+                            "মূলভাব, সম্প্রসারিত ভাব ও মন্তব্য — এই তিন অংশে, সহজ ভাষায়"
+                    }
+                    else -> "a paragraph (150-200 words) in $langName, in the style of a " +
+                        "Bangladesh NCTB textbook answer: one clear paragraph, simple sentences"
+                }
+                val prompt = "Write $format. Reply with the title on the first line, " +
+                    "then a blank line, then the body. No extra commentary, no quotes " +
+                    "around the title.\n\nTopic: " + topic.take(500)
+                val out = generateText(key, prompt)
+                val lines = out.lineSequence().filter { it.isNotBlank() }.toList()
+                if (lines.isEmpty()) throw IllegalStateException("Empty reply")
+                val title = lines.first().trim().removeSurrounding("\"").take(60)
+                val body = out.substringAfter("\n\n", "").trim().ifBlank {
+                    lines.drop(1).joinToString("\n").trim()
+                }
+                if (body.isBlank()) throw IllegalStateException("Empty body")
+                title to body
+            }
+        }
+
+    /**
      * Fixes obvious OCR misreads (wrong letters, split or joined words,
      * stray symbols) without changing the wording, capitalization,
      * numbers or line breaks — and keeps any **bold markers** exactly

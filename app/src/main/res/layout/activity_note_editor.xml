@@ -386,6 +386,56 @@
                     android:padding="9dp" />
             </LinearLayout>
 
+            <!-- Study pack (additive; everything above is unchanged) -->
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/editorReadAloud"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_read_aloud"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorFont"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_font"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/editorLock"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_lock_note"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorSelfDestruct"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_self_destruct"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+            </LinearLayout>
+
             <LinearLayout
                 android:id="@+id/editorVoiceBox"
                 android:layout_width="match_parent"

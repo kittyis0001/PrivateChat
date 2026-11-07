@@ -112,6 +112,65 @@
                 android:paddingVertical="8dp"
                 android:clipToPadding="false" />
 
+            <!-- Bulk select bar (hidden until "Select notes" in the overflow menu) -->
+            <LinearLayout
+                android:id="@+id/notesSelectionBar"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="4dp"
+                android:background="@color/surface"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/notesSelectionClose"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✕"
+                    android:textSize="16sp"
+                    android:textColor="@color/textSecondary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/notesSelectionCount"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/textPrimary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/notesSelectionDelete"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_delete"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/notesSelectionArchive"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_archive_action"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/notesSelectionCategory"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_bulk_category"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
+            </LinearLayout>
+
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
