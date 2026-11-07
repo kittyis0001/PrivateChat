@@ -9,6 +9,7 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.privatechat.app.R
 import com.privatechat.app.notes.data.Note
+import com.privatechat.app.notes.util.Countdown
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -57,6 +58,15 @@ class NotesAdapter(
             val days = ((note.expiresAt - System.currentTimeMillis()) / 86_400_000L).toInt()
             val suffix = if (days >= 1) ctx.getString(R.string.notes_self_destruct_days_left, days)
             else ctx.getString(R.string.notes_self_destruct_today)
+            holder.date.text = "${holder.date.text} · $suffix"
+        }
+        if (note.countdownAt != null) {
+            val days = Countdown.daysUntil(note.countdownAt)
+            val suffix = when {
+                days > 0 -> ctx.getString(R.string.notes_countdown_days_left, days)
+                days == 0 -> ctx.getString(R.string.notes_countdown_today)
+                else -> ctx.getString(R.string.notes_countdown_days_ago, -days)
+            }
             holder.date.text = "${holder.date.text} · $suffix"
         }
     }

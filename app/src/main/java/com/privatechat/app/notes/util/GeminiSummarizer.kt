@@ -274,31 +274,34 @@ object GeminiSummarizer {
                 val langName = if (lang == "en") "English" else "Bengali"
                 val format = when (typeKey) {
                     "LETTER" -> "a letter in $langName, in Bangladesh school textbook format: " +
-                        "sender address, date, salutation, body in 3 short paragraphs, " +
-                        "subscription and name at the end"
+                        "sender address, date, salutation, body in 3-4 detailed paragraphs " +
+                        "with examples, subscription and name at the end"
                     "EMAIL" -> "a formal email in $langName: To, Subject, greeting, " +
-                        "body in 2-3 short paragraphs, closing with name"
+                        "body in 3-4 detailed paragraphs with examples, closing with name"
                     "DIALOGUE" -> "a dialogue in $langName between two people, in Bangladesh " +
-                        "school textbook format: speaker names before each line, 8-12 short " +
-                        "natural exchanges"
-                    "STORY" -> "a short story in $langName, in Bangladesh school textbook " +
-                        "style: a clear beginning, middle and end, and a moral at the end"
+                        "school textbook format: speaker names before each line, 12-16 " +
+                        "natural exchanges with detail"
+                    "STORY" -> "a detailed story in $langName, in Bangladesh school textbook " +
+                        "style, about 400-500 words: a clear beginning, middle and end, " +
+                        "with details and a moral at the end"
                     "COMPOSITION" -> "a composition in $langName, in Bangladesh school " +
-                        "textbook format: introduction, 3-4 body paragraphs, conclusion, " +
-                        "about 250-300 words"
+                        "textbook format: introduction, 3-4 detailed body paragraphs with " +
+                        "examples, conclusion, about 350-450 words"
                     "SUMMARY" -> "a summary in $langName of the topic below, in Bangladesh " +
                         "school textbook style: only the main points, about one third of " +
                         "the length, in your own words"
                     "BHAB" -> if (lang == "en") {
-                        "an expansion of the idea below in English, in the style of a " +
-                            "Bangladesh school textbook answer: the main idea, an expanded " +
-                            "explanation with an example, and a concluding remark"
+                        "a detailed expansion of the idea below in English, in the style of a " +
+                            "Bangladesh school textbook answer, about 250-350 words: the main idea, an expanded " +
+                            "explanation with examples, and a concluding remark"
                     } else {
-                        "নিচের ভাবটির ভাবসম্প্রসারণ, বাংলাদেশের পাঠ্যবইয়ের ধরনে: " +
-                            "মূলভাব, সম্প্রসারিত ভাব ও মন্তব্য — এই তিন অংশে, সহজ ভাষায়"
+                        "নিচের ভাবটির ভাবসম্প্রসারণ, বাংলাদেশের পাঠ্যবইয়ের ধরনে, " +
+                            "বিস্তারিতভাবে, ২৫০-৩৫০ শব্দের মধ্যে: " +
+                            "মূলভাব, সম্প্রসারিত ভাব ও মন্তব্য — এই তিন অংশে, সহজ ভাষায়, উদাহরণসহ"
                     }
-                    else -> "a paragraph (150-200 words) in $langName, in the style of a " +
-                        "Bangladesh NCTB textbook answer: one clear paragraph, simple sentences"
+                    else -> "a detailed paragraph (200-250 words) in $langName, in the style of a " +
+                        "Bangladesh NCTB textbook answer: one clear paragraph, simple sentences, " +
+                        "with details and examples"
                 }
                 val prompt = "Write $format. Reply with the title on the first line, " +
                     "then a blank line, then the body. No extra commentary, no quotes " +

@@ -43,5 +43,8 @@ data class Note(
     @ColumnInfo(defaultValue = "0")
     val locked: Boolean = false,
     /** Self-destruct time (epoch millis), null = the note never expires. */
-    val expiresAt: Long? = null
+    val expiresAt: Long? = null,
+    // Added in kitty_notes.db v6 (additive; default keeps old rows valid):
+    /** Countdown target date (epoch millis, local midnight), null = no countdown. */
+    val countdownAt: Long? = null
 )

@@ -295,6 +295,14 @@ Remember:</string>
     <string name="notes_self_destruct_today">⏳ Expires today</string>
     <string name="notes_self_destruct_set">Note will move to Trash in %1$d days</string>
     <string name="notes_self_destruct_off_toast">Self-destruct turned off</string>
+    <string name="notes_countdown">📅 Countdown</string>
+    <string name="notes_countdown_title">Count down to</string>
+    <string name="notes_countdown_days_left">📅 %1$d days left</string>
+    <string name="notes_countdown_today">📅 Today</string>
+    <string name="notes_countdown_days_ago">📅 %1$d days ago</string>
+    <string name="notes_lock_note_only">This password only locks notes. It will not lock the whole app.</string>
+    <string name="notes_app_lock_label">App lock</string>
+    <string name="notes_lock_app_off_kept">App lock off — your locked notes still use the same password</string>
     <string name="notes_save_first">Save the note first</string>
     <string name="notes_select_title">Select notes</string>
     <string name="notes_selected_count">%1$d selected</string>

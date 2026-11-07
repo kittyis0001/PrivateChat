@@ -13,6 +13,13 @@ import kotlinx.coroutines.withContext
  * salt in a dedicated SharedPreferences file — never plaintext, and
  * completely separate from the chat login password and the promo
  * access-code gate.
+ *
+ * Two separate things live here, and they must not be confused:
+ * - the password hash/salt — needed by per-note locks, and it exists
+ *   even when the app lock is off;
+ * - KEY_ENABLED — the app lock itself (lock screen on launch). Only
+ *   the user turning the lock ON in Settings sets this; creating a
+ *   password for a per-note lock never turns the app lock on.
  */
 object NotesLockManager {
 
@@ -33,12 +40,26 @@ object NotesLockManager {
 
     fun isLockEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
 
-    /** 120k PBKDF2 iterations take ~100-300ms: always run off the UI thread. */
-    suspend fun setPassword(context: Context, password: String) = withContext(Dispatchers.IO) {
+    /** True when a Notes password hash exists — used by per-note locks even when the app lock is off. */
+    fun hasPassword(context: Context): Boolean = prefs(context).getString(KEY_HASH, null) != null
+
+    /** Turns only the launch lock screen on/off. The password itself stays, so locked notes keep working. */
+    fun setAppLockEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
+        if (!enabled) unlockedThisProcess = false
+    }
+
+    /**
+     * 120k PBKDF2 iterations take ~100-300ms: always run off the UI thread.
+     * [enableAppLock] is true only when the user enables the lock in
+     * Settings; a password created for a per-note lock passes false,
+     * so locking one note never locks the whole app.
+     */
+    suspend fun setPassword(context: Context, password: String, enableAppLock: Boolean = true) = withContext(Dispatchers.IO) {
         val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val hash = hash(password, salt)
         prefs(context).edit()
-            .putBoolean(KEY_ENABLED, true)
+            .putBoolean(KEY_ENABLED, enableAppLock)
             .putString(KEY_HASH, Base64.encodeToString(hash, Base64.NO_WRAP))
             .putString(KEY_SALT, Base64.encodeToString(salt, Base64.NO_WRAP))
             .apply()

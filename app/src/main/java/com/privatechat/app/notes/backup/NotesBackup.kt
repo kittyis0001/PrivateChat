@@ -52,6 +52,9 @@ object NotesBackup {
                     // and this parser reads them optionally below.
                     .put("locked", n.locked)
                     .put("expiresAt", n.expiresAt ?: JSONObject.NULL)
+                    // v6 field — additive; older parsers ignore it,
+                    // and this parser reads it optionally below.
+                    .put("countdownAt", n.countdownAt ?: JSONObject.NULL)
             )
         }
         root.put("notes", noteArr)
@@ -106,7 +109,8 @@ object NotesBackup {
                     reminderRepeat = o.optString("reminderRepeat", "NONE"),
                     tags = o.optString("tags", ""),
                     locked = o.optBoolean("locked", false),
-                    expiresAt = if (o.isNull("expiresAt")) null else o.optLong("expiresAt")
+                    expiresAt = if (o.isNull("expiresAt")) null else o.optLong("expiresAt"),
+                    countdownAt = if (o.isNull("countdownAt")) null else o.optLong("countdownAt")
                 )
             )
         }

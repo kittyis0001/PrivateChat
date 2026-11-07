@@ -121,6 +121,14 @@
     <string name="notes_self_destruct_today">⏳ আজই মুছে যাবে</string>
     <string name="notes_self_destruct_set">নোটটি %1$d দিন পর Trash-এ যাবে</string>
     <string name="notes_self_destruct_off_toast">নিজে মোছা বন্ধ করা হয়েছে</string>
+    <string name="notes_countdown">📅 কাউন্টডাউন</string>
+    <string name="notes_countdown_title">কাউন্টডাউন — তারিখ বেছে নিন</string>
+    <string name="notes_countdown_days_left">📅 আর %1$d দিন</string>
+    <string name="notes_countdown_today">📅 আজ</string>
+    <string name="notes_countdown_days_ago">📅 %1$d দিন আগে</string>
+    <string name="notes_lock_note_only">এই পাসওয়ার্ড শুধু নোটে তালা দেবে। পুরো অ্যাপ লক হবে না।</string>
+    <string name="notes_app_lock_label">অ্যাপ লক</string>
+    <string name="notes_lock_app_off_kept">অ্যাপ লক বন্ধ হয়েছে — তালা দেওয়া নোটগুলো একই পাসওয়ার্ডে খুলবে</string>
     <string name="notes_save_first">আগে নোটটা সেভ করো</string>
     <string name="notes_select_title">নোট বাছো</string>
     <string name="notes_selected_count">%1$dটি বাছা হয়েছে</string>

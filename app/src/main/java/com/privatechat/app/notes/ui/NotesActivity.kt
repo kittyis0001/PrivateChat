@@ -44,6 +44,7 @@ import com.privatechat.app.notes.security.NoteLockAuth
 import com.privatechat.app.notes.security.NotesLockManager
 import com.privatechat.app.notes.util.DocumentScan
 import com.privatechat.app.notes.util.GeminiSummarizer
+import com.privatechat.app.notes.util.LoadingDialog
 import com.privatechat.app.notes.util.QrShare
 import com.privatechat.app.notes.util.TextScanner
 import com.privatechat.app.ui.login.LoginActivity
@@ -97,13 +98,20 @@ class NotesActivity : AppCompatActivity() {
 
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri == null) return@registerForActivityResult
+        val progress = LoadingDialog.show(this)
         lifecycleScope.launch {
             runCatching {
-                val json = NotesBackup.exportJson(repo.getAllForBackup(), repo.getCategoriesOnce(), repo.getStickiesOnce())
-                contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                // JSON build + file write run off the UI thread: a big
+                // backup used to freeze the home list while it wrote.
+                withContext(Dispatchers.IO) {
+                    val json = NotesBackup.exportJson(repo.getAllForBackup(), repo.getCategoriesOnce(), repo.getStickiesOnce())
+                    contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                }
             }.onSuccess {
+                progress.dismiss()
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_backup_done), Toast.LENGTH_SHORT).show()
             }.onFailure {
+                progress.dismiss()
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_backup_failed), Toast.LENGTH_SHORT).show()
             }
         }
@@ -111,40 +119,45 @@ class NotesActivity : AppCompatActivity() {
 
     private val importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@registerForActivityResult
+        val progress = LoadingDialog.show(this)
         lifecycleScope.launch {
             runCatching {
-                val text = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
-                    ?: error("empty")
-                val parsed = NotesBackup.parseJson(text)
-                // Keep note->category grouping by matching category names:
-                // reuse an existing category id, or insert the category
-                // and use its new id. Notes whose name is unknown stay No Tag.
-                val oldIdToName = parsed.categories.associate { it.id to it.name }
-                val nameToId = repo.getCategoriesOnce().associate { it.name to it.id }.toMutableMap()
-                var imported = 0
-                parsed.notes.forEach { n ->
-                    val name = n.categoryId?.let { oldIdToName[it] }
-                    val mappedId: Long? = when {
-                        name == null -> null
-                        nameToId.containsKey(name) -> nameToId[name]
-                        else -> {
-                            val srcCat = parsed.categories.firstOrNull { it.name == name }
-                            val newId = repo.addCategory(name)
-                            if (srcCat != null && srcCat.isDefault) {
-                                // mark default-ness is cosmetic; id mapping is what matters
+                withContext(Dispatchers.IO) {
+                    val text = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                        ?: error("empty")
+                    val parsed = NotesBackup.parseJson(text)
+                    // Keep note->category grouping by matching category names:
+                    // reuse an existing category id, or insert the category
+                    // and use its new id. Notes whose name is unknown stay No Tag.
+                    val oldIdToName = parsed.categories.associate { it.id to it.name }
+                    val nameToId = repo.getCategoriesOnce().associate { it.name to it.id }.toMutableMap()
+                    var imported = 0
+                    parsed.notes.forEach { n ->
+                        val name = n.categoryId?.let { oldIdToName[it] }
+                        val mappedId: Long? = when {
+                            name == null -> null
+                            nameToId.containsKey(name) -> nameToId[name]
+                            else -> {
+                                val srcCat = parsed.categories.firstOrNull { it.name == name }
+                                val newId = repo.addCategory(name)
+                                if (srcCat != null && srcCat.isDefault) {
+                                    // mark default-ness is cosmetic; id mapping is what matters
+                                }
+                                nameToId[name] = newId
+                                newId
                             }
-                            nameToId[name] = newId
-                            newId
                         }
+                        repo.importNote(n.copy(categoryId = mappedId))
+                        imported++
                     }
-                    repo.importNote(n.copy(categoryId = mappedId))
-                    imported++
+                    parsed.stickies.forEach { repo.importSticky(it) }
+                    imported
                 }
-                parsed.stickies.forEach { repo.importSticky(it) }
-                imported
             }.onSuccess { count ->
+                progress.dismiss()
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_restore_done, count), Toast.LENGTH_SHORT).show()
             }.onFailure {
+                progress.dismiss()
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_restore_failed), Toast.LENGTH_SHORT).show()
             }
         }
@@ -373,8 +386,12 @@ class NotesActivity : AppCompatActivity() {
             val pw = input.text.toString()
             // PBKDF2 hashing takes ~100-300ms: keep the tap responsive by
             // verifying off the UI thread, then applying the same UI result.
+            // The loading dialog shows while it verifies, so the button
+            // never looks dead after the tap.
+            val progress = LoadingDialog.show(this@NotesActivity)
             lifecycleScope.launch {
                 if (NotesLockManager.verify(this@NotesActivity, pw)) {
+                    progress.dismiss()
                     NotesLockManager.unlockedThisProcess = true
                     lockView.visibility = View.GONE
                     mainContent.visibility = View.VISIBLE
@@ -382,6 +399,7 @@ class NotesActivity : AppCompatActivity() {
                     error.visibility = View.GONE
                     openPendingShare()
                 } else {
+                    progress.dismiss()
                     error.visibility = View.VISIBLE
                     input.text.clear()
                 }
@@ -1234,8 +1252,10 @@ class NotesActivity : AppCompatActivity() {
 
     /** Runs one auto-backup right now (same file format as the daily one). */
     private fun runBackupNow() {
+        val progress = LoadingDialog.show(this)
         lifecycleScope.launch {
-            val ok = BackupWorker.doBackup(this@NotesActivity)
+            val ok = withContext(Dispatchers.IO) { BackupWorker.doBackup(this@NotesActivity) }
+            progress.dismiss()
             Toast.makeText(
                 this@NotesActivity,
                 getString(if (ok) R.string.notes_backup_done else R.string.notes_backup_failed),
