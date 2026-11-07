@@ -30,6 +30,19 @@ class SimpleNotesAdapter(
         holder.pin.visibility = if (note.pinned) View.VISIBLE else View.GONE
         NoteCardStyle.bind(holder.itemView, holder.title, holder.preview, holder.date, note)
         holder.itemView.setOnClickListener { onClick(note) }
+        // Study pack: a locked note never shows its content preview,
+        // not even in Archive / Trash — only the 🔒 badge.
+        val ctx = holder.itemView.context
+        holder.lock.visibility = if (note.locked) View.VISIBLE else View.GONE
+        if (note.locked) {
+            holder.preview.text = ctx.getString(R.string.notes_locked_preview)
+        }
+        if (note.expiresAt != null) {
+            val days = ((note.expiresAt - System.currentTimeMillis()) / 86_400_000L).toInt()
+            val suffix = if (days >= 1) ctx.getString(R.string.notes_self_destruct_days_left, days)
+            else ctx.getString(R.string.notes_self_destruct_today)
+            holder.date.text = "${holder.date.text} · $suffix"
+        }
     }
 
     class VH(v: View) : RecyclerView.ViewHolder(v) {
@@ -37,6 +50,7 @@ class SimpleNotesAdapter(
         val preview: TextView = v.findViewById(R.id.notePreview)
         val date: TextView = v.findViewById(R.id.noteDate)
         val pin: TextView = v.findViewById(R.id.notePin)
+        val lock: TextView = v.findViewById(R.id.noteLock)
     }
 
     companion object {

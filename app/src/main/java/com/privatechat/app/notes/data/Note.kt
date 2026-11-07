@@ -37,5 +37,11 @@ data class Note(
     // Added in kitty_notes.db v4 (additive; default keeps old rows valid):
     /** AI-suggested tags, comma-separated, "" = none. */
     @ColumnInfo(defaultValue = "''")
-    val tags: String = ""
+    val tags: String = "",
+    // Added in kitty_notes.db v5 (additive; defaults keep old rows valid):
+    /** True when this note is locked with the Notes password/fingerprint. */
+    @ColumnInfo(defaultValue = "0")
+    val locked: Boolean = false,
+    /** Self-destruct time (epoch millis), null = the note never expires. */
+    val expiresAt: Long? = null
 )

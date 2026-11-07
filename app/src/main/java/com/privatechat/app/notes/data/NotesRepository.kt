@@ -56,6 +56,30 @@ class NotesRepository(context: Context) {
         notes.update(note.copy(archived = archived, updatedAt = System.currentTimeMillis()))
     }
 
+    /** Per-note lock (Notes password / fingerprint). */
+    suspend fun setLocked(note: Note, locked: Boolean) = withContext(Dispatchers.IO) {
+        notes.update(note.copy(locked = locked, updatedAt = System.currentTimeMillis()))
+    }
+
+    /** Self-destruct time (null = never expires). */
+    suspend fun setExpiresAt(note: Note, expiresAt: Long?) = withContext(Dispatchers.IO) {
+        notes.update(note.copy(expiresAt = expiresAt, updatedAt = System.currentTimeMillis()))
+    }
+
+    /**
+     * Moves notes past their self-destruct time into Trash (recoverable,
+     * never a permanent delete — Trash auto-cleans after 30 days).
+     * Returns the moved notes so the caller can cancel their reminders.
+     */
+    suspend fun moveExpiredNotesToTrash(): List<Note> = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val expired = notes.getExpired(now)
+        expired.forEach { n ->
+            notes.update(n.copy(deletedAt = now, updatedAt = now))
+        }
+        expired
+    }
+
     /** Soft-delete into Trash (recoverable). */
     suspend fun moveToTrash(note: Note) = withContext(Dispatchers.IO) {
         notes.update(note.copy(deletedAt = System.currentTimeMillis(), updatedAt = System.currentTimeMillis()))
@@ -123,6 +147,9 @@ class NotesRepository(context: Context) {
                 deletedAt = null,
                 reminderAt = null,
                 reminderRepeat = "NONE",
+                // A copy starts fresh: unlocked, and never expires.
+                locked = false,
+                expiresAt = null,
                 createdAt = now,
                 updatedAt = now
             )

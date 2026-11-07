@@ -24,6 +24,7 @@
         <item android:id="@+id/nav_qr_scan" android:icon="@drawable/ic_camera" android:title="@string/notes_qr_scan" />
         <item android:id="@+id/nav_scan_text" android:icon="@drawable/ic_camera" android:title="@string/notes_scan_text" />
         <item android:id="@+id/nav_ai_write" android:icon="@android:drawable/ic_menu_edit" android:title="@string/notes_ai_write" />
+        <item android:id="@+id/nav_study_helper" android:icon="@android:drawable/ic_menu_agenda" android:title="@string/notes_study_helper" />
         <item android:id="@+id/nav_open_pdf" android:icon="@drawable/ic_menu_edit" android:title="@string/notes_pdf_viewer" />
         <item android:id="@+id/nav_backup_now" android:icon="@drawable/ic_drv_backup" android:title="@string/notes_backup_now" />
     </group>

@@ -48,6 +48,10 @@ object NotesBackup {
                     // v4 field — additive; older parsers ignore it,
                     // and this parser reads it optionally below.
                     .put("tags", n.tags)
+                    // v5 fields — additive; older parsers ignore them,
+                    // and this parser reads them optionally below.
+                    .put("locked", n.locked)
+                    .put("expiresAt", n.expiresAt ?: JSONObject.NULL)
             )
         }
         root.put("notes", noteArr)
@@ -100,7 +104,9 @@ object NotesBackup {
                     isChecklist = o.optBoolean("isChecklist", false),
                     reminderAt = if (o.isNull("reminderAt")) null else o.optLong("reminderAt"),
                     reminderRepeat = o.optString("reminderRepeat", "NONE"),
-                    tags = o.optString("tags", "")
+                    tags = o.optString("tags", ""),
+                    locked = o.optBoolean("locked", false),
+                    expiresAt = if (o.isNull("expiresAt")) null else o.optLong("expiresAt")
                 )
             )
         }
