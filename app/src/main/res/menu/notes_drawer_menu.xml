@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <group android:checkableBehavior="none">
-        <item android:id="@+id/nav_sync" android:icon="@drawable/ic_notes_cloud" android:title="@string/notes_sync_title" />
         <item android:id="@+id/nav_backup" android:icon="@drawable/ic_drv_backup" android:title="@string/notes_backup" />
         <item android:id="@+id/nav_restore" android:icon="@drawable/ic_drv_restore" android:title="@string/notes_restore" />
     </group>

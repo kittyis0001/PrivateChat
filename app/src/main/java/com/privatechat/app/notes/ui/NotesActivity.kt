@@ -1,7 +1,10 @@
 package com.privatechat.app.notes.ui
 
 import android.animation.ObjectAnimator
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import android.os.Bundle
@@ -28,7 +31,13 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 import com.google.android.material.navigation.NavigationView
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.privatechat.app.R
@@ -38,10 +47,13 @@ import com.privatechat.app.notes.backup.ExpiryWorker
 import com.privatechat.app.notes.backup.NotesBackup
 import com.privatechat.app.notes.data.Category
 import com.privatechat.app.notes.data.Note
+import com.privatechat.app.notes.data.NoteImageStore
 import com.privatechat.app.notes.data.NotesRepository
 import com.privatechat.app.notes.reminder.ReminderManager
 import com.privatechat.app.notes.security.NoteLockAuth
 import com.privatechat.app.notes.security.NotesLockManager
+import com.privatechat.app.notes.sync.NotesSyncManager
+import com.privatechat.app.notes.sync.WeatherForecast
 import com.privatechat.app.notes.util.DocumentScan
 import com.privatechat.app.notes.util.GeminiSummarizer
 import com.privatechat.app.notes.util.LoadingDialog
@@ -55,6 +67,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Hello Kitty Notes home — the app's primary screen.
@@ -67,6 +83,61 @@ import java.io.File
 class NotesActivity : AppCompatActivity() {
 
     private val repo by lazy { NotesRepository(this) }
+
+    // ---------------- Keep-style Google sign-in + cloud sync ----------------
+
+    private val googleSignInOptions: GoogleSignInOptions by lazy {
+        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.google_web_client_id))
+            .requestEmail()
+            .build()
+    }
+
+    private val googleSignInLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account.idToken
+            if (idToken == null) {
+                Toast.makeText(this, getString(R.string.notes_sync_failed), Toast.LENGTH_SHORT).show()
+                return@registerForActivityResult
+            }
+            lifecycleScope.launch {
+                try {
+                    NotesSyncManager.awaitTask(
+                        FirebaseAuth.getInstance().signInWithCredential(
+                            GoogleAuthProvider.getCredential(idToken, null)
+                        )
+                    )
+                    val imported = NotesSyncManager.syncAfterSignIn(repo)
+                    refreshSyncHeader()
+                    val msg = if (imported > 0) {
+                        getString(R.string.notes_sync_restored, imported)
+                    } else {
+                        getString(
+                            R.string.notes_sync_signed_in,
+                            NotesSyncManager.currentEmail().orEmpty()
+                        )
+                    }
+                    Toast.makeText(this@NotesActivity, msg, Toast.LENGTH_LONG).show()
+                } catch (_: Exception) {
+                    Toast.makeText(
+                        this@NotesActivity,
+                        getString(R.string.notes_sync_failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        } catch (e: ApiException) {
+            when (e.statusCode) {
+                CommonStatusCodes.DEVELOPER_ERROR -> showSyncSetupIncomplete()
+                12501 -> Unit // The user cancelled the Google picker.
+                else -> Toast.makeText(this, getString(R.string.notes_sync_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     private lateinit var drawer: DrawerLayout
     private lateinit var notesList: RecyclerView
@@ -202,37 +273,74 @@ class NotesActivity : AppCompatActivity() {
             .create()
         progress.show()
         lifecycleScope.launch {
-            val scanned = withContext(Dispatchers.IO) {
-                TextScanner.recognizeUris(this@NotesActivity, pageUris)
-            }
-            scanned.onSuccess { text ->
-                // AI cleanup (best-effort, only with a saved key): fixes
-                // OCR misreads, keeps wording/case/line breaks and the
-                // ** bold markers. Falls back to the raw OCR text.
-                var plain = text.plainText
-                var md = text.markdownText
-                if (GeminiSummarizer.getApiKey(this@NotesActivity) != null) {
-                    GeminiSummarizer.cleanOcrText(this@NotesActivity, md).onSuccess { cleaned ->
-                        md = cleaned
-                        plain = cleaned.replace("**", "")
-                    }
+            val useAi = GeminiSummarizer.getApiKey(this@NotesActivity) != null
+            if (useAi) progress.setMessage(getString(R.string.notes_scan_ai_fixing))
+            // Per page: ML Kit OCR first, then (with a saved AI key) the
+            // vision pass, which reads the photo itself — it restores
+            // punctuation, marks __underlined__ text, rebuilds tables
+            // as | pipe | tables, and fills unreadable words from
+            // context, wrapping each guess in [? ?]. Any step that
+            // fails falls back to that page's plain OCR text, so a
+            // scan never fails because the AI step did. Without a key
+            // the old text-only cleanup runs instead (text + **bold**).
+            val pageTexts = mutableListOf<String>()
+            for (uri in pageUris) {
+                val md = withContext(Dispatchers.IO) {
+                    TextScanner.recognizeUri(this@NotesActivity, uri).getOrNull()?.markdownText
                 }
-                val title = GeminiSummarizer.smartTitle(this@NotesActivity, plain)
-                progress.dismiss()
-                openEditorWithTemplate(title, md)
-                Toast.makeText(
-                    this@NotesActivity,
-                    getString(R.string.notes_scan_text_saved),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }.onFailure {
+                if (md.isNullOrBlank()) continue
+                val fixed = if (useAi) {
+                    val jpeg = withContext(Dispatchers.IO) {
+                        GeminiSummarizer.pageJpegBytes(this@NotesActivity, uri)
+                    }
+                    if (jpeg != null) {
+                        GeminiSummarizer.fixScannedPage(this@NotesActivity, jpeg, md).getOrNull()
+                    } else null
+                } else null
+                pageTexts += fixed ?: md
+            }
+            if (pageTexts.isEmpty()) {
                 progress.dismiss()
                 Toast.makeText(
                     this@NotesActivity,
                     getString(R.string.notes_scan_no_text),
                     Toast.LENGTH_SHORT
                 ).show()
+                return@launch
             }
+            var md = pageTexts.joinToString("\n\n").trim()
+            if (!useAi) {
+                GeminiSummarizer.cleanOcrText(this@NotesActivity, md).onSuccess { cleaned ->
+                    md = cleaned
+                }
+            }
+            val plain = md.replace("**", "").replace("__", "")
+            val title = GeminiSummarizer.smartTitle(this@NotesActivity, plain)
+            // The scanned note is saved first so the page photos can be
+            // attached to it (photos live on a note id, max 10); the
+            // editor then opens that note, showing the photos under
+            // the text — so the boxes and the table stay visible
+            // exactly as printed in the book.
+            val noteId = withContext(Dispatchers.IO) {
+                repo.saveNote(Note(title = title, content = md))
+            }
+            withContext(Dispatchers.IO) {
+                pageUris.take(NoteImageStore.MAX_IMAGES_PER_NOTE).forEach { uri ->
+                    NoteImageStore.importImage(this@NotesActivity, uri)?.let { fileName ->
+                        repo.addImageRecord(noteId, fileName)
+                    }
+                }
+            }
+            progress.dismiss()
+            startActivity(
+                Intent(this@NotesActivity, NoteEditorActivity::class.java)
+                    .putExtra(NoteEditorActivity.EXTRA_NOTE_ID, noteId)
+            )
+            Toast.makeText(
+                this@NotesActivity,
+                getString(R.string.notes_scan_text_saved),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -308,7 +416,7 @@ class NotesActivity : AppCompatActivity() {
             bar.visibility = if (bar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
             if (bar.visibility == View.VISIBLE) searchInput.requestFocus()
         }
-        findViewById<View>(R.id.notesCloudButton).setOnClickListener { showSyncStatus() }
+        findViewById<View>(R.id.notesCloudButton).setOnClickListener { showWeather() }
         findViewById<View>(R.id.notesSearchClear).setOnClickListener {
             searchInput.text.clear()
             searchQuery = ""
@@ -354,6 +462,21 @@ class NotesActivity : AppCompatActivity() {
         lifecycleScope.launch { repo.ensureDefaultCategories() }
         observeData()
         applyAccent()
+        refreshSyncHeader()
+        // Signed in: pull any notes that arrived from another device.
+        // The merge skips notes already here, so this never duplicates.
+        if (NotesSyncManager.isSignedIn()) {
+            lifecycleScope.launch { NotesSyncManager.restoreFromCloud(repo) }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Signed in: push the current notes up when leaving this screen,
+        // so edits reach the cloud without any button.
+        if (NotesSyncManager.isSignedIn()) {
+            lifecycleScope.launch { NotesSyncManager.uploadNow(repo) }
+        }
     }
 
     /** Applies the chosen Notes theme accent to real UI elements (FAB tint). */
@@ -472,7 +595,6 @@ class NotesActivity : AppCompatActivity() {
         nav.setNavigationItemSelectedListener { item ->
             drawer.closeDrawers()
             when (item.itemId) {
-                R.id.nav_sync -> { showSyncStatus(); true }
                 R.id.nav_backup -> { exportLauncher.launch("kitty-notes-backup.json"); true }
                 R.id.nav_restore -> { importLauncher.launch(arrayOf("application/json")); true }
                 R.id.nav_calendar -> { startActivity(Intent(this, CalendarActivity::class.java)); true }
@@ -511,12 +633,122 @@ class NotesActivity : AppCompatActivity() {
                 else -> false
             }
         }
+
+        // Drawer header ("Sync Notes / Login"): shows the signed-in
+        // Google account when sync is on; tapping it signs in (or,
+        // when already signed in, offers sign-out).
+        val header = nav.getHeaderView(0)
+        header.setOnClickListener { onSyncHeaderClick() }
+        refreshSyncHeader()
     }
 
-    private fun showSyncStatus() {
+    /** Drawer header subtitle: the Google account email when signed in, else "Login". */
+    private fun refreshSyncHeader() {
+        val nav = findViewById<NavigationView>(R.id.notesNavView)
+        val label = nav.getHeaderView(0).findViewById<TextView>(R.id.syncLoginLabel)
+        label.text = NotesSyncManager.currentEmail() ?: getString(R.string.notes_sync_login)
+    }
+
+    private fun onSyncHeaderClick() {
+        if (NotesSyncManager.isSignedIn()) {
+            AlertDialog.Builder(this)
+                .setMessage(
+                    getString(
+                        R.string.notes_sync_signed_in,
+                        NotesSyncManager.currentEmail().orEmpty()
+                    )
+                )
+                .setPositiveButton(getString(R.string.notes_sync_sign_out)) { _, _ ->
+                    FirebaseAuth.getInstance().signOut()
+                    GoogleSignIn.getClient(this, googleSignInOptions).signOut()
+                    refreshSyncHeader()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        } else {
+            googleSignInLauncher.launch(
+                GoogleSignIn.getClient(this, googleSignInOptions).signInIntent
+            )
+        }
+    }
+
+    /** The one-time owner setup is missing (SHA-1 / Web client ID): say so plainly. */
+    private fun showSyncSetupIncomplete() {
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.notes_sync_title))
-            .setMessage(getString(R.string.notes_sync_unavailable))
+            .setTitle(getString(R.string.notes_sync_setup_title))
+            .setMessage(
+                getString(R.string.notes_sync_setup_msg, packageName, signingSha1())
+            )
+            .setNeutralButton(getString(R.string.notes_sync_copy_sha)) { _, _ ->
+                val cm = getSystemService(ClipboardManager::class.java)
+                cm?.setPrimaryClip(ClipData.newPlainText("sha1", signingSha1()))
+                Toast.makeText(this, getString(R.string.notes_sync_copied), Toast.LENGTH_SHORT).show()
+            }
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    /** SHA-1 of the certificate signing THIS installed build. */
+    private fun signingSha1(): String {
+        return runCatching {
+            val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+                    .signingInfo?.apkContentsSigners
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNATURES).signatures
+            }
+            val cert = signatures?.firstOrNull()?.toByteArray() ?: return "-"
+            MessageDigest.getInstance("SHA-1").digest(cert)
+                .joinToString(":") { "%02X".format(it) }
+        }.getOrDefault("-")
+    }
+
+    // ---------------- 7-day weather forecast (IP location) ----------------
+
+    private fun showWeather() {
+        val progress = LoadingDialog.show(this)
+        lifecycleScope.launch {
+            try {
+                val forecast = WeatherForecast.fetch()
+                progress.dismiss()
+                showForecastDialog(forecast)
+            } catch (_: Exception) {
+                progress.dismiss()
+                Toast.makeText(
+                    this@NotesActivity,
+                    getString(R.string.notes_weather_failed),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun showForecastDialog(forecast: WeatherForecast.Result) {
+        val dp = resources.displayMetrics.density
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((20 * dp).toInt(), (8 * dp).toInt(), (20 * dp).toInt(), (8 * dp).toInt())
+        }
+        val dayFmt = SimpleDateFormat("EEE, d MMM", Locale.getDefault())
+        val inFmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        forecast.days.forEach { day ->
+            val dateText = runCatching {
+                dayFmt.format(inFmt.parse(day.date) ?: Date())
+            }.getOrDefault(day.date)
+            val row = TextView(this).apply {
+                text = "$dateText  •  ${WeatherForecast.condition(day.code)}\n" +
+                    "H ${day.maxC}°  /  L ${day.minC}°  •  " +
+                    getString(R.string.notes_weather_rain, day.rainChance)
+                textSize = 14f
+                setPadding(0, (10 * dp).toInt(), 0, (10 * dp).toInt())
+            }
+            container.addView(row)
+        }
+        val scroll = android.widget.ScrollView(this).apply { addView(container) }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_weather_title, forecast.place))
+            .setView(scroll)
             .setPositiveButton(android.R.string.ok, null)
             .show()
     }

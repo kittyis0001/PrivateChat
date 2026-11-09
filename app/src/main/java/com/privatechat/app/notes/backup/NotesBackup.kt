@@ -8,10 +8,9 @@ import org.json.JSONObject
 
 /**
  * Local backup/restore for Notes data as JSON. Used with the Android
- * Storage Access Framework (user picks the file). There is no Notes
- * cloud backend in this project, so cloud sync is reported as
- * not configured — this never pretends to sync anywhere, and it only
- * ever reads/writes Notes tables.
+ * Storage Access Framework (user picks the file). The same JSON format
+ * is also what the Firebase cloud sync uploads (see NotesSyncManager);
+ * this file itself only ever reads/writes Notes tables.
  */
 object NotesBackup {
 
