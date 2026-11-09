@@ -39,6 +39,15 @@ import kotlin.coroutines.resumeWithException
  * stored as **markers** in the plain-text note (see [RichText]);
  * the editor renders them bold and PDF / image export does too.
  *
+ * Underline, tables and punctuation: ML Kit reports neither
+ * underlines nor table structure, so those come from the Gemini
+ * vision pass ([GeminiSummarizer.fixScannedPage]) when the user
+ * has an AI key — it reads the photo itself, marks __underlined__
+ * text, rebuilds tables as | pipe | tables, restores punctuation
+ * as printed, and fills unreadable words from context, wrapping
+ * each guess in [? ?]. Without a key the scan keeps text + bold
+ * only, exactly as before.
+ *
  * Bengali script is a known gap: ML Kit's on-device recogniser
  * supports Latin (plus Chinese / Devanagari / Japanese / Korean
  * with their own models), but there is no on-device Bengali model,

@@ -31,8 +31,6 @@
     <string name="notes_move_to_trash">Move to Trash</string>
     <string name="notes_last_edited">Last edited %1$s</string>
     <string name="notes_new_note">New note</string>
-    <string name="notes_sync_title">Cloud Sync</string>
-    <string name="notes_sync_unavailable">Cloud sync is not configured for Notes yet. Your notes are safely stored on this device, and you can back them up or restore them from the drawer menu.</string>
     <string name="notes_backup">Back up notes</string>
     <string name="notes_restore">Restore</string>
     <string name="notes_calendar_title">Calendar</string>
@@ -233,6 +231,22 @@ Remember:</string>
     <string name="notes_fingerprint_subtitle">Use your fingerprint to open your notes</string>
     <string name="notes_fingerprint_failed">Fingerprint not recognised — try again or use your password</string>
 
+    <!-- Keep-style Google sign-in + cloud sync (Notes only, Firebase) -->
+    <string name="google_web_client_id" translatable="false">PASTE_YOUR_WEB_CLIENT_ID_HERE</string>
+    <string name="notes_sync_sign_in">Sign in with Google</string>
+    <string name="notes_sync_sign_out">Sign out</string>
+    <string name="notes_sync_signed_in">Signed in as %1$s</string>
+    <string name="notes_sync_restored">%1$d notes restored from your Google account</string>
+    <string name="notes_sync_failed">Sign-in failed — please try again</string>
+    <string name="notes_sync_setup_title">One setup step left</string>
+    <string name="notes_sync_setup_msg">Google needs this app registered once by its owner before sign-in can work. In Firebase Console, add this build’s SHA-1 fingerprint under Project settings → Your apps → com.privatechat.app, and put the Web client ID into the app. Package: %1$s\nSHA-1: %2$s</string>
+    <string name="notes_sync_copy_sha">Copy SHA-1</string>
+    <string name="notes_sync_copied">Copied</string>
+    <!-- 7-day weather forecast (IP location, no permission needed) -->
+    <string name="notes_weather_title">7-day forecast — %1$s</string>
+    <string name="notes_weather_failed">Couldn’t load the forecast — check your internet and try again</string>
+    <string name="notes_weather_rain">Rain %1$d%%</string>
+
     <!-- Google Drive backup (Notes only) -->
 
     <!-- Kitty Notes smart pack (additive) -->
@@ -350,6 +364,7 @@ Remember:</string>
     <string name="notes_scan_doc">Scan document</string>
     <string name="notes_scan_text">Scan text</string>
     <string name="notes_scan_reading">Reading text…</string>
+    <string name="notes_scan_ai_fixing">AI is reading the photo to fix the text…</string>
     <string name="notes_scan_no_text">No text found in the scan</string>
     <string name="notes_scan_text_saved">Text scanned into a new note</string>
     <string name="notes_scan_saved">Scanned PDF saved</string>

@@ -1,6 +1,9 @@
 package com.privatechat.app.notes.util
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -9,6 +12,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
 
 /**
@@ -149,18 +153,47 @@ object GeminiSummarizer {
     data class CategorySuggestion(val category: String, val tags: List<String>)
 
     /** One Gemini text call, shared by the newer features. Throws on failure. */
-    private suspend fun generateText(key: String, prompt: String): String =
-        withContext(Dispatchers.IO) {
-            val bodyJson = JSONObject()
-                .put(
-                    "contents", JSONArray().put(
-                        JSONObject().put(
-                            "parts", JSONArray().put(
-                                JSONObject().put("text", prompt)
-                            )
+    private suspend fun generateText(key: String, prompt: String): String {
+        val bodyJson = JSONObject()
+            .put(
+                "contents", JSONArray().put(
+                    JSONObject().put(
+                        "parts", JSONArray().put(
+                            JSONObject().put("text", prompt)
                         )
                     )
-                ).toString()
+                )
+            ).toString()
+        return callGemini(key, bodyJson)
+    }
+
+    /**
+     * Same call, but with a JPEG photo attached so Gemini can SEE the
+     * page (vision). The model is multimodal, so the same endpoint
+     * accepts the image as an inlineData part. Throws on failure.
+     */
+    private suspend fun generateWithImage(key: String, prompt: String, jpegBytes: ByteArray): String {
+        val parts = JSONArray()
+            .put(JSONObject().put("text", prompt))
+            .put(
+                JSONObject().put(
+                    "inlineData", JSONObject()
+                        .put("mimeType", "image/jpeg")
+                        .put("data", Base64.encodeToString(jpegBytes, Base64.NO_WRAP))
+                )
+            )
+        val bodyJson = JSONObject()
+            .put(
+                "contents", JSONArray().put(
+                    JSONObject().put("parts", parts)
+                )
+            ).toString()
+        return callGemini(key, bodyJson)
+    }
+
+    /** The HTTP call + reply parsing shared by [generateText] and [generateWithImage]. */
+    private suspend fun callGemini(key: String, bodyJson: String): String =
+        withContext(Dispatchers.IO) {
             val client = OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
@@ -332,10 +365,75 @@ object GeminiSummarizer {
                 val prompt = "Fix obvious OCR misreads in this scanned text (wrong letters, " +
                     "split or joined words, stray symbols). Keep the exact wording, " +
                     "capitalization, numbers and line breaks — do not add, remove or " +
-                    "rephrase anything. Keep any **bold markers** exactly where they are. " +
+                    "rephrase anything. Keep any **bold** and __underline__ markers " +
+                    "exactly where they are. " +
                     "If the text is already clean, return it unchanged. Reply with only " +
                     "the corrected text:\n\n" + text.take(6000)
                 generateText(key, prompt)
             }
         }
+
+    /**
+     * Vision pass for one scanned page: Gemini reads the photo itself
+     * (not just the OCR text), so it can fix what the on-device OCR
+     * misread or missed entirely — faded print, shadows, a cut-off
+     * edge. It restores punctuation as printed, keeps **bold**,
+     * marks __underlined__ text, rebuilds tables as | pipe | tables,
+     * and fills an unreadable word from context only when confident,
+     * wrapped in [? ?] so the user can verify it against the book.
+     * Never throws; the caller keeps the raw OCR text when this fails
+     * (no key, no internet, bad reply).
+     */
+    suspend fun fixScannedPage(context: Context, jpegBytes: ByteArray, ocrText: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val prompt = "You are fixing the text of one scanned textbook page. " +
+                    "The attached photo IS the page. Below it is machine OCR of the same page, " +
+                    "with **bold** markers where the OCR thought the text was bold.\n\n" +
+                    "Read the photo carefully and return the page's full text, corrected:\n" +
+                    "- Fix misread letters and words. Restore punctuation exactly as printed " +
+                    "(full stops, commas, colons, semicolons, dashes, quotes, brackets).\n" +
+                    "- Keep the original wording, order, numbers, names, dates and line breaks. " +
+                    "Do not add, remove or rephrase anything.\n" +
+                    "- Keep **bold** on text that is bold in the photo. " +
+                    "Mark text that is underlined in the photo with __double underscores__.\n" +
+                    "- Reproduce any table as a Markdown table (| header | ... |), one row per line.\n" +
+                    "- If a word is unreadable even in the photo, reconstruct it from context " +
+                    "ONLY when you are confident, and wrap ONLY that word in [? ?] " +
+                    "(example: [? letter ?]) so the user can check it. Never invent a whole sentence.\n" +
+                    "Reply with only the corrected text, nothing else.\n\nOCR text:\n" + ocrText.take(6000)
+                generateWithImage(key, prompt, jpegBytes)
+            }
+        }
+
+    /**
+     * Downscales one scanned page to a JPEG byte array (max 1600px)
+     * for the vision call, so a huge camera photo does not make a
+     * multi-megabyte API request. Null when the page is unreadable.
+     */
+    fun pageJpegBytes(context: Context, uri: Uri): ByteArray? {
+        return try {
+            val resolver = context.applicationContext.contentResolver
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+            var sample = 1
+            while (bounds.outWidth / (sample * 2) >= 1600 ||
+                bounds.outHeight / (sample * 2) >= 1600
+            ) {
+                sample *= 2
+            }
+            val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+            val bitmap = resolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, opts)
+            } ?: return null
+            val out = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+            bitmap.recycle()
+            out.toByteArray()
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

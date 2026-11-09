@@ -221,41 +221,70 @@ class NoteEditorActivity : AppCompatActivity() {
         progress.show()
         lifecycleScope.launch {
             persistNow() // save the note being edited before opening the new one
-            val scanned = withContext(Dispatchers.IO) {
-                TextScanner.recognizeUris(this@NoteEditorActivity, pageUris)
-            }
-            scanned.onSuccess { text ->
-                // AI cleanup (best-effort, only with a saved key): fixes
-                // OCR misreads, keeps wording/case/line breaks and the
-                // ** bold markers. Falls back to the raw OCR text.
-                var plain = text.plainText
-                var md = text.markdownText
-                if (GeminiSummarizer.getApiKey(this@NoteEditorActivity) != null) {
-                    GeminiSummarizer.cleanOcrText(this@NoteEditorActivity, md).onSuccess { cleaned ->
-                        md = cleaned
-                        plain = cleaned.replace("**", "")
-                    }
+            val useAi = GeminiSummarizer.getApiKey(this@NoteEditorActivity) != null
+            if (useAi) progress.setMessage(getString(R.string.notes_scan_ai_fixing))
+            // Same per-page flow as the home screen's scan: ML Kit OCR,
+            // then (with a saved AI key) the vision pass, which reads
+            // the photo itself — restores punctuation, marks
+            // __underlined__ text, rebuilds tables as | pipe | tables,
+            // and fills unreadable words from context, wrapping each
+            // guess in [? ?]. Any step that fails falls back to that
+            // page's plain OCR text.
+            val pageTexts = mutableListOf<String>()
+            for (uri in pageUris) {
+                val md = withContext(Dispatchers.IO) {
+                    TextScanner.recognizeUri(this@NoteEditorActivity, uri).getOrNull()?.markdownText
                 }
-                val title = GeminiSummarizer.smartTitle(this@NoteEditorActivity, plain)
-                progress.dismiss()
-                startActivity(
-                    Intent(this@NoteEditorActivity, NoteEditorActivity::class.java)
-                        .putExtra(EXTRA_TEMPLATE_TITLE, title)
-                        .putExtra(EXTRA_TEMPLATE_CONTENT, md)
-                )
-                Toast.makeText(
-                    this@NoteEditorActivity,
-                    getString(R.string.notes_scan_text_saved),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }.onFailure {
+                if (md.isNullOrBlank()) continue
+                val fixed = if (useAi) {
+                    val jpeg = withContext(Dispatchers.IO) {
+                        GeminiSummarizer.pageJpegBytes(this@NoteEditorActivity, uri)
+                    }
+                    if (jpeg != null) {
+                        GeminiSummarizer.fixScannedPage(this@NoteEditorActivity, jpeg, md).getOrNull()
+                    } else null
+                } else null
+                pageTexts += fixed ?: md
+            }
+            if (pageTexts.isEmpty()) {
                 progress.dismiss()
                 Toast.makeText(
                     this@NoteEditorActivity,
                     getString(R.string.notes_scan_no_text),
                     Toast.LENGTH_SHORT
                 ).show()
+                return@launch
             }
+            var md = pageTexts.joinToString("\n\n").trim()
+            if (!useAi) {
+                GeminiSummarizer.cleanOcrText(this@NoteEditorActivity, md).onSuccess { cleaned ->
+                    md = cleaned
+                }
+            }
+            val plain = md.replace("**", "").replace("__", "")
+            val title = GeminiSummarizer.smartTitle(this@NoteEditorActivity, plain)
+            // Save first so the page photos can be attached to the
+            // note (photos live on a note id, max 10), then open it.
+            val noteId = withContext(Dispatchers.IO) {
+                repo.saveNote(Note(title = title, content = md))
+            }
+            withContext(Dispatchers.IO) {
+                pageUris.take(NoteImageStore.MAX_IMAGES_PER_NOTE).forEach { uri ->
+                    NoteImageStore.importImage(this@NoteEditorActivity, uri)?.let { fileName ->
+                        repo.addImageRecord(noteId, fileName)
+                    }
+                }
+            }
+            progress.dismiss()
+            startActivity(
+                Intent(this@NoteEditorActivity, NoteEditorActivity::class.java)
+                    .putExtra(EXTRA_NOTE_ID, noteId)
+            )
+            Toast.makeText(
+                this@NoteEditorActivity,
+                getString(R.string.notes_scan_text_saved),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -449,15 +478,16 @@ class NoteEditorActivity : AppCompatActivity() {
     }
 
     /**
-     * Bold in the editor: a note that stores **markers** (a scanned
-     * note) shows the words bold, with the markers hidden. Saving
-     * converts the bold spans back to markers (see [currentBodyText]),
-     * so the round-trip is stable. Notes without markers are
-     * untouched — their save path is byte-identical to before.
+     * Bold/underline in the editor: a note that stores **markers**
+     * or __markers__ (a scanned note) shows the words bold and
+     * underlined, with the markers hidden. Saving converts the
+     * spans back to markers (see [currentBodyText]), so the
+     * round-trip is stable. Notes without markers are untouched —
+     * their save path is byte-identical to before.
      */
     private fun applyBoldMarkersIfPresent() {
         val text = contentInput.text.toString()
-        if (!RichText.hasBoldMarkers(text)) return
+        if (!RichText.hasMarkers(text)) return
         boldMarkersPresent = true
         contentInput.setText(RichText.toSpanned(text))
     }

@@ -80,6 +80,11 @@ dependencies {
     implementation("com.google.firebase:firebase-database-ktx")
     implementation("com.google.firebase:firebase-messaging-ktx")
     implementation("com.google.firebase:firebase-storage-ktx")
+    implementation("com.google.firebase:firebase-auth-ktx")
+
+    // Kitty Notes Keep-style sync: Google sign-in for the account
+    // picker; the ID token goes to Firebase Auth (see NotesSyncManager).
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 

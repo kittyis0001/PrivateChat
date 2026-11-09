@@ -60,6 +60,19 @@
     <string name="notes_fingerprint_prompt">Kitty Notes খোলো</string>
     <string name="notes_fingerprint_subtitle">তোমার নোট খুলতে ফিঙ্গারপ্রিন্ট ব্যবহার করো</string>
     <string name="notes_fingerprint_failed">ফিঙ্গারপ্রিন্ট মেলেনি — আবার চেষ্টা করো বা পাসওয়ার্ড দাও</string>
+    <string name="notes_sync_login">লগইন</string>
+    <string name="notes_sync_sign_in">Google দিয়ে লগইন করো</string>
+    <string name="notes_sync_sign_out">সাইন আউট</string>
+    <string name="notes_sync_signed_in">%1$s হিসেবে লগইন হয়েছে</string>
+    <string name="notes_sync_restored">তোমার Google অ্যাকাউন্ট থেকে %1$d টা নোট ফিরে এসেছে</string>
+    <string name="notes_sync_failed">লগইন হয়নি — আবার চেষ্টা করো</string>
+    <string name="notes_sync_setup_title">একটা সেটআপ বাকি আছে</string>
+    <string name="notes_sync_setup_msg">সাইন-ইন চালু হওয়ার আগে Google-এ এই অ্যাপটা একবার রেজিস্টার করতে হয়। Firebase Console-এ Project settings → Your apps → com.privatechat.app-এ এই build-এর SHA-1 যোগ করো, আর Web client ID অ্যাপে বসাও। Package: %1$s\nSHA-1: %2$s</string>
+    <string name="notes_sync_copy_sha">SHA-1 কপি করো</string>
+    <string name="notes_sync_copied">কপি হয়েছে</string>
+    <string name="notes_weather_title">৭ দিনের আবহাওয়া — %1$s</string>
+    <string name="notes_weather_failed">আবহাওয়া লোড হয়নি — ইন্টারনেট দেখে আবার চেষ্টা করো</string>
+    <string name="notes_weather_rain">বৃষ্টি %1$d%%</string>
 
     <!-- Kitty Notes smart pack (additive) -->
     <string name="notes_voice_record">ভয়েস নোট</string>
@@ -176,6 +189,7 @@
     <string name="notes_scan_doc">ডকুমেন্ট স্ক্যান করো</string>
     <string name="notes_scan_text">টেক্সট স্ক্যান করো</string>
     <string name="notes_scan_reading">লেখা পড়ছি…</string>
+    <string name="notes_scan_ai_fixing">AI ছবিটা দেখে লেখা ঠিক করছে…</string>
     <string name="notes_scan_no_text">স্ক্যানে কোনো লেখা পাওয়া যায়নি</string>
     <string name="notes_scan_text_saved">লেখা স্ক্যান করে নতুন নোটে নেওয়া হয়েছে</string>
     <string name="notes_scan_saved">স্ক্যান করা PDF সেভ হয়েছে</string>
