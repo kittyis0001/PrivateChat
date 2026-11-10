@@ -190,6 +190,7 @@
     <string name="notes_scan_text">টেক্সট স্ক্যান করো</string>
     <string name="notes_scan_reading">লেখা পড়ছি…</string>
     <string name="notes_scan_ai_fixing">AI ছবিটা দেখে লেখা ঠিক করছে…</string>
+    <string name="notes_scan_ai_failed">AI ঠিক করতে পারেনি — সাধারণ OCR লেখা দেখানো হচ্ছে। ইন্টারনেট দেখে আবার scan করো</string>
     <string name="notes_scan_no_text">স্ক্যানে কোনো লেখা পাওয়া যায়নি</string>
     <string name="notes_scan_text_saved">লেখা স্ক্যান করে নতুন নোটে নেওয়া হয়েছে</string>
     <string name="notes_scan_saved">স্ক্যান করা PDF সেভ হয়েছে</string>
@@ -201,6 +202,10 @@
     <string name="notes_pdf_viewer">PDF খোলো</string>
     <string name="notes_pdf_no_text">এই PDF-এ পড়ার মতো লেখা পাওয়া যায়নি</string>
     <string name="notes_pdf_open_failed">এই PDF খোলা যায়নি</string>
+    <string name="notes_pdf_password_title">পাসওয়ার্ড-সুরক্ষিত PDF</string>
+    <string name="notes_pdf_password_message">এই PDF লক করা। খুলতে পাসওয়ার্ড দাও।</string>
+    <string name="notes_pdf_password_hint">PDF পাসওয়ার্ড</string>
+    <string name="notes_pdf_wrong_password">ভুল পাসওয়ার্ড — আবার চেষ্টা করো</string>
     <string name="notes_pdf_page_of">পৃষ্ঠা %1$d / %2$d</string>
     <string name="notes_pdf_extract">লেখা নোটে নাও</string>
     <string name="notes_preview">প্রিভিউ</string>
