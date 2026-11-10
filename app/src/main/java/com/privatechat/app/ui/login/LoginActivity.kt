@@ -45,10 +45,6 @@ import com.google.android.material.button.MaterialButton
  */
 class LoginActivity : AppCompatActivity() {
 
-    companion object {
-        private const val KEY_GATE_UNLOCKED = "gate_unlocked"
-    }
-
     // No-op result callback — notifications simply won't show if the user
     // declines; nothing else in the app depends on this being granted.
     private val notificationPermissionLauncher =
@@ -64,12 +60,13 @@ class LoginActivity : AppCompatActivity() {
         // Privacy: block screenshots / screen recordings of private chat content.
         SecureWindow.protect(this)
 
-        // Restore gate state across configuration changes within the same
-        // process. A fresh process starts locked because AccessGate lives
-        // only in process memory and nothing is persisted.
-        val wasUnlocked = savedInstanceState?.getBoolean(KEY_GATE_UNLOCKED, false) == true ||
-            AccessGate.isUnlocked
-        if (wasUnlocked) AccessGate.unlock()
+        // The gate lives only in process memory (see AccessGate):
+        // rotation keeps it because the process survives, but a fresh
+        // process — including one the system killed and restored —
+        // starts locked and must enter the code again. Deliberately
+        // NOT restored from savedInstanceState: that Bundle survives
+        // process death, so reading it here would reopen the chat
+        // without the code.
 
         // Always inflate the layout first and keep the login form hidden
         // so the username/password fields never flash before the gate
@@ -137,11 +134,6 @@ class LoginActivity : AppCompatActivity() {
                     }
                 })
         }
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        outState.putBoolean(KEY_GATE_UNLOCKED, AccessGate.isUnlocked)
     }
 
     private fun onAccessContinue() {

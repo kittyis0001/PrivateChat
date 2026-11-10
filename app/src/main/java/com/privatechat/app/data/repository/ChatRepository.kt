@@ -37,6 +37,14 @@ class ChatRepository(
     private val photosRef: DatabaseReference = db.getReference("photos")
 
     private var messagesListener: ChildEventListener? = null
+    private var connectionListener: ValueEventListener? = null
+    private var blockListener: ValueEventListener? = null
+    private var blockedByOtherListener: ValueEventListener? = null
+    private var nicknamesListener: ValueEventListener? = null
+    private var vanishModeListener: ValueEventListener? = null
+    private var photosListener: ValueEventListener? = null
+    private var presenceListener: ValueEventListener? = null
+    private var typingListener: ValueEventListener? = null
     private var isListenerAttached = false
     private var isBlockListenerAttached = false
     private var isBlockedByOtherListenerAttached = false
@@ -117,9 +125,37 @@ class ChatRepository(
     }
 
     fun detachAll() {
+        // Every listener attached in onStart() must come off here:
+        // only the messages listener was stored before, so the other
+        // eight kept firing into this dead repository (and the
+        // destroyed Activity's callbacks) after onDestroy.
         messagesListener?.let { messagesRef.removeEventListener(it) }
         messagesListener = null
         isListenerAttached = false
+        connectionListener?.let { connectedRef.removeEventListener(it) }
+        connectionListener = null
+        isConnectionMonitorAttached = false
+        blockListener?.let { blocksRef.child(currentUser).removeEventListener(it) }
+        blockListener = null
+        isBlockListenerAttached = false
+        blockedByOtherListener?.let { blocksRef.child(otherUser).removeEventListener(it) }
+        blockedByOtherListener = null
+        isBlockedByOtherListenerAttached = false
+        nicknamesListener?.let { nicknamesRef.removeEventListener(it) }
+        nicknamesListener = null
+        isNicknamesListenerAttached = false
+        vanishModeListener?.let { vanishModeRef.removeEventListener(it) }
+        vanishModeListener = null
+        isVanishModeListenerAttached = false
+        photosListener?.let { photosRef.removeEventListener(it) }
+        photosListener = null
+        isPhotosListenerAttached = false
+        presenceListener?.let { statusRef.child(otherUser).removeEventListener(it) }
+        presenceListener = null
+        isPresenceListenerAttached = false
+        typingListener?.let { typingRef.child(otherUser).removeEventListener(it) }
+        typingListener = null
+        isTypingListenerAttached = false
     }
 
     // ── Connection monitoring ────────────────────────────────────
@@ -127,7 +163,7 @@ class ChatRepository(
     private fun attachConnectionMonitor() {
         if (isConnectionMonitorAttached) return
         isConnectionMonitorAttached = true
-        connectedRef.addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val connected = snapshot.getValue(Boolean::class.java) ?: false
                 Log.d(TAG, "connected = $connected")
@@ -142,7 +178,9 @@ class ChatRepository(
             override fun onCancelled(error: DatabaseError) {
                 Log.e(TAG, "connection monitor cancelled: ${error.message}")
             }
-        })
+        }
+        connectionListener = listener
+        connectedRef.addValueEventListener(listener)
     }
 
     // ── Messages ──────────────────────────────────────────────────
@@ -257,26 +295,30 @@ class ChatRepository(
     private fun attachBlockListener() {
         if (isBlockListenerAttached) return
         isBlockListenerAttached = true
-        blocksRef.child(currentUser).addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val blocked = snapshot.child("blocked").getValue(Boolean::class.java) ?: false
                 val timestamp = snapshot.child("timestamp").getValue(Long::class.java) ?: 0L
                 onBlockStateChanged?.invoke(blocked, timestamp)
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        blockListener = listener
+        blocksRef.child(currentUser).addValueEventListener(listener)
     }
 
     private fun attachBlockedByOtherListener() {
         if (isBlockedByOtherListenerAttached) return
         isBlockedByOtherListenerAttached = true
-        blocksRef.child(otherUser).addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val blocked = snapshot.child("blocked").getValue(Boolean::class.java) ?: false
                 onBlockedByOtherChanged?.invoke(blocked)
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        blockedByOtherListener = listener
+        blocksRef.child(otherUser).addValueEventListener(listener)
     }
 
     // ── Nicknames ─────────────────────────────────────────────────
@@ -299,7 +341,7 @@ class ChatRepository(
     private fun attachNicknamesListener() {
         if (isNicknamesListenerAttached) return
         isNicknamesListenerAttached = true
-        nicknamesRef.addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val nicknames = mutableMapOf<String, String>()
                 for (child in snapshot.children) {
@@ -310,7 +352,9 @@ class ChatRepository(
                 onNicknamesChanged?.invoke(nicknames)
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        nicknamesListener = listener
+        nicknamesRef.addValueEventListener(listener)
     }
 
     // ── Profile photos ────────────────────────────────────────────
@@ -326,7 +370,7 @@ class ChatRepository(
     private fun attachPhotosListener() {
         if (isPhotosListenerAttached) return
         isPhotosListenerAttached = true
-        photosRef.addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val photos = mutableMapOf<String, String>()
                 for (child in snapshot.children) {
@@ -337,7 +381,9 @@ class ChatRepository(
                 onPhotosChanged?.invoke(photos)
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        photosListener = listener
+        photosRef.addValueEventListener(listener)
     }
 
     // ── Vanish Mode ───────────────────────────────────────────────
@@ -393,13 +439,15 @@ class ChatRepository(
     private fun attachVanishModeListener() {
         if (isVanishModeListenerAttached) return
         isVanishModeListenerAttached = true
-        vanishModeRef.addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val hours = snapshot.child("durationHours").getValue(Int::class.java)
                 onVanishModeChanged?.invoke(hours)
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        vanishModeListener = listener
+        vanishModeRef.addValueEventListener(listener)
     }
 
     // ── Presence ──────────────────────────────────────────────────
@@ -421,13 +469,15 @@ class ChatRepository(
     private fun attachPresenceListener() {
         if (isPresenceListenerAttached) return
         isPresenceListenerAttached = true
-        statusRef.child(otherUser).addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val status = snapshot.getValue(PresenceStatus::class.java) ?: PresenceStatus()
                 onOtherUserPresence?.invoke(status)
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        presenceListener = listener
+        statusRef.child(otherUser).addValueEventListener(listener)
     }
 
     // ── Typing ────────────────────────────────────────────────────
@@ -439,12 +489,14 @@ class ChatRepository(
     private fun attachTypingListener() {
         if (isTypingListenerAttached) return
         isTypingListenerAttached = true
-        typingRef.child(otherUser).addValueEventListener(object : ValueEventListener {
+        val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 onOtherUserTyping?.invoke(snapshot.getValue(Boolean::class.java) ?: false)
             }
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        typingListener = listener
+        typingRef.child(otherUser).addValueEventListener(listener)
     }
 
     companion object {

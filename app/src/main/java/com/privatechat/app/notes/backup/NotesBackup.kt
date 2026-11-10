@@ -22,7 +22,7 @@ object NotesBackup {
 
         val catArr = JSONArray()
         categories.forEach { c ->
-            catArr.put(JSONObject().put("name", c.name).put("isDefault", c.isDefault))
+            catArr.put(JSONObject().put("id", c.id).put("name", c.name).put("isDefault", c.isDefault))
         }
         root.put("categories", catArr)
 
@@ -86,7 +86,7 @@ object NotesBackup {
         val catArr = root.optJSONArray("categories") ?: JSONArray()
         for (i in 0 until catArr.length()) {
             val o = catArr.getJSONObject(i)
-            cats.add(Category(name = o.optString("name"), isDefault = o.optBoolean("isDefault")))
+            cats.add(Category(id = o.optLong("id", 0), name = o.optString("name"), isDefault = o.optBoolean("isDefault")))
         }
         val notes = mutableListOf<Note>()
         val noteArr = root.optJSONArray("notes") ?: JSONArray()
