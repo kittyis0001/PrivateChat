@@ -3,10 +3,7 @@ package com.privatechat.app.notes.ui
 import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.RectF
-import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
@@ -16,8 +13,6 @@ import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -33,9 +28,18 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Opens a PDF (e.g. a scanned document) page by page, and can pull
- * its readable text into a new note. Extraction is best-effort:
- * image-only PDFs have no text to extract, and the user is told so.
+ * Opens a PDF page by page, and can pull its readable text into a new
+ * note or save every page as an image in the Gallery. Extraction is
+ * best-effort: image-only PDFs have no text to extract, and the user
+ * is told so.
+ *
+ * Opens two ways: from inside the app with [EXTRA_PDF_URI], or from
+ * any other app through the system "Open with" chooser
+ * (ACTION_VIEW + application/pdf, see the manifest) — the shared
+ * file arrives as [Intent.getData].
+ *
+ * There is no edit mode in this viewer on purpose: drawing on pages
+ * was removed (2026-11-10), so the viewer only reads.
  */
 class PdfViewerActivity : AppCompatActivity() {
 
@@ -50,40 +54,16 @@ class PdfViewerActivity : AppCompatActivity() {
     private var pageCount = 0
     private var pdfUri: Uri? = null
 
-    // Edit mode: freehand drawing + stamped text on top of a page.
-    // Marks are kept per page (in the page bitmap's coordinates) so
-    // switching pages never loses them, and saving burns them into
-    // a NEW pdf — the original file is never overwritten.
-    private var editMode = false
-    private val pageAnnotations =
-        mutableMapOf<Int, MutableList<PdfAnnotateView.Element>>()
-    private lateinit var annotateView: PdfAnnotateView
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pdf_viewer)
-        val uriString = intent.getStringExtra(EXTRA_PDF_URI)
-        pdfUri = uriString?.let { Uri.parse(it) }
+        pdfUri = intent.getStringExtra(EXTRA_PDF_URI)?.let { Uri.parse(it) }
+            ?: if (intent.action == Intent.ACTION_VIEW) intent.data else null
         findViewById<View>(R.id.pdfBack).setOnClickListener { finish() }
         findViewById<Button>(R.id.pdfPrev).setOnClickListener { showPage(currentPage - 1) }
         findViewById<Button>(R.id.pdfNext).setOnClickListener { showPage(currentPage + 1) }
         findViewById<Button>(R.id.pdfExtractText).setOnClickListener { extractToNote() }
-        annotateView = findViewById(R.id.pdfAnnotateView)
-        annotateView.onTextTap = { x, y -> promptAddText(x, y) }
-        findViewById<ImageButton>(R.id.pdfEdit).setOnClickListener { enterEditMode() }
-        findViewById<Button>(R.id.pdfEditDraw).setOnClickListener {
-            setAnnotateMode(PdfAnnotateView.Mode.DRAW)
-        }
-        findViewById<Button>(R.id.pdfEditText).setOnClickListener {
-            setAnnotateMode(PdfAnnotateView.Mode.TEXT)
-        }
-        findViewById<Button>(R.id.pdfEditUndo).setOnClickListener { annotateView.undo() }
-        findViewById<Button>(R.id.pdfEditClear).setOnClickListener { confirmClearPage() }
-        findViewById<Button>(R.id.pdfEditSave).setOnClickListener { saveEditedPdf() }
-        findViewById<Button>(R.id.pdfEditCancel).setOnClickListener { exitEditMode() }
-        findViewById<Button>(R.id.pdfColorBlack).setOnClickListener { setPenColor(Color.BLACK) }
-        findViewById<Button>(R.id.pdfColorRed).setOnClickListener { setPenColor(Color.RED) }
-        findViewById<Button>(R.id.pdfColorBlue).setOnClickListener { setPenColor(Color.BLUE) }
+        findViewById<Button>(R.id.pdfSaveImages).setOnClickListener { savePagesAsImages() }
         val uri = pdfUri
         if (uri == null) {
             Toast.makeText(this, R.string.notes_pdf_open_failed, Toast.LENGTH_SHORT).show()
@@ -107,7 +87,6 @@ class PdfViewerActivity : AppCompatActivity() {
     private fun showPage(index: Int) {
         val r = renderer ?: return
         if (index !in 0 until pageCount) return
-        if (editMode) stashCurrentPageAnnotations()
         currentPage = index
         r.openPage(index).use { page ->
             val bitmap = Bitmap.createBitmap(
@@ -122,9 +101,6 @@ class PdfViewerActivity : AppCompatActivity() {
             currentBitmap?.recycle()
             currentBitmap = bitmap
             findViewById<ImageView>(R.id.pdfPageImage).setImageBitmap(bitmap)
-            if (editMode) {
-                annotateView.setPage(bitmap, pageAnnotations[index].orEmpty())
-            }
         }
         findViewById<TextView>(R.id.pdfPageLabel).text =
             getString(R.string.notes_pdf_page_of, index + 1, pageCount)
@@ -210,113 +186,28 @@ class PdfViewerActivity : AppCompatActivity() {
         }
     }
 
-    // ---------------- PDF edit mode (draw + add text, save a copy) ----------------
-
-    private fun enterEditMode() {
-        val bmp = currentBitmap ?: return
-        editMode = true
-        annotateView.setPage(bmp, pageAnnotations[currentPage].orEmpty())
-        findViewById<ImageView>(R.id.pdfPageImage).visibility = View.GONE
-        annotateView.visibility = View.VISIBLE
-        findViewById<View>(R.id.pdfEditBar).visibility = View.VISIBLE
-        findViewById<View>(R.id.pdfEdit).visibility = View.GONE
-        setAnnotateMode(PdfAnnotateView.Mode.DRAW)
-        setPenColor(Color.BLACK)
-    }
-
-    private fun exitEditMode() {
-        stashCurrentPageAnnotations()
-        editMode = false
-        annotateView.visibility = View.GONE
-        findViewById<ImageView>(R.id.pdfPageImage).visibility = View.VISIBLE
-        findViewById<View>(R.id.pdfEditBar).visibility = View.GONE
-        findViewById<View>(R.id.pdfEdit).visibility = View.VISIBLE
-    }
-
-    private fun stashCurrentPageAnnotations() {
-        if (!editMode) return
-        val elems = annotateView.getElements()
-        if (elems.isEmpty()) pageAnnotations.remove(currentPage)
-        else pageAnnotations[currentPage] = elems.toMutableList()
-    }
-
-    private fun setAnnotateMode(mode: PdfAnnotateView.Mode) {
-        annotateView.mode = mode
-        findViewById<Button>(R.id.pdfEditDraw).text =
-            if (mode == PdfAnnotateView.Mode.DRAW) "● ${getString(R.string.notes_pdf_edit_draw)}"
-            else getString(R.string.notes_pdf_edit_draw)
-        findViewById<Button>(R.id.pdfEditText).text =
-            if (mode == PdfAnnotateView.Mode.TEXT) "● ${getString(R.string.notes_pdf_edit_text)}"
-            else getString(R.string.notes_pdf_edit_text)
-    }
-
-    private fun setPenColor(color: Int) {
-        annotateView.penColor = color
-        annotateView.textColor = color
-        findViewById<Button>(R.id.pdfColorBlack).alpha =
-            if (color == Color.BLACK) 1f else 0.4f
-        findViewById<Button>(R.id.pdfColorRed).alpha =
-            if (color == Color.RED) 1f else 0.4f
-        findViewById<Button>(R.id.pdfColorBlue).alpha =
-            if (color == Color.BLUE) 1f else 0.4f
-    }
-
-    private fun promptAddText(x: Float, y: Float) {
-        val input = EditText(this).apply {
-            hint = getString(R.string.notes_pdf_add_text_hint)
-            setPadding(48, 32, 48, 32)
-        }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.notes_pdf_add_text_title))
-            .setView(input)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                annotateView.addText(x, y, input.text.toString().trim())
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun confirmClearPage() {
-        AlertDialog.Builder(this)
-            .setMessage(getString(R.string.notes_pdf_edit_clear_confirm))
-            .setPositiveButton(android.R.string.ok) { _, _ -> annotateView.clearAll() }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
     /**
-     * Saves a NEW pdf (original untouched) into Downloads/Kitty Notes:
-     * every page rendered on white, with this session's drawings and
-     * stamped text burned in. The saved pages are images, so their
-     * text cannot be selected like the original's — that is the price
-     * of editing without a heavy PDF engine, and the user is told so.
+     * Saves every page as a JPEG in Pictures/Kitty Notes so the pages
+     * show in the Gallery. Same MediaStore pattern as the note-image
+     * and QR saves (API 29+). The progress dialog is modal, so no
+     * page button can touch the renderer while this runs on IO.
      */
-    private fun saveEditedPdf() {
-        stashCurrentPageAnnotations()
-        if (pageAnnotations.isEmpty()) {
-            Toast.makeText(this, R.string.notes_pdf_edit_nothing, Toast.LENGTH_SHORT).show()
-            return
-        }
+    private fun savePagesAsImages() {
+        if (pageCount == 0) return
         val progress = AlertDialog.Builder(this)
-            .setMessage(getString(R.string.notes_pdf_edit_saving))
+            .setMessage(getString(R.string.notes_pdf_images_saving))
             .setCancelable(false)
             .create()
         progress.show()
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { buildEditedPdf() }
+            val result = withContext(Dispatchers.IO) { buildPageImages() }
             progress.dismiss()
-            result.onSuccess { (name, uri) ->
-                exitEditMode()
-                AlertDialog.Builder(this@PdfViewerActivity)
-                    .setTitle(getString(R.string.notes_pdf_saved_title))
-                    .setMessage(getString(R.string.notes_pdf_saved, name))
-                    .setPositiveButton(getString(R.string.notes_pdf_open)) { _, _ ->
-                        val intent = Intent(this@PdfViewerActivity, PdfViewerActivity::class.java)
-                            .putExtra(EXTRA_PDF_URI, uri.toString())
-                        startActivity(intent)
-                    }
-                    .setNegativeButton(android.R.string.ok, null)
-                    .show()
+            result.onSuccess { count ->
+                Toast.makeText(
+                    this@PdfViewerActivity,
+                    getString(R.string.notes_pdf_images_saved, count),
+                    Toast.LENGTH_SHORT
+                ).show()
             }.onFailure {
                 Toast.makeText(
                     this@PdfViewerActivity,
@@ -326,7 +217,7 @@ class PdfViewerActivity : AppCompatActivity() {
         }
     }
 
-    private fun buildEditedPdf(): Result<Pair<String, Uri>> = runCatching {
+    private fun buildPageImages(): Result<Int> = runCatching {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             throw UnsupportedOperationException("API 29+ required")
         }
@@ -336,57 +227,38 @@ class PdfViewerActivity : AppCompatActivity() {
             ?.takeIf { it.isNotBlank() }
             ?.replace(Regex("[\\\\/:*?\"<>|]"), " ")
             ?.take(40) ?: "PDF"
-        val fileName = "$baseName - edited.pdf"
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
-            put(
-                MediaStore.MediaColumns.RELATIVE_PATH,
-                Environment.DIRECTORY_DOWNLOADS + "/Kitty Notes"
-            )
-        }
         val resolver = contentResolver
-        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-            ?: throw IllegalStateException("MediaStore insert failed")
-        resolver.openOutputStream(uri)?.use { out ->
-            val doc = PdfDocument()
-            try {
-                for (index in 0 until pageCount) {
-                    r.openPage(index).use { page ->
-                        val bitmap = Bitmap.createBitmap(
-                            page.width * 2, page.height * 2, Bitmap.Config.ARGB_8888
+        var saved = 0
+        for (index in 0 until pageCount) {
+            r.openPage(index).use { page ->
+                val bitmap = Bitmap.createBitmap(
+                    page.width * 2, page.height * 2, Bitmap.Config.ARGB_8888
+                )
+                bitmap.eraseColor(Color.WHITE)
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                try {
+                    val fileName = "$baseName - p${index + 1}.jpg"
+                    val values = ContentValues().apply {
+                        put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                        put(
+                            MediaStore.MediaColumns.RELATIVE_PATH,
+                            Environment.DIRECTORY_PICTURES + "/Kitty Notes"
                         )
-                        bitmap.eraseColor(Color.WHITE)
-                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        val annotated =
-                            pageAnnotations[index]?.takeIf { it.isNotEmpty() }?.let { elems ->
-                                val copy = Bitmap.createBitmap(
-                                    bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888
-                                )
-                                Canvas(copy).apply {
-                                    drawBitmap(bitmap, 0f, 0f, null)
-                                    PdfAnnotateView.drawElementsOnto(this, elems)
-                                }
-                                bitmap.recycle()
-                                copy
-                            } ?: bitmap
-                        val pageInfo =
-                            PdfDocument.PageInfo.Builder(page.width, page.height, index + 1).create()
-                        val docPage = doc.startPage(pageInfo)
-                        docPage.canvas.drawBitmap(
-                            annotated, null,
-                            RectF(0f, 0f, page.width.toFloat(), page.height.toFloat()), null
-                        )
-                        doc.finishPage(docPage)
-                        annotated.recycle()
                     }
+                    val uri = resolver.insert(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values
+                    ) ?: throw IllegalStateException("MediaStore insert failed")
+                    resolver.openOutputStream(uri)?.use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                    } ?: throw IllegalStateException("Could not open Gallery")
+                    saved++
+                } finally {
+                    bitmap.recycle()
                 }
-                doc.writeTo(out)
-            } finally {
-                doc.close()
             }
-        } ?: throw IllegalStateException("Could not open Downloads")
-        fileName to uri
+        }
+        saved
     }
 
     override fun onDestroy() {

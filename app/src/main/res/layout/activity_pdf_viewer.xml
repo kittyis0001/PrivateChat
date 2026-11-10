@@ -30,15 +30,6 @@
             android:textColor="?attr/colorOnSurface"
             android:ellipsize="end"
             android:maxLines="1" />
-
-        <ImageButton
-            android:id="@+id/pdfEdit"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@android:drawable/ic_menu_edit"
-            android:tint="?attr/colorOnSurface"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/notes_pdf_edit" />
     </LinearLayout>
 
     <ImageView
@@ -47,14 +38,6 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:scaleType="fitCenter"
-        android:background="@android:color/white" />
-
-    <com.privatechat.app.notes.ui.PdfAnnotateView
-        android:id="@+id/pdfAnnotateView"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:visibility="gone"
         android:background="@android:color/white" />
 
     <LinearLayout
@@ -84,96 +67,19 @@
             android:text="→" />
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/pdfEditBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:paddingLeft="8dp"
-        android:paddingRight="8dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/pdfEditDraw"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/notes_pdf_edit_draw" />
-
-            <Button
-                android:id="@+id/pdfEditText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/notes_pdf_edit_text" />
-
-            <Button
-                android:id="@+id/pdfEditUndo"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/notes_pdf_edit_undo" />
-
-            <Button
-                android:id="@+id/pdfEditClear"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/notes_pdf_edit_clear" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <Button
-                android:id="@+id/pdfColorBlack"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="●"
-                android:textColor="@android:color/black" />
-
-            <Button
-                android:id="@+id/pdfColorRed"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="●"
-                android:textColor="@android:color/holo_red_dark" />
-
-            <Button
-                android:id="@+id/pdfColorBlue"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="●"
-                android:textColor="@android:color/holo_blue_dark" />
-
-            <Button
-                android:id="@+id/pdfEditSave"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/notes_pdf_edit_save" />
-
-            <Button
-                android:id="@+id/pdfEditCancel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/notes_pdf_edit_cancel" />
-        </LinearLayout>
-    </LinearLayout>
-
     <Button
         android:id="@+id/pdfExtractText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="12dp"
         android:text="@string/notes_pdf_extract" />
+
+    <Button
+        android:id="@+id/pdfSaveImages"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="12dp"
+        android:layout_marginRight="12dp"
+        android:layout_marginBottom="12dp"
+        android:text="@string/notes_pdf_save_images" />
 </LinearLayout>

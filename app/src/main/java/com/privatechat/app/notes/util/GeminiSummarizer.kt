@@ -389,6 +389,10 @@ object GeminiSummarizer {
         withContext(Dispatchers.IO) {
             runCatching {
                 val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                // The whole OCR text is the prompt's safety net: a dense
+                // textbook page can run past 6000 chars, and cutting it
+                // cut the sections after a table out of the model's view.
+                val ocr = ocrText.take(12000)
                 val prompt = "You are fixing the text of one scanned textbook page. " +
                     "The attached photo IS the page. Below it is machine OCR of the same page, " +
                     "with **bold** markers where the OCR thought the text was bold.\n\n" +
@@ -396,15 +400,26 @@ object GeminiSummarizer {
                     "- Fix misread letters and words. Restore punctuation exactly as printed " +
                     "(full stops, commas, colons, semicolons, dashes, quotes, brackets).\n" +
                     "- Keep the original wording, order, numbers, names, dates and line breaks. " +
-                    "Do not add, remove or rephrase anything.\n" +
+                    "Do not add, remove or rephrase anything. Return the WHOLE page from top " +
+                    "to bottom, including every section after a table (for example a specimen " +
+                    "letter below the table). Never stop after a table.\n" +
                     "- Keep **bold** on text that is bold in the photo. " +
                     "Mark text that is underlined in the photo with __double underscores__.\n" +
-                    "- Reproduce any table as a Markdown table (| header | ... |), one row per line.\n" +
+                    "- Reproduce any table as a Markdown table (| header | ... |), one row per line. " +
+                    "Inside a table cell, never use <br> or any HTML tag — write the cell text " +
+                    "as one flowing line; it will wrap on its own.\n" +
                     "- If a word is unreadable even in the photo, reconstruct it from context " +
                     "ONLY when you are confident, and wrap ONLY that word in [? ?] " +
                     "(example: [? letter ?]) so the user can check it. Never invent a whole sentence.\n" +
-                    "Reply with only the corrected text, nothing else.\n\nOCR text:\n" + ocrText.take(6000)
-                generateWithImage(key, prompt, jpegBytes)
+                    "Reply with only the corrected text, nothing else.\n\nOCR text:\n" + ocr
+                val fixed = generateWithImage(key, prompt, jpegBytes)
+                // Safety net: the vision pass fixes wording, it does not
+                // delete whole sections — if its reply is much shorter
+                // than the OCR text, it dropped part of the page (seen:
+                // a specimen letter below a table vanished). Fall back
+                // to the OCR text then; a plain scan beats a silently
+                // incomplete one.
+                if (fixed.length < ocr.length * 0.75) ocr else fixed
             }
         }
 
