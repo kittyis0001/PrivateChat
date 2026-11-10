@@ -191,6 +191,16 @@
     <string name="notes_scan_reading">লেখা পড়ছি…</string>
     <string name="notes_scan_ai_fixing">AI ছবিটা দেখে লেখা ঠিক করছে…</string>
     <string name="notes_scan_ai_failed">AI ঠিক করতে পারেনি — সাধারণ OCR লেখা দেখানো হচ্ছে। ইন্টারনেট দেখে আবার scan করো</string>
+    <string name="notes_scan_ai_failed_reason">AI ঠিক করতে পারেনি (%1$s) — সাধারণ OCR লেখা দেখানো হচ্ছে। আবার scan করো</string>
+    <string name="notes_scan_ai_reason_no_internet">ইন্টারনেট নেই</string>
+    <string name="notes_scan_ai_reason_timeout">সময় শেষ হয়ে গেছে</string>
+    <string name="notes_scan_ai_reason_no_key">Gemini key নেই</string>
+    <string name="notes_scan_ai_reason_key">key-তে সমস্যা</string>
+    <string name="notes_scan_ai_reason_quota">আজকের AI সীমা শেষ</string>
+    <string name="notes_scan_ai_reason_server">AI সার্ভার ব্যস্ত</string>
+    <string name="notes_scan_ai_reason_empty">খালি উত্তর</string>
+    <string name="notes_scan_ai_reason_other">অজানা সমস্যা</string>
+    <string name="notes_scan_no_key">নোট সেভ হয়েছে, কিন্তু Gemini key নেই বলে শুধু OCR লেখা। Settings-এ key দিলে ছকসহ আসবে।</string>
     <string name="notes_scan_no_text">স্ক্যানে কোনো লেখা পাওয়া যায়নি</string>
     <string name="notes_scan_text_saved">লেখা স্ক্যান করে নতুন নোটে নেওয়া হয়েছে</string>
     <string name="notes_scan_saved">স্ক্যান করা PDF সেভ হয়েছে</string>

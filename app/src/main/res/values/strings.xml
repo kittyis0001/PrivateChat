@@ -368,6 +368,16 @@ Remember:</string>
     <string name="notes_scan_reading">Reading text…</string>
     <string name="notes_scan_ai_fixing">AI is reading the photo to fix the text…</string>
     <string name="notes_scan_ai_failed">AI fix did not run — showing plain OCR text. Check internet and scan again</string>
+    <string name="notes_scan_ai_failed_reason">AI fix did not run (%1$s) — showing plain OCR text. Scan again</string>
+    <string name="notes_scan_ai_reason_no_internet">no internet</string>
+    <string name="notes_scan_ai_reason_timeout">timed out</string>
+    <string name="notes_scan_ai_reason_no_key">no Gemini key</string>
+    <string name="notes_scan_ai_reason_key">key problem</string>
+    <string name="notes_scan_ai_reason_quota">daily AI limit reached</string>
+    <string name="notes_scan_ai_reason_server">AI server busy</string>
+    <string name="notes_scan_ai_reason_empty">empty reply</string>
+    <string name="notes_scan_ai_reason_other">unknown error</string>
+    <string name="notes_scan_no_key">Note saved, but there is no Gemini key — only OCR text. Add the key in Settings and the table will come with the scan.</string>
     <string name="notes_scan_no_text">No text found in the scan</string>
     <string name="notes_scan_text_saved">Text scanned into a new note</string>
     <string name="notes_scan_saved">Scanned PDF saved</string>

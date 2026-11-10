@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import com.privatechat.app.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -189,15 +190,21 @@ object GeminiSummarizer {
                     JSONObject().put("parts", parts)
                 )
             ).toString()
-        return callGemini(key, bodyJson)
+        // Vision calls carry a photo and wait for a long answer, so
+        // they get a longer timeout than plain text calls — on a
+        // slow connection the default 10 s write timeout killed the
+        // upload before it finished, and the scan silently fell
+        // back to plain OCR.
+        return callGemini(key, bodyJson, timeoutSeconds = 90)
     }
 
     /** The HTTP call + reply parsing shared by [generateText] and [generateWithImage]. */
-    private suspend fun callGemini(key: String, bodyJson: String): String =
+    private suspend fun callGemini(key: String, bodyJson: String, timeoutSeconds: Long = 30): String =
         withContext(Dispatchers.IO) {
             val client = OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
                 .build()
             val request = Request.Builder()
                 .url(
@@ -422,6 +429,42 @@ object GeminiSummarizer {
                 if (fixed.length < ocr.length * 0.75) ocr else fixed
             }
         }
+
+    /**
+     * Vision fix with one retry — the first call often fails on a
+     * flaky connection, and a second attempt costs nothing when the
+     * first one worked. Returns the Result of the last attempt.
+     */
+    suspend fun fixScannedPageWithRetry(
+        context: Context,
+        jpegBytes: ByteArray,
+        ocrText: String
+    ): Result<String> {
+        val first = fixScannedPage(context, jpegBytes, ocrText)
+        if (first.isSuccess) return first
+        return fixScannedPage(context, jpegBytes, ocrText)
+    }
+
+    /** Resource id of the short user-facing reason for a failed vision call. */
+    fun visionFailureReasonRes(e: Throwable?): Int = when (e) {
+        is java.net.UnknownHostException -> R.string.notes_scan_ai_reason_no_internet
+        is java.net.SocketTimeoutException -> R.string.notes_scan_ai_reason_timeout
+        is java.io.IOException -> R.string.notes_scan_ai_reason_no_internet
+        is IllegalStateException -> when (e.message) {
+            "NO_API_KEY" -> R.string.notes_scan_ai_reason_no_key
+            "Empty reply" -> R.string.notes_scan_ai_reason_empty
+            else -> {
+                val code = e.message?.removePrefix("HTTP ")?.toIntOrNull()
+                when (code) {
+                    401, 403 -> R.string.notes_scan_ai_reason_key
+                    429 -> R.string.notes_scan_ai_reason_quota
+                    in 500..599 -> R.string.notes_scan_ai_reason_server
+                    else -> R.string.notes_scan_ai_reason_other
+                }
+            }
+        }
+        else -> R.string.notes_scan_ai_reason_other
+    }
 
     /**
      * Downscales one scanned page to a JPEG byte array (max 1600px)
