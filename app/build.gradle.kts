@@ -122,6 +122,12 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     implementation("com.google.mlkit:text-recognition:16.0.0")
 
+    // Password-protected PDFs: Android's PdfRenderer cannot open an
+    // encrypted file at all, so this pure-Java PDFBox fork decrypts
+    // it (PDDocument.load(file, password)) and renders its pages.
+    // It adds ~10 MB to the APK — the price of the feature.
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
 }

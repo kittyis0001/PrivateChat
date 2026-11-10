@@ -239,6 +239,7 @@ class NoteEditorActivity : AppCompatActivity() {
             // guess in [? ?]. Any step that fails falls back to that
             // page's plain OCR text.
             val pageTexts = mutableListOf<String>()
+            var aiFailed = false
             for (uri in pageUris) {
                 val md = withContext(Dispatchers.IO) {
                     TextScanner.recognizeUri(this@NoteEditorActivity, uri).getOrNull()?.markdownText
@@ -252,6 +253,7 @@ class NoteEditorActivity : AppCompatActivity() {
                         GeminiSummarizer.fixScannedPage(this@NoteEditorActivity, jpeg, md).getOrNull()
                     } else null
                 } else null
+                if (useAi && fixed == null) aiFailed = true
                 pageTexts += fixed ?: md
             }
             if (pageTexts.isEmpty()) {
@@ -290,8 +292,11 @@ class NoteEditorActivity : AppCompatActivity() {
             )
             Toast.makeText(
                 this@NoteEditorActivity,
-                getString(R.string.notes_scan_text_saved),
-                Toast.LENGTH_SHORT
+                getString(
+                    if (aiFailed) R.string.notes_scan_ai_failed
+                    else R.string.notes_scan_text_saved
+                ),
+                Toast.LENGTH_LONG
             ).show()
         }
     }

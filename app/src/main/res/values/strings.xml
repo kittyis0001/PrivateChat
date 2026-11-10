@@ -367,6 +367,7 @@ Remember:</string>
     <string name="notes_scan_text">Scan text</string>
     <string name="notes_scan_reading">Reading text…</string>
     <string name="notes_scan_ai_fixing">AI is reading the photo to fix the text…</string>
+    <string name="notes_scan_ai_failed">AI fix did not run — showing plain OCR text. Check internet and scan again</string>
     <string name="notes_scan_no_text">No text found in the scan</string>
     <string name="notes_scan_text_saved">Text scanned into a new note</string>
     <string name="notes_scan_saved">Scanned PDF saved</string>
@@ -378,6 +379,10 @@ Remember:</string>
     <string name="notes_pdf_viewer">Open PDF</string>
     <string name="notes_pdf_no_text">No readable text found in this PDF</string>
     <string name="notes_pdf_open_failed">Could not open this PDF</string>
+    <string name="notes_pdf_password_title">Password-protected PDF</string>
+    <string name="notes_pdf_password_message">This PDF is locked. Enter its password to open it.</string>
+    <string name="notes_pdf_password_hint">PDF password</string>
+    <string name="notes_pdf_wrong_password">Wrong password — try again</string>
     <string name="notes_pdf_page_of">Page %1$d of %2$d</string>
     <string name="notes_pdf_extract">Extract text to note</string>
     <string name="notes_pdf_save_images">Save pages as images</string>
