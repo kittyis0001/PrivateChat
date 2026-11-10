@@ -66,9 +66,19 @@
             android:textSize="13sp"
             android:textColor="@color/kittyError"
             android:padding="9dp" />
+
+        <TextView
+            android:id="@+id/editorPreviewButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/notes_preview"
+            android:textSize="13sp"
+            android:textColor="@color/primary"
+            android:padding="9dp" />
     </LinearLayout>
 
     <ScrollView
+        android:id="@+id/editorScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
@@ -500,6 +510,16 @@
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
+
+    <!-- Note Preview: renders the note's **bold** / __underline__ /
+         | pipe | tables as a real page (see NoteMarkdown). Hidden
+         until the Preview button in the top bar is tapped. -->
+    <WebView
+        android:id="@+id/editorPreview"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/editorSave"

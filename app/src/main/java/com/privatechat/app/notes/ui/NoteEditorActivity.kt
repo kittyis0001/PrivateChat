@@ -23,6 +23,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebView
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
@@ -61,6 +62,7 @@ import com.privatechat.app.notes.util.GeminiSummarizer
 import com.privatechat.app.notes.util.LinkPreviewFetcher
 import com.privatechat.app.notes.util.LoadingDialog
 import com.privatechat.app.notes.util.NoteImageShare
+import com.privatechat.app.notes.util.NoteMarkdown
 import com.privatechat.app.notes.util.NoteSmart
 import com.privatechat.app.notes.util.PdfExporter
 import com.privatechat.app.notes.util.QrShare
@@ -116,6 +118,12 @@ class NoteEditorActivity : AppCompatActivity() {
     private lateinit var reminderValue: TextView
     private lateinit var reminderClear: TextView
     private lateinit var imagesList: RecyclerView
+
+    // ---- Note Preview state ----
+    private lateinit var editorScroll: View
+    private lateinit var previewView: WebView
+    private lateinit var previewButton: TextView
+    private var previewMode = false
 
     private var noteId: Long = 0
     private var categories: List<Category> = emptyList()
@@ -304,6 +312,12 @@ class NoteEditorActivity : AppCompatActivity() {
         reminderValue = findViewById(R.id.editorReminderValue)
         reminderClear = findViewById(R.id.editorReminderClear)
         imagesList = findViewById(R.id.editorImages)
+
+        editorScroll = findViewById(R.id.editorScroll)
+        previewView = findViewById(R.id.editorPreview)
+        previewButton = findViewById(R.id.editorPreviewButton)
+        previewView.settings.javaScriptEnabled = false
+        previewButton.setOnClickListener { togglePreview() }
 
         findViewById<View>(R.id.editorBack).setOnClickListener { saveAndFinish() }
         findViewById<View>(R.id.editorSave).setOnClickListener { saveAndFinish() }
@@ -872,6 +886,38 @@ class NoteEditorActivity : AppCompatActivity() {
             if (noteId != 0L) onReady()
             else Toast.makeText(this@NoteEditorActivity, getString(R.string.notes_save_first), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * Preview / Edit toggle (top bar). Preview renders the CURRENT
+     * title + content through NoteMarkdown, so it always matches
+     * what is on screen — tables drawn with real borders, bold and
+     * underline as printed. The note itself stays plain text, and
+     * tapping Edit returns to the text fields untouched.
+     */
+    private fun togglePreview() {
+        previewMode = !previewMode
+        if (previewMode) {
+            val html = NoteMarkdown.toHtml(
+                titleInput.text.toString(),
+                contentInput.text.toString(),
+                hexColor(R.color.background),
+                hexColor(R.color.textPrimary)
+            )
+            previewView.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+            editorScroll.visibility = View.GONE
+            previewView.visibility = View.VISIBLE
+            previewButton.text = getString(R.string.notes_preview_edit)
+        } else {
+            previewView.visibility = View.GONE
+            editorScroll.visibility = View.VISIBLE
+            previewButton.text = getString(R.string.notes_preview)
+        }
+    }
+
+    private fun hexColor(@androidx.annotation.ColorRes id: Int): String {
+        val c = ContextCompat.getColor(this, id)
+        return String.format("#%06X", 0xFFFFFF and c)
     }
 
     private fun saveAndFinish() {

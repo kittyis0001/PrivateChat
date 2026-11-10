@@ -121,10 +121,20 @@
             android:name=".notes.ui.HabitActivity"
             android:exported="false" />
 
+        <!-- Opens any PDF the user picks from another app (Open with):
+             ACTION_VIEW + application/pdf, so Kitty Notes appears in the
+             system chooser next to the other PDF apps. In-app opens still
+             use EXTRA_PDF_URI (see PdfViewerActivity). -->
         <activity
             android:name=".notes.ui.PdfViewerActivity"
-            android:exported="false"
-            android:windowSoftInputMode="adjustResize" />
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".ui.chat.ChatActivity"
