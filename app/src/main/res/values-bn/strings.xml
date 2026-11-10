@@ -102,6 +102,8 @@
     <string name="notes_study_type">ধরন</string>
     <string name="notes_study_done">স্টাডি নোট তৈরি</string>
     <string name="notes_study_length">উত্তরের দৈর্ঘ্য</string>
+    <string name="notes_study_extra">অতিরিক্ত নির্দেশনা (ঐচ্ছিক)</string>
+    <string name="notes_study_extra_hint">যেমন: শুধু ২ আর ৫ নম্বর প্রশ্ন</string>
     <string name="notes_study_pick_questions">কোন প্রশ্নগুলোর উত্তর চাও বেছে নাও</string>
     <string name="notes_regenerate">আবার লেখো</string>
     <string name="notes_regenerate_title">আবার লিখবে?</string>
