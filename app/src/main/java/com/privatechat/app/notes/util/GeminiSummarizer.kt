@@ -296,66 +296,217 @@ object GeminiSummarizer {
     /**
      * Study helper: writes a school-style answer in [lang] ("bn"/"en")
      * for [topic] in the chosen [typeKey] — PARAGRAPH, LETTER, EMAIL,
-     * DIALOGUE, STORY, COMPOSITION, SUMMARY or BHAB (ভাবসম্প্রসারণ).
-     * The prompt asks for the Bangladesh NCTB textbook format for that
-     * type (e.g. a letter with address/date/salutation/closing, a
-     * dialogue with speaker names, a ভাবসম্প্রসারণ in মূলভাব /
-     * সম্প্রসারিত ভাব / মন্তব্য parts), at a class 6–10 level.
+     * DIALOGUE, STORY, COMPOSITION, SUMMARY, BHAB (ভাবসম্প্রসারণ),
+     * QUESTION, MATH, MCQ, SCIENCE or AUTO (the model picks the format
+     * that fits the question). [lengthKey] is SHORT / MEDIUM / LONG;
+     * MEDIUM is exactly the old behaviour (no length note in the
+     * prompt). The prompt asks for the Bangladesh NCTB textbook format
+     * for that type (e.g. a letter with address/date/salutation/
+     * closing, a dialogue with speaker names, a ভাবসম্প্রসারণ in
+     * মূলভাব / সম্প্রসারিত ভাব / মন্তব্য parts), at a class 6–10 level.
      * Same result shape as [writeFromIdea]: title + body.
      */
     suspend fun writeStudyMaterial(
         context: Context,
         topic: String,
         typeKey: String,
-        lang: String = "bn"
+        lang: String = "bn",
+        lengthKey: String = "MEDIUM"
     ): Result<Pair<String, String>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
-                val langName = if (lang == "en") "English" else "Bengali"
-                val format = when (typeKey) {
-                    "LETTER" -> "a letter in $langName, in Bangladesh school textbook format: " +
-                        "sender address, date, salutation, body in 3-4 detailed paragraphs " +
-                        "with examples, subscription and name at the end"
-                    "EMAIL" -> "a formal email in $langName: To, Subject, greeting, " +
-                        "body in 3-4 detailed paragraphs with examples, closing with name"
-                    "DIALOGUE" -> "a dialogue in $langName between two people, in Bangladesh " +
-                        "school textbook format: speaker names before each line, 12-16 " +
-                        "natural exchanges with detail"
-                    "STORY" -> "a detailed story in $langName, in Bangladesh school textbook " +
-                        "style, about 400-500 words: a clear beginning, middle and end, " +
-                        "with details and a moral at the end"
-                    "COMPOSITION" -> "a composition in $langName, in Bangladesh school " +
-                        "textbook format: introduction, 3-4 detailed body paragraphs with " +
-                        "examples, conclusion, about 350-450 words"
-                    "SUMMARY" -> "a summary in $langName of the topic below, in Bangladesh " +
-                        "school textbook style: only the main points, about one third of " +
-                        "the length, in your own words"
-                    "BHAB" -> if (lang == "en") {
-                        "a detailed expansion of the idea below in English, in the style of a " +
-                            "Bangladesh school textbook answer, about 250-350 words: the main idea, an expanded " +
-                            "explanation with examples, and a concluding remark"
-                    } else {
-                        "নিচের ভাবটির ভাবসম্প্রসারণ, বাংলাদেশের পাঠ্যবইয়ের ধরনে, " +
-                            "বিস্তারিতভাবে, ২৫০-৩৫০ শব্দের মধ্যে: " +
-                            "মূলভাব, সম্প্রসারিত ভাব ও মন্তব্য — এই তিন অংশে, সহজ ভাষায়, উদাহরণসহ"
-                    }
-                    else -> "a detailed paragraph (200-250 words) in $langName, in the style of a " +
-                        "Bangladesh NCTB textbook answer: one clear paragraph, simple sentences, " +
-                        "with details and examples"
+                val format = studyFormat(typeKey, lang)
+                val lengthNote = when (lengthKey) {
+                    "SHORT" -> " Keep it short and to the point, about half the usual length " +
+                        "for this kind of answer, without dropping the key points."
+                    "LONG" -> " Give a detailed answer, about twice the usual length for this " +
+                        "kind of answer, with extra examples and explanation."
+                    else -> ""
                 }
-                val prompt = "Write $format. Reply with the title on the first line, " +
+                val prompt = "Write $format." + lengthNote + " Reply with the title on the first line, " +
                     "then a blank line, then the body. No extra commentary, no quotes " +
                     "around the title.\n\nTopic: " + topic.take(500)
                 val out = generateText(key, prompt)
-                val lines = out.lineSequence().filter { it.isNotBlank() }.toList()
-                if (lines.isEmpty()) throw IllegalStateException("Empty reply")
-                val title = lines.first().trim().removeSurrounding("\"").take(60)
-                val body = out.substringAfter("\n\n", "").trim().ifBlank {
-                    lines.drop(1).joinToString("\n").trim()
+                splitStudyReply(out)
+            }
+        }
+
+    /** The answer format for a study type, in the requested language. */
+    private fun studyFormat(typeKey: String, lang: String): String {
+        val langName = if (lang == "en") "English" else "Bengali"
+        return when (typeKey) {
+            "LETTER" -> "a letter in $langName, in Bangladesh school textbook format: " +
+                "sender address, date, salutation, body in 3-4 detailed paragraphs " +
+                "with examples, subscription and name at the end"
+            "EMAIL" -> "a formal email in $langName: To, Subject, greeting, " +
+                "body in 3-4 detailed paragraphs with examples, closing with name"
+            "DIALOGUE" -> "a dialogue in $langName between two people, in Bangladesh " +
+                "school textbook format: speaker names before each line, 12-16 " +
+                "natural exchanges with detail"
+            "STORY" -> "a detailed story in $langName, in Bangladesh school textbook " +
+                "style, about 400-500 words: a clear beginning, middle and end, " +
+                "with details and a moral at the end"
+            "COMPOSITION" -> "a composition in $langName, in Bangladesh school " +
+                "textbook format: introduction, 3-4 detailed body paragraphs with " +
+                "examples, conclusion, about 350-450 words"
+            "SUMMARY" -> "a summary in $langName of the topic below, in Bangladesh " +
+                "school textbook style: only the main points, about one third of " +
+                "the length, in your own words"
+            "BHAB" -> if (lang == "en") {
+                "a detailed expansion of the idea below in English, in the style of a " +
+                    "Bangladesh school textbook answer, about 250-350 words: the main idea, an expanded " +
+                    "explanation with examples, and a concluding remark"
+            } else {
+                "নিচের ভাবটির ভাবসম্প্রসারণ, বাংলাদেশের পাঠ্যবইয়ের ধরনে, " +
+                    "বিস্তারিতভাবে, ২৫০-৩৫০ শব্দের মধ্যে: " +
+                    "মূলভাব, সম্প্রসারিত ভাব ও মন্তব্য — এই তিন অংশে, সহজ ভাষায়, উদাহরণসহ"
+            }
+            "QUESTION" -> "an answer to the question below in $langName, in the style " +
+                "of a Bangladesh school textbook answer: a clear direct answer first, " +
+                "then a simple explanation in easy language with an example when useful"
+            "MATH" -> "a step-by-step solution to the math problem below in $langName, " +
+                "exactly like a Bangladesh school textbook solution: each step on its " +
+                "own line with the working shown, then the final answer, then a short " +
+                "explanation in easy language of why each step is done"
+            "MCQ" -> "an answer to the multiple-choice question below in $langName, " +
+                "in Bangladesh school textbook style: first the correct option " +
+                "(its letter and text), then why it is correct, then briefly why " +
+                "each other option is wrong"
+            "SCIENCE" -> "a step-by-step solution to the science (physics/chemistry) " +
+                "numerical problem below in $langName, exactly like a Bangladesh school " +
+                "textbook solution: the formula first, then the values substituted, " +
+                "then the calculation step by step, then the final answer with the " +
+                "correct unit, then a short explanation in easy language"
+            "AUTO" -> "an answer to the question below in $langName, in the format " +
+                "that fits it best: a step-by-step math solution with the working shown " +
+                "if it is a math problem; a formula, substituted values and step-by-step " +
+                "calculation with the unit if it is a science numerical problem; the " +
+                "correct option plus why it is correct and why the others are wrong " +
+                "if it is a multiple-choice question; a letter, email or dialogue in " +
+                "Bangladesh school textbook format if it asks for one; an expansion " +
+                "in মূলভাব / সম্প্রসারিত ভাব / মন্তব্য parts if it is an idea to " +
+                "expand; otherwise a clear textbook-style answer with a simple " +
+                "explanation and an example. If there are several questions, answer " +
+                "each one in turn, repeating each question before its answer"
+            else -> "a detailed paragraph (200-250 words) in $langName, in the style of a " +
+                "Bangladesh NCTB textbook answer: one clear paragraph, simple sentences, " +
+                "with details and examples"
+        }
+    }
+
+    /** Splits a study reply into title + body (title = first line). */
+    private fun splitStudyReply(out: String): Pair<String, String> {
+        val lines = out.lineSequence().filter { it.isNotBlank() }.toList()
+        if (lines.isEmpty()) throw IllegalStateException("Empty reply")
+        val title = lines.first().trim().removeSurrounding("\"").take(60)
+        val body = out.substringAfter("\n\n", "").trim().ifBlank {
+            lines.drop(1).joinToString("\n").trim()
+        }
+        if (body.isBlank()) throw IllegalStateException("Empty body")
+        return title to body
+    }
+
+    /**
+     * Study answer WITH the photo: for questions that come with a
+     * diagram, graph or table, the text alone is not enough — the
+     * model sees the photo too, so the diagram is part of the answer.
+     * Same formats and length as [writeStudyMaterial].
+     */
+    suspend fun writeStudyMaterialWithImage(
+        context: Context,
+        topic: String,
+        typeKey: String,
+        lang: String = "bn",
+        lengthKey: String = "MEDIUM",
+        jpegBytes: ByteArray
+    ): Result<Pair<String, String>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val format = studyFormat(typeKey, lang)
+                val lengthNote = when (lengthKey) {
+                    "SHORT" -> " Keep it short and to the point, about half the usual length " +
+                        "for this kind of answer, without dropping the key points."
+                    "LONG" -> " Give a detailed answer, about twice the usual length for this " +
+                        "kind of answer, with extra examples and explanation."
+                    else -> ""
                 }
-                if (body.isBlank()) throw IllegalStateException("Empty body")
-                title to body
+                val prompt = "Write $format." + lengthNote + " Reply with the title on the first line, " +
+                    "then a blank line, then the body. No extra commentary, no quotes " +
+                    "around the title.\n\nTopic: " + topic.take(500) +
+                    "\nThe attached photo shows the question — use anything in it, " +
+                    "including a diagram, graph or table, to answer."
+                val out = generateWithImage(key, prompt, jpegBytes)
+                splitStudyReply(out)
+            }
+        }
+
+    /**
+     * Study helper "Scan question": reads EVERY question out of a
+     * photo (Bengali, English or math — numbers, symbols and formulas
+     * included), one per line, in order. Tried twice, like the scan
+     * vision fix — the first call often fails on a flaky connection.
+     * Never answers the questions itself; the answers come from
+     * [writeStudyMaterial]. Empty list when nothing readable is found.
+     */
+    suspend fun readQuestionsFromImage(context: Context, jpegBytes: ByteArray): Result<List<String>> =
+        withContext(Dispatchers.IO) {
+            var lastError: Throwable? = null
+            repeat(2) {
+                val attempt = runCatching {
+                    val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                    val prompt = "List every separate question visible in this photo, in order, " +
+                        "one per line, exactly as printed, including numbers, math symbols and " +
+                        "formulas. Do not number them, do not answer them, do not add any other words."
+                    val out = generateWithImage(key, prompt, jpegBytes).trim()
+                    if (out.isBlank()) throw IllegalStateException("Empty reply")
+                    out.lineSequence()
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .map {
+                            it.replace(Regex("^\\d+[.)]\\s*"), "")
+                                .replace(Regex("^Q\\d+[:.)]\\s*"), "").trim()
+                        }
+                        .filter { it.isNotBlank() }
+                        .toList()
+                        .also { if (it.isEmpty()) throw IllegalStateException("Empty reply") }
+                }
+                if (attempt.isSuccess) return@withContext attempt
+                lastError = attempt.exceptionOrNull()
+            }
+            Result.failure(lastError ?: IllegalStateException("Empty reply"))
+        }
+
+    /**
+     * @ai in a note: answers the user's question like a tutor, in the
+     * question's own language (Bengali or English), using the rest of
+     * the note as context when it is relevant. Textbook style when it
+     * fits — a direct answer first, then a simple explanation.
+     */
+    suspend fun answerNoteQuestion(
+        context: Context,
+        question: String,
+        noteContext: String
+    ): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val prompt = "You are a helpful tutor like ChatGPT. The user wrote a note " +
+                    "(context below) and asked a question marked @ai. Answer it professionally " +
+                    "and clearly, in the same language as the question (Bengali if the question " +
+                    "is in Bengali, English if it is in English), in a Bangladesh school " +
+                    "textbook style when it fits. Write it like a professional Gemini answer: " +
+                    "a direct answer first, then short clear sections with a bold section line " +
+                    "when the answer has parts; use **bold** for key terms; numbered steps for " +
+                    "procedures; dash (-) bullets for lists; a short example when it helps. " +
+                    "If it is a multiple-choice question, give the correct option and explain " +
+                    "why the others are wrong. Use the note's context when it is relevant. " +
+                    "Reply with only the answer, no extra commentary.\n\n" +
+                    "Note context:\n" + noteContext.take(4000) + "\n\nQuestion: " + question.take(1000)
+                val out = generateText(key, prompt).trim()
+                if (out.isBlank()) throw IllegalStateException("Empty reply")
+                out
             }
         }
 

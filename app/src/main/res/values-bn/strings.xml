@@ -101,6 +101,20 @@
     <string name="notes_study_hint">টপিক — যেমন সততা, আমার বিদ্যালয়, বর্ষার দিন</string>
     <string name="notes_study_type">ধরন</string>
     <string name="notes_study_done">স্টাডি নোট তৈরি</string>
+    <string name="notes_study_length">উত্তরের দৈর্ঘ্য</string>
+    <string name="notes_study_pick_questions">কোন প্রশ্নগুলোর উত্তর চাও বেছে নাও</string>
+    <string name="notes_regenerate">আবার লেখো</string>
+    <string name="notes_regenerate_title">আবার লিখবে?</string>
+    <string name="notes_regenerate_message">এখনকার লেখাটা বদলে নতুন করে লেখা হবে।</string>
+    <string name="notes_regenerate_done">নতুন করে লেখা হয়েছে</string>
+    <string name="notes_ask_ai_redone">নতুন উত্তর বসানো হয়েছে</string>
+    <string name="notes_study_scan_question">প্রশ্ন স্ক্যান করো</string>
+    <string name="notes_study_reading">AI প্রশ্নটা পড়ছে…</string>
+    <string name="notes_study_scan_failed">প্রশ্ন পড়া যায়নি — আবার চেষ্টা করো, অথবা লিখে দাও</string>
+    <string name="notes_ask_ai">AI-কে জিজ্ঞেস করো</string>
+    <string name="notes_ask_ai_no_tag">নোটে @ai লিখে তারপর প্রশ্ন করো</string>
+    <string name="notes_ask_ai_no_question">@ai-এর পরে প্রশ্নটা লেখো</string>
+    <string name="notes_ask_ai_done">AI উত্তর নোটে যোগ হয়েছে</string>
     <string name="notes_locked_preview">🔒 তালা দেওয়া — পড়তে খুলুন</string>
     <string name="notes_lock_note">🔒 নোটে তালা দাও</string>
     <string name="notes_unlock_note">🔓 তালা খুলুন</string>
@@ -159,6 +173,16 @@
         <item>রচনা</item>
         <item>সারাংশ</item>
         <item>ভাবসম্প্রসারণ</item>
+        <item>প্রশ্নের উত্তর</item>
+        <item>গণিত সমাধান</item>
+        <item>অটো</item>
+        <item>MCQ উত্তর</item>
+        <item>বিজ্ঞান অঙ্ক</item>
+    </string-array>
+    <string-array name="study_lengths">
+        <item>সংক্ষেপে</item>
+        <item>মাঝারি</item>
+        <item>বিস্তারিত</item>
     </string-array>
     <string name="notes_ai_category">AI ক্যাটাগরি</string>
     <string name="notes_ai_category_title">AI ক্যাটাগরি ও ট্যাগ</string>

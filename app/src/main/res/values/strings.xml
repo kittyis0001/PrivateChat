@@ -278,6 +278,20 @@ Remember:</string>
     <string name="notes_study_hint">Topic — e.g. Honesty, My School, A Rainy Day</string>
     <string name="notes_study_type">Type</string>
     <string name="notes_study_done">Study note is ready</string>
+    <string name="notes_study_length">Answer length</string>
+    <string name="notes_study_pick_questions">Pick the questions to answer</string>
+    <string name="notes_regenerate">Rewrite</string>
+    <string name="notes_regenerate_title">Rewrite the answer?</string>
+    <string name="notes_regenerate_message">The current text will be replaced with a fresh answer.</string>
+    <string name="notes_regenerate_done">Written again</string>
+    <string name="notes_ask_ai_redone">New answer written</string>
+    <string name="notes_study_scan_question">Scan question</string>
+    <string name="notes_study_reading">AI is reading the question…</string>
+    <string name="notes_study_scan_failed">Could not read the question — try again, or type it</string>
+    <string name="notes_ask_ai">Ask AI</string>
+    <string name="notes_ask_ai_no_tag">Write @ai followed by your question in the note first</string>
+    <string name="notes_ask_ai_no_question">Write your question after @ai</string>
+    <string name="notes_ask_ai_done">AI answer added to the note</string>
     <string name="notes_locked_preview">🔒 Locked — tap to unlock and read</string>
     <string name="notes_lock_note">🔒 Lock note</string>
     <string name="notes_unlock_note">🔓 Unlock note</string>
@@ -336,6 +350,16 @@ Remember:</string>
         <item>Composition</item>
         <item>Summary</item>
         <item>Expansion of an idea</item>
+        <item>Question answer</item>
+        <item>Math solution</item>
+        <item>Auto</item>
+        <item>MCQ answer</item>
+        <item>Science problem</item>
+    </string-array>
+    <string-array name="study_lengths">
+        <item>Short</item>
+        <item>Medium</item>
+        <item>Detailed</item>
     </string-array>
     <string name="notes_ai_category">AI category</string>
     <string name="notes_ai_category_title">AI category &amp; tags</string>
