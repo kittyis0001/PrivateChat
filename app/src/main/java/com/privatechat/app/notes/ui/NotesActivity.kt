@@ -285,6 +285,7 @@ class NotesActivity : AppCompatActivity() {
             // the old text-only cleanup runs instead (text + **bold**).
             val pageTexts = mutableListOf<String>()
             var aiFailed = false
+            var aiFailure: Throwable? = null
             for (uri in pageUris) {
                 val md = withContext(Dispatchers.IO) {
                     TextScanner.recognizeUri(this@NotesActivity, uri).getOrNull()?.markdownText
@@ -295,7 +296,11 @@ class NotesActivity : AppCompatActivity() {
                         GeminiSummarizer.pageJpegBytes(this@NotesActivity, uri)
                     }
                     if (jpeg != null) {
-                        GeminiSummarizer.fixScannedPage(this@NotesActivity, jpeg, md).getOrNull()
+                        val result = GeminiSummarizer.fixScannedPageWithRetry(
+                            this@NotesActivity, jpeg, md
+                        )
+                        aiFailure = result.exceptionOrNull()
+                        result.getOrNull()
                     } else null
                 } else null
                 if (useAi && fixed == null) aiFailed = true
@@ -340,10 +345,14 @@ class NotesActivity : AppCompatActivity() {
             )
             Toast.makeText(
                 this@NotesActivity,
-                getString(
-                    if (aiFailed) R.string.notes_scan_ai_failed
-                    else R.string.notes_scan_text_saved
-                ),
+                when {
+                    aiFailed -> getString(
+                        R.string.notes_scan_ai_failed_reason,
+                        getString(GeminiSummarizer.visionFailureReasonRes(aiFailure))
+                    )
+                    !useAi -> getString(R.string.notes_scan_no_key)
+                    else -> getString(R.string.notes_scan_text_saved)
+                },
                 Toast.LENGTH_LONG
             ).show()
         }

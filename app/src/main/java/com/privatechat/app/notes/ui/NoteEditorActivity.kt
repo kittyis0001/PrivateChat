@@ -240,6 +240,7 @@ class NoteEditorActivity : AppCompatActivity() {
             // page's plain OCR text.
             val pageTexts = mutableListOf<String>()
             var aiFailed = false
+            var aiFailure: Throwable? = null
             for (uri in pageUris) {
                 val md = withContext(Dispatchers.IO) {
                     TextScanner.recognizeUri(this@NoteEditorActivity, uri).getOrNull()?.markdownText
@@ -250,7 +251,11 @@ class NoteEditorActivity : AppCompatActivity() {
                         GeminiSummarizer.pageJpegBytes(this@NoteEditorActivity, uri)
                     }
                     if (jpeg != null) {
-                        GeminiSummarizer.fixScannedPage(this@NoteEditorActivity, jpeg, md).getOrNull()
+                        val result = GeminiSummarizer.fixScannedPageWithRetry(
+                            this@NoteEditorActivity, jpeg, md
+                        )
+                        aiFailure = result.exceptionOrNull()
+                        result.getOrNull()
                     } else null
                 } else null
                 if (useAi && fixed == null) aiFailed = true
@@ -292,10 +297,14 @@ class NoteEditorActivity : AppCompatActivity() {
             )
             Toast.makeText(
                 this@NoteEditorActivity,
-                getString(
-                    if (aiFailed) R.string.notes_scan_ai_failed
-                    else R.string.notes_scan_text_saved
-                ),
+                when {
+                    aiFailed -> getString(
+                        R.string.notes_scan_ai_failed_reason,
+                        getString(GeminiSummarizer.visionFailureReasonRes(aiFailure))
+                    )
+                    !useAi -> getString(R.string.notes_scan_no_key)
+                    else -> getString(R.string.notes_scan_text_saved)
+                },
                 Toast.LENGTH_LONG
             ).show()
         }
