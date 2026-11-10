@@ -21,6 +21,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.text.SpannableStringBuilder
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -97,6 +98,11 @@ class NoteEditorActivity : AppCompatActivity() {
         const val EXTRA_NOTE_ID = "note_id"
         const val EXTRA_TEMPLATE_TITLE = "template_title"
         const val EXTRA_TEMPLATE_CONTENT = "template_content"
+        /** Study helper context, so the editor can offer "Rewrite". */
+        const val EXTRA_STUDY_TOPIC = "study_topic"
+        const val EXTRA_STUDY_TYPE = "study_type"
+        const val EXTRA_STUDY_LANG = "study_lang"
+        const val EXTRA_STUDY_LENGTH = "study_length"
         private val DATE_FMT = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault())
 
         /** Selectable pastel card colors; "" (first entry) = default. */
@@ -180,6 +186,16 @@ class NoteEditorActivity : AppCompatActivity() {
     private var lastLinkUrl: String? = null
     /** True when the loaded note stores **bold** markers (e.g. a scanned note). */
     private var boldMarkersPresent = false
+    /** Study helper context (from the intent): present only for a generated study note. */
+    private var studyTopic: String? = null
+    private var studyType: String? = null
+    private var studyLang: String? = null
+    private var studyLength: String? = null
+    /** Last @ai answer, so Ask AI again rewrites it instead of adding a second one. */
+    private var aiAnswerStart = -1
+    private var aiAnswerEnd = -1
+    private var aiAnswerAtIndex = -1
+    private var aiAnswerText: String? = null
     private lateinit var imagesAdapter: EditorImagesAdapter
 
     private val pickPhoto = registerForActivityResult(
@@ -400,6 +416,8 @@ class NoteEditorActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.editorShareImage).setOnClickListener { shareNoteAsImage() }
         findViewById<View>(R.id.editorSavePdf).setOnClickListener { savePdfToDownloads() }
+        findViewById<View>(R.id.editorAskAi).setOnClickListener { askAiAboutNote() }
+        findViewById<View>(R.id.editorRegenerate).setOnClickListener { regenerateStudyNote() }
         findViewById<View>(R.id.editorSaveImage).setOnClickListener { saveNoteAsImage() }
         findViewById<View>(R.id.editorAutoCategory).setOnClickListener { suggestCategory() }
         findViewById<View>(R.id.editorFixText).setOnClickListener { fixTextWithAi() }
@@ -462,6 +480,14 @@ class NoteEditorActivity : AppCompatActivity() {
                 intent.getStringExtra(EXTRA_TEMPLATE_TITLE)?.let { titleInput.setText(it) }
                 intent.getStringExtra(EXTRA_TEMPLATE_CONTENT)?.let { contentInput.setText(it) }
                 metaText.text = getString(R.string.notes_new_note)
+                // A generated study note carries its question, so the
+                // editor can offer "Rewrite" for the same question.
+                studyTopic = intent.getStringExtra(EXTRA_STUDY_TOPIC)
+                studyType = intent.getStringExtra(EXTRA_STUDY_TYPE)
+                studyLang = intent.getStringExtra(EXTRA_STUDY_LANG)
+                studyLength = intent.getStringExtra(EXTRA_STUDY_LENGTH)
+                findViewById<View>(R.id.editorRegenerate).visibility =
+                    if (studyTopic != null) View.VISIBLE else View.GONE
             }
             updateTagsView()
             applyBoldMarkersIfPresent()
@@ -1653,6 +1679,176 @@ class NoteEditorActivity : AppCompatActivity() {
             voicePlayer = VoiceNoteStore.createPlayer(file).apply {
                 setOnCompletionListener { runCatching { release() }; voicePlayer = null }
                 start()
+            }
+        }
+    }
+
+    /**
+     * @ai in a note: write "@ai" followed by a question anywhere in
+     * the note, tap Ask AI, and the answer is inserted right under
+     * the question line, like a chat reply. The rest of the note is
+     * the context, so the answer can build on what is already there.
+     * The question is answered in its own language (Bengali or
+     * English). Nothing is sent anywhere until the button is tapped.
+     */
+    private fun askAiAboutNote() {
+        val editable = contentInput.text ?: return
+        val text = editable.toString()
+        val atIndex = text.indexOf("@ai", ignoreCase = true)
+        if (atIndex < 0) {
+            Toast.makeText(this, getString(R.string.notes_ask_ai_no_tag), Toast.LENGTH_SHORT).show()
+            return
+        }
+        // Question = the rest of the @ai line; when the question is on
+        // the next line, that line instead.
+        val after = text.substring(atIndex + 3)
+        val question = after.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        if (question.isBlank()) {
+            Toast.makeText(this, getString(R.string.notes_ask_ai_no_question), Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (GeminiSummarizer.getApiKey(this) == null) {
+            AlertDialog.Builder(this)
+                .setTitle(getString(R.string.notes_ask_ai))
+                .setMessage(getString(R.string.notes_summary_no_key))
+                .setPositiveButton(getString(R.string.notes_settings_title)) { _, _ ->
+                    startActivity(Intent(this, NotesSettingsActivity::class.java))
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            return
+        }
+        val loading = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_ask_ai))
+            .setMessage("…")
+            .setCancelable(false)
+            .create()
+        loading.show()
+        lifecycleScope.launch {
+            val noteContext = text.replace(Regex("@ai", RegexOption.IGNORE_CASE), "").trim()
+            val result = GeminiSummarizer.answerNoteQuestion(
+                this@NoteEditorActivity, question, noteContext
+            )
+            loading.dismiss()
+            result.onSuccess { answer ->
+                val replaced = replaceAiAnswer(atIndex, answer)
+                Toast.makeText(
+                    this@NoteEditorActivity,
+                    getString(
+                        if (replaced) R.string.notes_ask_ai_redone
+                        else R.string.notes_ask_ai_done
+                    ),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }.onFailure {
+                Toast.makeText(
+                    this@NoteEditorActivity,
+                    getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    /**
+     * Inserts the AI answer right after the @ai question line.
+     * Inserts into the Editable (not setText) so existing bold spans
+     * elsewhere in the note are kept. The answer's **bold** markers
+     * are converted to real bold spans at once, so the answer looks
+     * professional in the editor too — not just in Preview. Records
+     * where the answer sits, so asking again rewrites it instead of
+     * adding a second one.
+     */
+    private fun insertAiAnswer(atIndex: Int, answer: String) {
+        val editable = contentInput.text ?: return
+        val text = editable.toString()
+        val lineEnd = text.indexOf('\n', atIndex).let { if (it < 0) text.length else it }
+        val clean = answer.trim()
+        val spanned = RichText.toSpanned(clean)
+        val insert = SpannableStringBuilder("\n\n").append(spanned).append("\n")
+        editable.insert(lineEnd, insert)
+        aiAnswerAtIndex = atIndex
+        aiAnswerStart = lineEnd + 2
+        aiAnswerEnd = aiAnswerStart + spanned.length
+        aiAnswerText = spanned.toString()
+        if (RichText.hasMarkers(clean)) boldMarkersPresent = true
+        contentInput.setSelection(aiAnswerEnd.coerceAtMost(editable.length))
+        lifecycleScope.launch { persistNow() }
+    }
+
+    /**
+     * Rewrites the previous @ai answer when Ask AI is tapped again
+     * for the same question and the old answer is still untouched;
+     * otherwise inserts a fresh answer under the question line.
+     * Returns true when an old answer was replaced.
+     */
+    private fun replaceAiAnswer(atIndex: Int, answer: String): Boolean {
+        val editable = contentInput.text ?: return false
+        if (aiAnswerAtIndex != atIndex || aiAnswerStart < 0 || aiAnswerEnd < 0 ||
+            aiAnswerEnd > editable.length || aiAnswerText == null ||
+            editable.subSequence(aiAnswerStart, aiAnswerEnd).toString() != aiAnswerText
+        ) {
+            insertAiAnswer(atIndex, answer)
+            return false
+        }
+        val clean = answer.trim()
+        val spanned = RichText.toSpanned(clean)
+        editable.replace(aiAnswerStart, aiAnswerEnd, spanned)
+        aiAnswerEnd = aiAnswerStart + spanned.length
+        aiAnswerText = spanned.toString()
+        if (RichText.hasMarkers(clean)) boldMarkersPresent = true
+        contentInput.setSelection(aiAnswerEnd.coerceAtMost(editable.length))
+        lifecycleScope.launch { persistNow() }
+        return true
+    }
+
+    /**
+     * "Rewrite": writes a fresh answer for the same study question
+     * (same topic, type, language and length) and replaces the
+     * current text with it. Asks first, because any edits to the
+     * current text would be lost.
+     */
+    private fun regenerateStudyNote() {
+        val topic = studyTopic ?: return
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_regenerate_title))
+            .setMessage(getString(R.string.notes_regenerate_message))
+            .setPositiveButton(getString(R.string.notes_regenerate)) { _, _ ->
+                runRegenerate(topic)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun runRegenerate(topic: String) {
+        val loading = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_study_helper))
+            .setMessage("…")
+            .setCancelable(false)
+            .create()
+        loading.show()
+        lifecycleScope.launch {
+            val result = GeminiSummarizer.writeStudyMaterial(
+                this@NoteEditorActivity,
+                topic,
+                studyType ?: "PARAGRAPH",
+                studyLang ?: "bn",
+                studyLength ?: "MEDIUM"
+            )
+            loading.dismiss()
+            result.onSuccess { (title, body) ->
+                titleInput.setText(title)
+                contentInput.setText(body)
+                applyBoldMarkersIfPresent()
+                persistNow()
+                Toast.makeText(
+                    this@NoteEditorActivity,
+                    getString(R.string.notes_regenerate_done), Toast.LENGTH_SHORT
+                ).show()
+            }.onFailure {
+                Toast.makeText(
+                    this@NoteEditorActivity,
+                    getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
