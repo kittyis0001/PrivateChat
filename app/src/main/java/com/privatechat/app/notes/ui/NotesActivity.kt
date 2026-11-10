@@ -1480,6 +1480,16 @@ class NotesActivity : AppCompatActivity() {
             ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
             setSelection(1) // MEDIUM, the old behaviour
         }
+        val extraLabel = TextView(this).apply {
+            text = getString(R.string.notes_study_extra)
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@NotesActivity, R.color.textSecondary))
+            setPadding(0, (16 * dp).toInt(), 0, (4 * dp).toInt())
+        }
+        val extraInput = EditText(this).apply {
+            hint = getString(R.string.notes_study_extra_hint)
+            minLines = 2
+        }
         val langRow = makeLangButtonRow()
         container.addView(input)
         container.addView(scanButton)
@@ -1487,10 +1497,12 @@ class NotesActivity : AppCompatActivity() {
         container.addView(typeSpinner)
         container.addView(lengthLabel)
         container.addView(lengthSpinner)
+        container.addView(extraLabel)
+        container.addView(extraInput)
         container.addView(langRow.row)
         val dialog = AlertDialog.Builder(this)
             .setTitle(getString(R.string.notes_study_helper))
-            .setView(container)
+            .setView(android.widget.ScrollView(this).apply { addView(container) })
             .create()
         // A scanned question lets the AI pick the format — math steps,
         // MCQ answer, letter, or a plain answer — instead of guessing.
@@ -1523,8 +1535,9 @@ class NotesActivity : AppCompatActivity() {
             GeminiSummarizer.saveSummaryLang(this, lang)
             val typeKey = STUDY_TYPE_KEYS.getOrElse(typeSpinner.selectedItemPosition) { "PARAGRAPH" }
             val lengthKey = LENGTH_KEYS.getOrElse(lengthSpinner.selectedItemPosition) { "MEDIUM" }
+            val extraNote = extraInput.text.toString().trim()
             dialog.dismiss()
-            runStudyMaterial(topic, typeKey, lang, lengthKey)
+            runStudyMaterial(topic, typeKey, lang, lengthKey, extraNote)
         }
         dialog.show()
     }
@@ -1610,7 +1623,13 @@ class NotesActivity : AppCompatActivity() {
         }
     }
 
-    private fun runStudyMaterial(topic: String, typeKey: String, lang: String, lengthKey: String = "MEDIUM") {
+    private fun runStudyMaterial(
+        topic: String,
+        typeKey: String,
+        lang: String,
+        lengthKey: String = "MEDIUM",
+        extraNote: String = ""
+    ) {
         if (GeminiSummarizer.getApiKey(this) == null) {
             showAiNoKeyDialog(R.string.notes_study_helper)
             return
@@ -1625,16 +1644,16 @@ class NotesActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = if (image != null) {
                 GeminiSummarizer.writeStudyMaterialWithImage(
-                    this@NotesActivity, topic, typeKey, lang, lengthKey, image
+                    this@NotesActivity, topic, typeKey, lang, lengthKey, extraNote, image
                 )
             } else {
                 GeminiSummarizer.writeStudyMaterial(
-                    this@NotesActivity, topic, typeKey, lang, lengthKey
+                    this@NotesActivity, topic, typeKey, lang, lengthKey, extraNote
                 )
             }
             loading.dismiss()
             result.onSuccess { (title, body) ->
-                openEditorWithTemplate(title, body, topic, typeKey, lang, lengthKey)
+                openEditorWithTemplate(title, body, topic, typeKey, lang, lengthKey, extraNote)
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_study_done), Toast.LENGTH_SHORT).show()
             }.onFailure {
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT).show()
@@ -1644,9 +1663,9 @@ class NotesActivity : AppCompatActivity() {
 
     /**
      * Opens the generated note in the editor. The study context
-     * (topic/type/language/length) travels with it, so the editor
-     * can offer "Rewrite" — a fresh answer for the same question —
-     * without asking for the question again.
+     * (topic/type/language/length + the additional note) travels with
+     * it, so the editor can offer "Rewrite" — a fresh answer for the
+     * same question — without asking for the question again.
      */
     private fun openEditorWithTemplate(
         title: String?,
@@ -1654,7 +1673,8 @@ class NotesActivity : AppCompatActivity() {
         studyTopic: String? = null,
         studyType: String? = null,
         studyLang: String? = null,
-        studyLength: String? = null
+        studyLength: String? = null,
+        studyNote: String? = null
     ) {
         val editorIntent = Intent(this, NoteEditorActivity::class.java)
             .putExtra(NoteEditorActivity.EXTRA_TEMPLATE_CONTENT, content)
@@ -1666,6 +1686,9 @@ class NotesActivity : AppCompatActivity() {
             editorIntent.putExtra(NoteEditorActivity.EXTRA_STUDY_TYPE, studyType)
             editorIntent.putExtra(NoteEditorActivity.EXTRA_STUDY_LANG, studyLang)
             editorIntent.putExtra(NoteEditorActivity.EXTRA_STUDY_LENGTH, studyLength)
+            if (!studyNote.isNullOrBlank()) {
+                editorIntent.putExtra(NoteEditorActivity.EXTRA_STUDY_NOTE, studyNote)
+            }
         }
         startActivity(editorIntent)
     }

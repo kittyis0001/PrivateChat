@@ -311,26 +311,48 @@ object GeminiSummarizer {
         topic: String,
         typeKey: String,
         lang: String = "bn",
-        lengthKey: String = "MEDIUM"
+        lengthKey: String = "MEDIUM",
+        extraNote: String = ""
     ): Result<Pair<String, String>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
                 val format = studyFormat(typeKey, lang)
-                val lengthNote = when (lengthKey) {
-                    "SHORT" -> " Keep it short and to the point, about half the usual length " +
-                        "for this kind of answer, without dropping the key points."
-                    "LONG" -> " Give a detailed answer, about twice the usual length for this " +
-                        "kind of answer, with extra examples and explanation."
-                    else -> ""
-                }
-                val prompt = "Write $format." + lengthNote + " Reply with the title on the first line, " +
+                val prompt = "Write $format." + studySuffix(typeKey, lengthKey, extraNote) +
+                    " Reply with the title on the first line, " +
                     "then a blank line, then the body. No extra commentary, no quotes " +
                     "around the title.\n\nTopic: " + topic.take(500)
                 val out = generateText(key, prompt)
                 splitStudyReply(out)
             }
         }
+
+    /**
+     * Extra instructions appended to a study prompt: answer length,
+     * plain-text math (never LaTeX — the app cannot render it, so
+     * $...$ and \frac would show as unreadable markup), and the
+     * user's additional note, when they wrote one.
+     */
+    private fun studySuffix(typeKey: String, lengthKey: String, extraNote: String): String {
+        val lengthNote = when (lengthKey) {
+            "SHORT" -> " Keep it short and to the point, about half the usual length " +
+                "for this kind of answer, without dropping the key points."
+            "LONG" -> " Give a detailed answer, about twice the usual length for this " +
+                "kind of answer, with extra examples and explanation."
+            else -> ""
+        }
+        val mathNote = if (typeKey == "MATH" || typeKey == "SCIENCE" || typeKey == "AUTO") {
+            " Write math in plain readable text, never LaTeX: use √ for square root, " +
+                "/ for fractions, ^ for powers and dy/dx for derivatives — never $...$, " +
+                "\\frac, \\sqrt or any other LaTeX command."
+        } else ""
+        val extra = if (extraNote.isNotBlank()) {
+            " The user added this note about the question: " + extraNote.take(300) +
+                " Follow it — for example, if they say only certain questions or a " +
+                "certain part of the photo, answer only those."
+        } else ""
+        return lengthNote + mathNote + extra
+    }
 
     /** The answer format for a study type, in the requested language. */
     private fun studyFormat(typeKey: String, lang: String): String {
@@ -364,7 +386,9 @@ object GeminiSummarizer {
             }
             "QUESTION" -> "an answer to the question below in $langName, in the style " +
                 "of a Bangladesh school textbook answer: a clear direct answer first, " +
-                "then a simple explanation in easy language with an example when useful"
+                "then a simple explanation in easy language with an example when useful. " +
+                "If the question has lettered or numbered parts (a, b, c…), answer every " +
+                "part on its own line in order, like (a) answer — one short explanation beside it"
             "MATH" -> "a step-by-step solution to the math problem below in $langName, " +
                 "exactly like a Bangladesh school textbook solution: each step on its " +
                 "own line with the working shown, then the final answer, then a short " +
@@ -388,7 +412,9 @@ object GeminiSummarizer {
                 "in মূলভাব / সম্প্রসারিত ভাব / মন্তব্য parts if it is an idea to " +
                 "expand; otherwise a clear textbook-style answer with a simple " +
                 "explanation and an example. If there are several questions, answer " +
-                "each one in turn, repeating each question before its answer"
+                "each one in turn, repeating each question before its answer. If a " +
+                "question has lettered or numbered parts (a, b, c…), answer every part " +
+                "on its own line in order, like (a) answer — one short explanation beside it"
             else -> "a detailed paragraph (200-250 words) in $langName, in the style of a " +
                 "Bangladesh NCTB textbook answer: one clear paragraph, simple sentences, " +
                 "with details and examples"
@@ -419,20 +445,15 @@ object GeminiSummarizer {
         typeKey: String,
         lang: String = "bn",
         lengthKey: String = "MEDIUM",
+        extraNote: String = "",
         jpegBytes: ByteArray
     ): Result<Pair<String, String>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
                 val format = studyFormat(typeKey, lang)
-                val lengthNote = when (lengthKey) {
-                    "SHORT" -> " Keep it short and to the point, about half the usual length " +
-                        "for this kind of answer, without dropping the key points."
-                    "LONG" -> " Give a detailed answer, about twice the usual length for this " +
-                        "kind of answer, with extra examples and explanation."
-                    else -> ""
-                }
-                val prompt = "Write $format." + lengthNote + " Reply with the title on the first line, " +
+                val prompt = "Write $format." + studySuffix(typeKey, lengthKey, extraNote) +
+                    " Reply with the title on the first line, " +
                     "then a blank line, then the body. No extra commentary, no quotes " +
                     "around the title.\n\nTopic: " + topic.take(500) +
                     "\nThe attached photo shows the question — use anything in it, " +
@@ -500,6 +521,11 @@ object GeminiSummarizer {
                     "a direct answer first, then short clear sections with a bold section line " +
                     "when the answer has parts; use **bold** for key terms; numbered steps for " +
                     "procedures; dash (-) bullets for lists; a short example when it helps. " +
+                    "Write math in plain readable text, never LaTeX: use √ for square root, " +
+                    "/ for fractions, ^ for powers and dy/dx for derivatives — never $...$, " +
+                    "\\frac, \\sqrt or any other LaTeX command. " +
+                    "If the question has lettered or numbered parts (a, b, c…), answer every " +
+                    "part on its own line in order, like (a) answer — one short explanation beside it. " +
                     "If it is a multiple-choice question, give the correct option and explain " +
                     "why the others are wrong. Use the note's context when it is relevant. " +
                     "Reply with only the answer, no extra commentary.\n\n" +
@@ -566,6 +592,9 @@ object GeminiSummarizer {
                     "- Reproduce any table as a Markdown table (| header | ... |), one row per line. " +
                     "Inside a table cell, never use <br> or any HTML tag — write the cell text " +
                     "as one flowing line; it will wrap on its own.\n" +
+                    "- Write math in plain readable text, never LaTeX: use √ for square root, " +
+                    "/ for fractions, ^ for powers, dy/dx for derivatives — never $...$, " +
+                    "\\frac, \\sqrt or any other LaTeX command.\n" +
                     "- If a word is unreadable even in the photo, reconstruct it from context " +
                     "ONLY when you are confident, and wrap ONLY that word in [? ?] " +
                     "(example: [? letter ?]) so the user can check it. Never invent a whole sentence.\n" +

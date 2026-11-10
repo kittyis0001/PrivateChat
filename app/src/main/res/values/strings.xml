@@ -279,6 +279,8 @@ Remember:</string>
     <string name="notes_study_type">Type</string>
     <string name="notes_study_done">Study note is ready</string>
     <string name="notes_study_length">Answer length</string>
+    <string name="notes_study_extra">Additional note (optional)</string>
+    <string name="notes_study_extra_hint">e.g. only questions 2 and 5</string>
     <string name="notes_study_pick_questions">Pick the questions to answer</string>
     <string name="notes_regenerate">Rewrite</string>
     <string name="notes_regenerate_title">Rewrite the answer?</string>

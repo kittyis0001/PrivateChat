@@ -103,6 +103,7 @@ class NoteEditorActivity : AppCompatActivity() {
         const val EXTRA_STUDY_TYPE = "study_type"
         const val EXTRA_STUDY_LANG = "study_lang"
         const val EXTRA_STUDY_LENGTH = "study_length"
+        const val EXTRA_STUDY_NOTE = "study_note"
         private val DATE_FMT = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault())
 
         /** Selectable pastel card colors; "" (first entry) = default. */
@@ -191,6 +192,7 @@ class NoteEditorActivity : AppCompatActivity() {
     private var studyType: String? = null
     private var studyLang: String? = null
     private var studyLength: String? = null
+    private var studyNote: String? = null
     /** Last @ai answer, so Ask AI again rewrites it instead of adding a second one. */
     private var aiAnswerStart = -1
     private var aiAnswerEnd = -1
@@ -486,6 +488,7 @@ class NoteEditorActivity : AppCompatActivity() {
                 studyType = intent.getStringExtra(EXTRA_STUDY_TYPE)
                 studyLang = intent.getStringExtra(EXTRA_STUDY_LANG)
                 studyLength = intent.getStringExtra(EXTRA_STUDY_LENGTH)
+                studyNote = intent.getStringExtra(EXTRA_STUDY_NOTE)
                 findViewById<View>(R.id.editorRegenerate).visibility =
                     if (studyTopic != null) View.VISIBLE else View.GONE
             }
@@ -1832,7 +1835,8 @@ class NoteEditorActivity : AppCompatActivity() {
                 topic,
                 studyType ?: "PARAGRAPH",
                 studyLang ?: "bn",
-                studyLength ?: "MEDIUM"
+                studyLength ?: "MEDIUM",
+                studyNote ?: ""
             )
             loading.dismiss()
             result.onSuccess { (title, body) ->
