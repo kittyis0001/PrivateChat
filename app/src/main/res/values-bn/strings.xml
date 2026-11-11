@@ -104,6 +104,45 @@
     <string name="notes_study_length">উত্তরের দৈর্ঘ্য</string>
     <string name="notes_study_extra">অতিরিক্ত নির্দেশনা (ঐচ্ছিক)</string>
     <string name="notes_study_extra_hint">যেমন: শুধু ২ আর ৫ নম্বর প্রশ্ন</string>
+    <string name="notes_study_model">মডেল</string>
+    <string name="notes_study_question_failed">এই প্রশ্নের উত্তর আসেনি — আবার চেষ্টা করো।</string>
+    <string name="notes_ai_chat">AI চ্যাট</string>
+    <string name="notes_ai_chat_hint">যেকোনো কিছু জিজ্ঞেস করো…</string>
+    <string name="notes_ai_chat_typing">AI লিখছে…</string>
+    <string name="notes_ai_chat_new">নতুন চ্যাট</string>
+    <string name="notes_ai_chat_new_confirm">নতুন চ্যাট শুরু করবো? এখনকার কথোপকথন মুছে যাবে।</string>
+    <string name="notes_ai_chat_save_note">নোট হিসেবে সংরক্ষণ করো</string>
+    <string name="notes_ai_chat_image_failed">ছবিটা পড়া যায়নি।</string>
+    <string name="notes_ai_chat_ask_image">এই ছবিতে কী আছে? বুঝিয়ে বলো।</string>
+    <string name="notes_ai_chat_empty">সংরক্ষণ করার মতো কোনো বার্তা নেই।</string>
+    <string name="notes_ai_chat_copied">কপি হয়েছে</string>
+    <string name="notes_ai_chat_attach">ছবি যোগ করো</string>
+    <string name="notes_ai_chat_send">পাঠাও</string>
+    <string name="notes_ai_chat_remove_image">ছবি সরাও</string>
+    <string name="notes_ai_chat_list_title">AI চ্যাটগুলো</string>
+    <string name="notes_ai_chat_list_empty">এখনো কোনো চ্যাট নেই। নতুন চ্যাট শুরু করো!</string>
+    <string name="notes_ai_chat_rename">নাম বদলাও</string>
+    <string name="notes_ai_chat_delete">মুছুন</string>
+    <string name="notes_ai_chat_delete_confirm">এই চ্যাটটা মুছে দেবো?</string>
+    <string name="notes_ai_chat_regenerate">আবার লেখো</string>
+    <string name="notes_ai_chat_listen">শুনুন</string>
+    <string name="notes_ai_chat_speak_prompt">এখন বলো</string>
+    <string name="notes_ai_chat_voice_failed">এই ফোনে ভয়েস ইনপুট নেই।</string>
+    <string name="notes_ai_chat_export">চ্যাট এক্সপোর্ট করো</string>
+    <string name="notes_ai_chat_exported">চ্যাট এক্সপোর্ট হয়েছে</string>
+    <string name="notes_ai_chat_create_image">ছবি বানাও</string>
+    <string name="notes_ai_chat_image_prompt">ছবিটা কেমন হবে লেখো…</string>
+    <string name="notes_ai_chat_image_paid">ছবি বানাতে paid Gemini key লাগে — ফ্রি key দিয়ে ছবি বানানো যায় না।</string>
+    <string name="notes_ai_chat_image_saved">ছবি Gallery-তে সংরক্ষণ হয়েছে</string>
+    <string name="notes_ai_chat_image_save_failed">ছবি সংরক্ষণ করা যায়নি।</string>
+    <string name="notes_ai_chat_model_fast">দ্রুত</string>
+    <string name="notes_ai_chat_model_accurate">নির্ভুল</string>
+    <string name="notes_ai_chat_about_note">এই নোট নিয়ে AI-কে জিজ্ঞেস করো</string>
+    <string name="notes_ai_chat_note_empty">নোটটা খালি।</string>
+    <string name="notes_ai_chat_chip_fact">একটা মজার তথ্য বলো</string>
+    <string name="notes_ai_chat_chip_quote">একটা অনুপ্রেরণামূলক উক্তি দাও</string>
+    <string name="notes_ai_chat_chip_story">একটা ছোট গল্প লেখো</string>
+    <string name="notes_ai_chat_chip_quiz">আমাকে একটা কুইজ প্রশ্ন করো</string>
     <string name="notes_study_pick_questions">কোন প্রশ্নগুলোর উত্তর চাও বেছে নাও</string>
     <string name="notes_regenerate">আবার লেখো</string>
     <string name="notes_regenerate_title">আবার লিখবে?</string>
@@ -185,6 +224,10 @@
         <item>সংক্ষেপে</item>
         <item>মাঝারি</item>
         <item>বিস্তারিত</item>
+    </string-array>
+    <string-array name="study_models">
+        <item>দ্রুত</item>
+        <item>নির্ভুল</item>
     </string-array>
     <string name="notes_ai_category">AI ক্যাটাগরি</string>
     <string name="notes_ai_category_title">AI ক্যাটাগরি ও ট্যাগ</string>

@@ -19,10 +19,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v4 adds a tags column.
  * v5 adds locked and expiresAt columns (per-note lock, self-destruct).
  * v6 adds a countdownAt column (countdown note).
+ * v7 adds ai_chats and ai_chat_messages tables (saved AI chats).
  */
 @Database(
-    entities = [Note::class, Category::class, StickyNote::class, NoteImage::class, ChecklistItem::class, Habit::class, HabitTick::class, VoiceNote::class],
-    version = 6,
+    entities = [Note::class, Category::class, StickyNote::class, NoteImage::class, ChecklistItem::class, Habit::class, HabitTick::class, VoiceNote::class, AiChat::class, AiChatMessageEntity::class],
+    version = 7,
     exportSchema = false
 )
 abstract class NotesDatabase : RoomDatabase() {
@@ -32,6 +33,7 @@ abstract class NotesDatabase : RoomDatabase() {
     abstract fun noteExtrasDao(): NoteExtrasDao
     abstract fun habitDao(): HabitDao
     abstract fun voiceNoteDao(): VoiceNoteDao
+    abstract fun aiChatDao(): AiChatDao
 
     companion object {
         @Volatile
@@ -118,13 +120,36 @@ abstract class NotesDatabase : RoomDatabase() {
             }
         }
 
+        /** Additive v6 -> v7 migration (saved AI chats: two new tables). */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS ai_chats (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "title TEXT NOT NULL, " +
+                        "contextText TEXT NOT NULL, " +
+                        "createdAt INTEGER NOT NULL, " +
+                        "updatedAt INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS ai_chat_messages (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "chatId INTEGER NOT NULL, " +
+                        "role TEXT NOT NULL, " +
+                        "text TEXT NOT NULL, " +
+                        "image BLOB, " +
+                        "createdAt INTEGER NOT NULL)"
+                )
+            }
+        }
+
         fun get(context: Context): NotesDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     NotesDatabase::class.java,
                     "kitty_notes.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build().also { instance = it }
             }
         }
     }

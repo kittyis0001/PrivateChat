@@ -88,6 +88,16 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".notes.ui.AiChatActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".notes.ui.AiChatListActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".notes.ui.SimpleNotesActivity"
             android:exported="false" />
 
