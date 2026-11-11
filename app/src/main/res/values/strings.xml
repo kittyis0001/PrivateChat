@@ -281,6 +281,45 @@ Remember:</string>
     <string name="notes_study_length">Answer length</string>
     <string name="notes_study_extra">Additional note (optional)</string>
     <string name="notes_study_extra_hint">e.g. only questions 2 and 5</string>
+    <string name="notes_study_model">Model</string>
+    <string name="notes_study_question_failed">Could not answer this question — try again.</string>
+    <string name="notes_ai_chat">AI Chat</string>
+    <string name="notes_ai_chat_hint">Ask anything…</string>
+    <string name="notes_ai_chat_typing">AI is typing…</string>
+    <string name="notes_ai_chat_new">New chat</string>
+    <string name="notes_ai_chat_new_confirm">Start a new chat? The current conversation will be cleared.</string>
+    <string name="notes_ai_chat_save_note">Save as note</string>
+    <string name="notes_ai_chat_image_failed">Could not read that image.</string>
+    <string name="notes_ai_chat_ask_image">What is in this photo? Explain it.</string>
+    <string name="notes_ai_chat_empty">No messages to save yet.</string>
+    <string name="notes_ai_chat_copied">Copied</string>
+    <string name="notes_ai_chat_attach">Attach image</string>
+    <string name="notes_ai_chat_send">Send</string>
+    <string name="notes_ai_chat_remove_image">Remove image</string>
+    <string name="notes_ai_chat_list_title">AI Chats</string>
+    <string name="notes_ai_chat_list_empty">No chats yet. Start a new chat!</string>
+    <string name="notes_ai_chat_rename">Rename</string>
+    <string name="notes_ai_chat_delete">Delete</string>
+    <string name="notes_ai_chat_delete_confirm">Delete this chat?</string>
+    <string name="notes_ai_chat_regenerate">Rewrite</string>
+    <string name="notes_ai_chat_listen">Listen</string>
+    <string name="notes_ai_chat_speak_prompt">Speak now</string>
+    <string name="notes_ai_chat_voice_failed">Voice input is not available on this phone.</string>
+    <string name="notes_ai_chat_export">Export chat</string>
+    <string name="notes_ai_chat_exported">Chat exported</string>
+    <string name="notes_ai_chat_create_image">Create image</string>
+    <string name="notes_ai_chat_image_prompt">Describe the image…</string>
+    <string name="notes_ai_chat_image_paid">Image generation needs a paid Gemini key — the free key cannot make images.</string>
+    <string name="notes_ai_chat_image_saved">Image saved to Gallery</string>
+    <string name="notes_ai_chat_image_save_failed">Could not save the image.</string>
+    <string name="notes_ai_chat_model_fast">Fast</string>
+    <string name="notes_ai_chat_model_accurate">Accurate</string>
+    <string name="notes_ai_chat_about_note">Ask AI about this note</string>
+    <string name="notes_ai_chat_note_empty">This note is empty.</string>
+    <string name="notes_ai_chat_chip_fact">Tell me an interesting fact</string>
+    <string name="notes_ai_chat_chip_quote">Give me an inspiring quote</string>
+    <string name="notes_ai_chat_chip_story">Write a short story</string>
+    <string name="notes_ai_chat_chip_quiz">Ask me a quiz question</string>
     <string name="notes_study_pick_questions">Pick the questions to answer</string>
     <string name="notes_regenerate">Rewrite</string>
     <string name="notes_regenerate_title">Rewrite the answer?</string>
@@ -362,6 +401,10 @@ Remember:</string>
         <item>Short</item>
         <item>Medium</item>
         <item>Detailed</item>
+    </string-array>
+    <string-array name="study_models">
+        <item>Fast</item>
+        <item>Accurate</item>
     </string-array>
     <string name="notes_ai_category">AI category</string>
     <string name="notes_ai_category_title">AI category &amp; tags</string>

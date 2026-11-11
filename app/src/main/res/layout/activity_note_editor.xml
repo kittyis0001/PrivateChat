@@ -389,6 +389,15 @@
                     android:textSize="13sp"
                     android:textColor="@color/primary"
                     android:padding="9dp" />
+
+                <TextView
+                    android:id="@+id/editorAskAiChat"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/notes_ai_chat_about_note"
+                    android:textSize="13sp"
+                    android:textColor="@color/primary"
+                    android:padding="9dp" />
             </LinearLayout>
 
             <LinearLayout

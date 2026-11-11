@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/aiChatToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/kittyHeaderBg"
+        app:titleTextColor="@color/textPrimary"
+        xmlns:app="http://schemas.android.com/apk/res-auto" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/aiChatList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp" />
+
+    <LinearLayout
+        android:id="@+id/aiChatChipsRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/aiChatChip1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_chip_unselected"
+            android:text="@string/notes_ai_chat_chip_fact"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/aiChatChip2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_chip_unselected"
+            android:text="@string/notes_ai_chat_chip_quote"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/aiChatChip3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_chip_unselected"
+            android:text="@string/notes_ai_chat_chip_story"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/aiChatChip4"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_chip_unselected"
+            android:text="@string/notes_ai_chat_chip_quiz"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/aiChatImagePreviewRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/aiChatImagePreview"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:scaleType="centerCrop" />
+
+        <ImageButton
+            android:id="@+id/aiChatImageRemove"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/notes_ai_chat_remove_image"
+            android:src="@android:drawable/ic_menu_close_clear_cancel" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="8dp">
+
+        <ImageButton
+            android:id="@+id/aiChatAttach"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/notes_ai_chat_attach"
+            android:src="@android:drawable/ic_menu_gallery" />
+
+        <ImageButton
+            android:id="@+id/aiChatMic"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/notes_ai_chat_speak_prompt"
+            android:src="@android:drawable/ic_btn_speak_now" />
+
+        <EditText
+            android:id="@+id/aiChatInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input_field"
+            android:hint="@string/notes_ai_chat_hint"
+            android:inputType="textMultiLine|textCapSentences"
+            android:maxLines="4"
+            android:padding="12dp" />
+
+        <ImageButton
+            android:id="@+id/aiChatSend"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_send_button"
+            android:contentDescription="@string/notes_ai_chat_send"
+            android:src="@drawable/ic_send" />
+    </LinearLayout>
+</LinearLayout>

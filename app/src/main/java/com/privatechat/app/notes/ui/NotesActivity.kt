@@ -644,6 +644,7 @@ class NotesActivity : AppCompatActivity() {
                 R.id.nav_open_pdf -> { openPdfLauncher.launch(arrayOf("application/pdf")); true }
                 R.id.nav_ai_write -> { promptAiWrite(); true }
                 R.id.nav_study_helper -> { promptStudyMaterial(); true }
+                R.id.nav_ai_chat -> { startActivity(Intent(this, AiChatListActivity::class.java)); true }
                 R.id.nav_backup_now -> { runBackupNow(); true }
                 else -> false
             }
@@ -1344,8 +1345,14 @@ class NotesActivity : AppCompatActivity() {
     /** Study helper answer-length keys, in the same order as R.array.study_lengths. */
     private val LENGTH_KEYS = listOf("SHORT", "MEDIUM", "LONG")
 
+    /** Study helper model keys, in the same order as R.array.study_models. */
+    private val MODEL_KEYS = listOf("FAST", "ACCURATE")
+
     /** Photo of a scanned question, kept only until its answer runs — the vision answer needs it. */
     private var pendingStudyImage: ByteArray? = null
+
+    /** Questions picked from one scanned page, kept until the dialog's OK runs. */
+    private var pendingStudyQuestions: List<String>? = null
 
     /**
      * Study helper "Scan question": the document scanner (camera or
@@ -1396,6 +1403,7 @@ class NotesActivity : AppCompatActivity() {
                 return@launch
             }
             pendingStudyImage = jpeg
+            pendingStudyQuestions = null
             if (questions.size == 1) {
                 promptStudyMaterial(questions.first(), autoType = true)
                 return@launch
@@ -1411,13 +1419,16 @@ class NotesActivity : AppCompatActivity() {
                     val picked = questions.filterIndexed { i, _ -> checked[i] }
                     if (picked.isEmpty()) {
                         pendingStudyImage = null
+                        pendingStudyQuestions = null
                         promptStudyMaterial()
                     } else {
+                        pendingStudyQuestions = picked
                         promptStudyMaterial(picked.joinToString("\n\n"), autoType = true)
                     }
                 }
                 .setNegativeButton(android.R.string.cancel) { _, _ ->
                     pendingStudyImage = null
+                    pendingStudyQuestions = null
                     promptStudyMaterial()
                 }
                 .show()
@@ -1433,10 +1444,13 @@ class NotesActivity : AppCompatActivity() {
      * button fills the topic from a photo instead of typing it.
      */
     private fun promptStudyMaterial(prefillTopic: String? = null, autoType: Boolean = false) {
-        // A manual open (no scanned topic) drops any photo left over
-        // from an earlier scan, so a typed topic never answers with
-        // a stale diagram.
-        if (prefillTopic == null) pendingStudyImage = null
+        // A manual open (no scanned topic) drops any photo and any
+        // picked questions left over from an earlier scan, so a typed
+        // topic never answers with a stale diagram or list.
+        if (prefillTopic == null) {
+            pendingStudyImage = null
+            pendingStudyQuestions = null
+        }
         val dp = resources.displayMetrics.density
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1490,6 +1504,20 @@ class NotesActivity : AppCompatActivity() {
             hint = getString(R.string.notes_study_extra_hint)
             minLines = 2
         }
+        val modelLabel = TextView(this).apply {
+            text = getString(R.string.notes_study_model)
+            textSize = 13f
+            setTextColor(ContextCompat.getColor(this@NotesActivity, R.color.textSecondary))
+            setPadding(0, (16 * dp).toInt(), 0, (4 * dp).toInt())
+        }
+        val modelSpinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@NotesActivity,
+                android.R.layout.simple_spinner_item,
+                resources.getStringArray(R.array.study_models)
+            ).also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+            setSelection(0) // FAST, the old behaviour
+        }
         val langRow = makeLangButtonRow()
         container.addView(input)
         container.addView(scanButton)
@@ -1499,6 +1527,8 @@ class NotesActivity : AppCompatActivity() {
         container.addView(lengthSpinner)
         container.addView(extraLabel)
         container.addView(extraInput)
+        container.addView(modelLabel)
+        container.addView(modelSpinner)
         container.addView(langRow.row)
         val dialog = AlertDialog.Builder(this)
             .setTitle(getString(R.string.notes_study_helper))
@@ -1523,6 +1553,7 @@ class NotesActivity : AppCompatActivity() {
         }
         langRow.cancel.setOnClickListener {
             pendingStudyImage = null
+            pendingStudyQuestions = null
             dialog.dismiss()
         }
         langRow.ok.setOnClickListener {
@@ -1536,8 +1567,21 @@ class NotesActivity : AppCompatActivity() {
             val typeKey = STUDY_TYPE_KEYS.getOrElse(typeSpinner.selectedItemPosition) { "PARAGRAPH" }
             val lengthKey = LENGTH_KEYS.getOrElse(lengthSpinner.selectedItemPosition) { "MEDIUM" }
             val extraNote = extraInput.text.toString().trim()
+            val modelKey = MODEL_KEYS.getOrElse(modelSpinner.selectedItemPosition) { "FAST" }
+            // Several questions picked from one scan, and the topic was
+            // not edited since: answer each one in its own call. Any
+            // other case (one question, or an edited topic) takes the
+            // single-call path.
+            val questions = pendingStudyQuestions?.takeIf {
+                it.size > 1 && topic == it.joinToString("\n\n")
+            }
+            pendingStudyQuestions = null
             dialog.dismiss()
-            runStudyMaterial(topic, typeKey, lang, lengthKey, extraNote)
+            if (questions != null) {
+                runStudyMaterialMulti(questions, typeKey, lang, lengthKey, extraNote, modelKey)
+            } else {
+                runStudyMaterial(topic, typeKey, lang, lengthKey, extraNote, modelKey)
+            }
         }
         dialog.show()
     }
@@ -1628,7 +1672,8 @@ class NotesActivity : AppCompatActivity() {
         typeKey: String,
         lang: String,
         lengthKey: String = "MEDIUM",
-        extraNote: String = ""
+        extraNote: String = "",
+        modelKey: String = "FAST"
     ) {
         if (GeminiSummarizer.getApiKey(this) == null) {
             showAiNoKeyDialog(R.string.notes_study_helper)
@@ -1639,21 +1684,22 @@ class NotesActivity : AppCompatActivity() {
         // diagram, graph or table in it is seen too.
         val image = pendingStudyImage
         pendingStudyImage = null
+        val model = GeminiSummarizer.modelForKey(modelKey)
         val loading = showAiLoadingDialog(R.string.notes_study_helper)
         loading.show()
         lifecycleScope.launch {
             val result = if (image != null) {
                 GeminiSummarizer.writeStudyMaterialWithImage(
-                    this@NotesActivity, topic, typeKey, lang, lengthKey, extraNote, image
+                    this@NotesActivity, topic, typeKey, lang, lengthKey, extraNote, image, model
                 )
             } else {
                 GeminiSummarizer.writeStudyMaterial(
-                    this@NotesActivity, topic, typeKey, lang, lengthKey, extraNote
+                    this@NotesActivity, topic, typeKey, lang, lengthKey, extraNote, model
                 )
             }
             loading.dismiss()
             result.onSuccess { (title, body) ->
-                openEditorWithTemplate(title, body, topic, typeKey, lang, lengthKey, extraNote)
+                openEditorWithTemplate(title, body, topic, typeKey, lang, lengthKey, extraNote, modelKey)
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_study_done), Toast.LENGTH_SHORT).show()
             }.onFailure {
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT).show()
@@ -1662,10 +1708,64 @@ class NotesActivity : AppCompatActivity() {
     }
 
     /**
+     * Several questions from one scan: each gets its own answer call
+     * (text only — the photo is not re-uploaded for every question; a
+     * diagram question should be picked alone so it gets the vision
+     * answer), then they are combined into one note. The loading
+     * dialog can be cancelled, because many questions take a while
+     * on a slow connection.
+     */
+    private fun runStudyMaterialMulti(
+        questions: List<String>,
+        typeKey: String,
+        lang: String,
+        lengthKey: String,
+        extraNote: String,
+        modelKey: String
+    ) {
+        if (GeminiSummarizer.getApiKey(this) == null) {
+            showAiNoKeyDialog(R.string.notes_study_helper)
+            return
+        }
+        pendingStudyImage = null
+        var job: Job? = null
+        val loading = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.notes_study_helper))
+            .setMessage("…")
+            .setCancelable(false)
+            .setNegativeButton(android.R.string.cancel) { _, _ -> job?.cancel() }
+            .create()
+        loading.show()
+        job = lifecycleScope.launch {
+            try {
+                val result = GeminiSummarizer.answerQuestionsOneByOne(
+                    this@NotesActivity, questions, typeKey, lang, lengthKey, extraNote,
+                    GeminiSummarizer.modelForKey(modelKey)
+                )
+                result.onSuccess { (title, body) ->
+                    openEditorWithTemplate(
+                        title, body, questions.joinToString("\n\n"),
+                        typeKey, lang, lengthKey, extraNote, modelKey
+                    )
+                    Toast.makeText(
+                        this@NotesActivity, getString(R.string.notes_study_done), Toast.LENGTH_SHORT
+                    ).show()
+                }.onFailure {
+                    Toast.makeText(
+                        this@NotesActivity, getString(R.string.notes_ai_failed), Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } finally {
+                loading.dismiss()
+            }
+        }
+    }
+
+    /**
      * Opens the generated note in the editor. The study context
-     * (topic/type/language/length + the additional note) travels with
-     * it, so the editor can offer "Rewrite" — a fresh answer for the
-     * same question — without asking for the question again.
+     * (topic/type/language/length + the additional note and model)
+     * travels with it, so the editor can offer "Rewrite" — a fresh
+     * answer for the same question — without asking for it again.
      */
     private fun openEditorWithTemplate(
         title: String?,
@@ -1674,7 +1774,8 @@ class NotesActivity : AppCompatActivity() {
         studyType: String? = null,
         studyLang: String? = null,
         studyLength: String? = null,
-        studyNote: String? = null
+        studyNote: String? = null,
+        studyModel: String? = null
     ) {
         val editorIntent = Intent(this, NoteEditorActivity::class.java)
             .putExtra(NoteEditorActivity.EXTRA_TEMPLATE_CONTENT, content)
@@ -1688,6 +1789,9 @@ class NotesActivity : AppCompatActivity() {
             editorIntent.putExtra(NoteEditorActivity.EXTRA_STUDY_LENGTH, studyLength)
             if (!studyNote.isNullOrBlank()) {
                 editorIntent.putExtra(NoteEditorActivity.EXTRA_STUDY_NOTE, studyNote)
+            }
+            if (studyModel != null) {
+                editorIntent.putExtra(NoteEditorActivity.EXTRA_STUDY_MODEL, studyModel)
             }
         }
         startActivity(editorIntent)

@@ -7,15 +7,22 @@ import android.net.Uri
 import android.util.Base64
 import com.privatechat.app.R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * AI summary via the Gemini API. The user's own API key is stored in
@@ -31,6 +38,23 @@ object GeminiSummarizer {
     // 404s for every key. gemini-3.5-flash-lite is the current GA
     // replacement (free tier: 500 requests/day).
     private const val MODEL = "gemini-3.5-flash-lite"
+    /**
+     * The bigger model for hard study questions ("নির্ভুল"): the
+     * current stable full Flash. If it fails (e.g. its own daily
+     * limit), study calls fall back to [MODEL] automatically.
+     */
+    private const val ACCURATE_MODEL = "gemini-3.7-flash"
+    /**
+     * Image generation model (Nano Banana 2.1). Honest limit: image
+     * output is NOT on Gemini's free tier — it needs a paid project,
+     * so a free key fails here.
+     */
+    private const val IMAGE_MODEL = "gemini-nano-banana-2.1"
+    /** Low temperature for study answers: fewer guesses, more facts. */
+    private const val STUDY_TEMPERATURE = 0.3
+
+    /** Maps a Study dialog model key ("FAST"/"ACCURATE") to a model id. */
+    fun modelForKey(key: String?): String = if (key == "ACCURATE") ACCURATE_MODEL else MODEL
 
     fun getApiKey(context: Context): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -155,8 +179,14 @@ object GeminiSummarizer {
     data class CategorySuggestion(val category: String, val tags: List<String>)
 
     /** One Gemini text call, shared by the newer features. Throws on failure. */
-    private suspend fun generateText(key: String, prompt: String): String {
-        val bodyJson = JSONObject()
+    private suspend fun generateText(
+        key: String,
+        prompt: String,
+        temperature: Double? = null,
+        model: String = MODEL,
+        timeoutSeconds: Long = 30
+    ): String {
+        val body = JSONObject()
             .put(
                 "contents", JSONArray().put(
                     JSONObject().put(
@@ -165,8 +195,11 @@ object GeminiSummarizer {
                         )
                     )
                 )
-            ).toString()
-        return callGemini(key, bodyJson)
+            )
+        if (temperature != null) {
+            body.put("generationConfig", JSONObject().put("temperature", temperature))
+        }
+        return callGemini(key, body.toString(), timeoutSeconds = timeoutSeconds, model = model)
     }
 
     /**
@@ -174,7 +207,13 @@ object GeminiSummarizer {
      * page (vision). The model is multimodal, so the same endpoint
      * accepts the image as an inlineData part. Throws on failure.
      */
-    private suspend fun generateWithImage(key: String, prompt: String, jpegBytes: ByteArray): String {
+    private suspend fun generateWithImage(
+        key: String,
+        prompt: String,
+        jpegBytes: ByteArray,
+        temperature: Double? = null,
+        model: String = MODEL
+    ): String {
         val parts = JSONArray()
             .put(JSONObject().put("text", prompt))
             .put(
@@ -184,22 +223,46 @@ object GeminiSummarizer {
                         .put("data", Base64.encodeToString(jpegBytes, Base64.NO_WRAP))
                 )
             )
-        val bodyJson = JSONObject()
+        val body = JSONObject()
             .put(
                 "contents", JSONArray().put(
                     JSONObject().put("parts", parts)
                 )
-            ).toString()
+            )
+        if (temperature != null) {
+            body.put("generationConfig", JSONObject().put("temperature", temperature))
+        }
         // Vision calls carry a photo and wait for a long answer, so
         // they get a longer timeout than plain text calls — on a
         // slow connection the default 10 s write timeout killed the
         // upload before it finished, and the scan silently fell
         // back to plain OCR.
-        return callGemini(key, bodyJson, timeoutSeconds = 90)
+        return callGemini(key, body.toString(), timeoutSeconds = 90, model = model)
     }
 
     /** The HTTP call + reply parsing shared by [generateText] and [generateWithImage]. */
-    private suspend fun callGemini(key: String, bodyJson: String, timeoutSeconds: Long = 30): String =
+    private suspend fun callGemini(
+        key: String,
+        bodyJson: String,
+        timeoutSeconds: Long = 30,
+        model: String = MODEL
+    ): String {
+        val raw = callGeminiRaw(key, bodyJson, timeoutSeconds, model)
+        val out = JSONObject(raw)
+            .getJSONArray("candidates").getJSONObject(0)
+            .getJSONObject("content").getJSONArray("parts").getJSONObject(0)
+            .getString("text").trim()
+        if (out.isBlank()) throw IllegalStateException("Empty reply")
+        return out
+    }
+
+    /** One generateContent call returning the raw response body. Throws on HTTP failure. */
+    private suspend fun callGeminiRaw(
+        key: String,
+        bodyJson: String,
+        timeoutSeconds: Long = 30,
+        model: String = MODEL
+    ): String =
         withContext(Dispatchers.IO) {
             val client = OkHttpClient.Builder()
                 .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
@@ -209,21 +272,90 @@ object GeminiSummarizer {
             val request = Request.Builder()
                 .url(
                     "https://generativelanguage.googleapis.com/v1beta/models/" +
-                        "$MODEL:generateContent?key=$key"
+                        "$model:generateContent?key=$key"
                 )
                 .post(bodyJson.toRequestBody("application/json".toMediaType()))
                 .build()
             client.newCall(request).execute().use { response ->
                 val raw = response.body?.string().orEmpty()
                 if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}")
-                val out = JSONObject(raw)
-                    .getJSONArray("candidates").getJSONObject(0)
-                    .getJSONObject("content").getJSONArray("parts").getJSONObject(0)
-                    .getString("text").trim()
-                if (out.isBlank()) throw IllegalStateException("Empty reply")
-                out
+                raw
             }
         }
+
+    /**
+     * Streaming generateContent (SSE): each text piece is handed to
+     * [onChunk] as it arrives. Cancelling the caller's coroutine
+     * aborts the network call. Returns the full reply text.
+     */
+    private suspend fun streamGemini(
+        key: String,
+        bodyJson: String,
+        model: String,
+        onChunk: (String) -> Unit
+    ): String = suspendCancellableCoroutine { cont ->
+        val client = OkHttpClient.Builder()
+            .connectTimeout(90, TimeUnit.SECONDS)
+            .readTimeout(90, TimeUnit.SECONDS)
+            .writeTimeout(90, TimeUnit.SECONDS)
+            .build()
+        val request = Request.Builder()
+            .url(
+                "https://generativelanguage.googleapis.com/v1beta/models/" +
+                    "$model:streamGenerateContent?alt=sse&key=$key"
+            )
+            .post(bodyJson.toRequestBody("application/json".toMediaType()))
+            .build()
+        val call = client.newCall(request)
+        cont.invokeOnCancellation { call.cancel() }
+        call.enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                if (cont.isActive) cont.resumeWithException(e)
+            }
+
+            override fun onResponse(call: Call, response: Response) {
+                response.use {
+                    if (!it.isSuccessful) {
+                        if (cont.isActive) {
+                            cont.resumeWithException(IllegalStateException("HTTP ${it.code}"))
+                        }
+                        return
+                    }
+                    val full = StringBuilder()
+                    try {
+                        val source = it.body?.source()
+                            ?: throw IllegalStateException("Empty reply")
+                        while (true) {
+                            val line = source.readUtf8Line() ?: break
+                            if (!line.startsWith("data:")) continue
+                            val json = line.removePrefix("data:").trim()
+                            if (json.isEmpty()) continue
+                            val text = try {
+                                JSONObject(json).optJSONArray("candidates")?.optJSONObject(0)
+                                    ?.optJSONObject("content")?.optJSONArray("parts")
+                                    ?.optJSONObject(0)?.optString("text").orEmpty()
+                            } catch (_: Exception) {
+                                ""
+                            }
+                            if (text.isNotEmpty()) {
+                                full.append(text)
+                                onChunk(text)
+                            }
+                        }
+                        if (cont.isActive) {
+                            if (full.isBlank()) {
+                                cont.resumeWithException(IllegalStateException("Empty reply"))
+                            } else {
+                                cont.resume(full.toString())
+                            }
+                        }
+                    } catch (e: Exception) {
+                        if (cont.isActive) cont.resumeWithException(e)
+                    }
+                }
+            }
+        })
+    }
 
     /**
      * Auto category + tags: picks the best existing category for the
@@ -312,7 +444,8 @@ object GeminiSummarizer {
         typeKey: String,
         lang: String = "bn",
         lengthKey: String = "MEDIUM",
-        extraNote: String = ""
+        extraNote: String = "",
+        model: String = MODEL
     ): Result<Pair<String, String>> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -322,8 +455,243 @@ object GeminiSummarizer {
                     " Reply with the title on the first line, " +
                     "then a blank line, then the body. No extra commentary, no quotes " +
                     "around the title.\n\nTopic: " + topic.take(500)
-                val out = generateText(key, prompt)
-                splitStudyReply(out)
+                val first = splitStudyReply(generateForStudy(key, prompt, model, null))
+                verifyStudyAnswer(key, topic, first, model).getOrNull()?.let { verified ->
+                    runCatching { splitStudyReply(verified) }.getOrNull()
+                } ?: first
+            }
+        }
+
+    /**
+     * One study call at low temperature, with the chosen model; if
+     * the accurate model fails (e.g. its own daily limit), it falls
+     * back to the fast model once instead of failing the answer.
+     */
+    private suspend fun generateForStudy(
+        key: String,
+        prompt: String,
+        model: String,
+        jpegBytes: ByteArray?
+    ): String {
+        val attempt = runCatching {
+            if (jpegBytes != null) {
+                generateWithImage(key, prompt, jpegBytes, temperature = STUDY_TEMPERATURE, model = model)
+            } else {
+                generateText(key, prompt, temperature = STUDY_TEMPERATURE, model = model)
+            }
+        }
+        if (attempt.isSuccess || model == MODEL) return attempt.getOrThrow()
+        return if (jpegBytes != null) {
+            generateWithImage(key, prompt, jpegBytes, temperature = STUDY_TEMPERATURE, model = MODEL)
+        } else {
+            generateText(key, prompt, temperature = STUDY_TEMPERATURE, model = MODEL)
+        }
+    }
+
+    /**
+     * Second pass: re-checks a study answer against its question and
+     * fixes mistakes (calculation errors, wrong facts, wrong options,
+     * missed parts). Returns the corrected reply text in the same
+     * title+body shape, or failure — the caller then keeps the first
+     * answer, so a failed check never loses a good answer.
+     */
+    private suspend fun verifyStudyAnswer(
+        key: String,
+        topic: String,
+        first: Pair<String, String>,
+        model: String
+    ): Result<String> =
+        runCatching {
+            val prompt = "You are checking a study answer for mistakes. Question: " +
+                topic.take(500) + "\n\nAnswer title: " + first.first +
+                "\nAnswer:\n" + first.second.take(4000) +
+                "\n\nCheck it carefully against the question: fix any calculation errors, " +
+                "wrong facts, wrong options, or missed parts. Only fix mistakes — do not " +
+                "rewrite correct parts or change the style or length. If you are not sure " +
+                "about a fact or a step, mark that line with ⚠️. Reply with the corrected " +
+                "answer in the same format: the title on the first line, then a blank line, " +
+                "then the body. No extra commentary."
+            generateForStudy(key, prompt, model, null)
+        }
+
+    /**
+     * Answers each question in its own call (same type/language/length/
+     * note/model), then combines them into one note: the first answer's
+     * title, and one bold question line + answer per question. A question
+     * that fails gets a short "could not answer" line instead, so one
+     * failure never loses the other answers.
+     */
+    suspend fun answerQuestionsOneByOne(
+        context: Context,
+        questions: List<String>,
+        typeKey: String,
+        lang: String = "bn",
+        lengthKey: String = "MEDIUM",
+        extraNote: String = "",
+        model: String = MODEL
+    ): Result<Pair<String, String>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                var title: String? = null
+                val sections = StringBuilder()
+                for (q in questions) {
+                    val one = writeStudyMaterial(context, q, typeKey, lang, lengthKey, extraNote, model)
+                    if (one.isSuccess) {
+                        val (t, b) = one.getOrThrow()
+                        if (title == null) title = t
+                        sections.append("**").append(q.trim().take(200)).append("**\n")
+                            .append(b).append("\n\n")
+                    } else {
+                        sections.append("**").append(q.trim().take(200)).append("**\n")
+                            .append(context.getString(R.string.notes_study_question_failed))
+                            .append("\n\n")
+                    }
+                }
+                val finalTitle = title ?: throw IllegalStateException("Empty reply")
+                finalTitle to sections.toString().trim()
+            }
+        }
+
+    /** One turn of an AI chat: role is "user" or "assistant". */
+    data class ChatTurn(val role: String, val text: String)
+
+    /**
+     * AI chat (ChatGPT-style): answers a new message with the recent
+     * conversation as context, so follow-ups ("আরও সহজ করে বলো") work.
+     * Attaches the photo when the new message has one, so the user
+     * can ask anything about an image. Only the current message's
+     * photo is sent; older turns keep a "[Image attached]" note in
+     * the transcript. When [noteContext] is given (a note the user is
+     * asking about), it travels as context, not as a visible message.
+     * Returns the assistant's reply text.
+     */
+    suspend fun chatAnswer(
+        context: Context,
+        history: List<ChatTurn>,
+        message: String,
+        jpegBytes: ByteArray? = null,
+        model: String = MODEL,
+        noteContext: String? = null
+    ): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val prompt = buildChatPrompt(history, message, jpegBytes != null, noteContext)
+                val out = if (jpegBytes != null) {
+                    generateWithImage(key, prompt, jpegBytes, temperature = 0.7, model = model)
+                } else {
+                    generateText(key, prompt, temperature = 0.7, model = model, timeoutSeconds = 60)
+                }
+                val reply = out.trim()
+                if (reply.isBlank()) throw IllegalStateException("Empty reply")
+                reply
+            }
+        }
+
+    /**
+     * Streaming AI chat: the same answer as [chatAnswer], but each
+     * piece of text is handed to [onChunk] as it arrives, so the
+     * reply appears word by word instead of all at once.
+     */
+    suspend fun chatAnswerStream(
+        context: Context,
+        history: List<ChatTurn>,
+        message: String,
+        jpegBytes: ByteArray? = null,
+        model: String = MODEL,
+        noteContext: String? = null,
+        onChunk: (String) -> Unit
+    ): Result<String> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val prompt = buildChatPrompt(history, message, jpegBytes != null, noteContext)
+                val parts = JSONArray()
+                    .put(JSONObject().put("text", prompt))
+                if (jpegBytes != null) {
+                    parts.put(
+                        JSONObject().put(
+                            "inlineData", JSONObject()
+                                .put("mimeType", "image/jpeg")
+                                .put("data", Base64.encodeToString(jpegBytes, Base64.NO_WRAP))
+                        )
+                    )
+                }
+                val body = JSONObject()
+                    .put(
+                        "contents", JSONArray().put(
+                            JSONObject().put("parts", parts)
+                        )
+                    )
+                    .put("generationConfig", JSONObject().put("temperature", 0.7))
+                streamGemini(key, body.toString(), model, onChunk)
+            }
+        }
+
+    /** The shared chat prompt: instructions + note context + recent turns + new message. */
+    private fun buildChatPrompt(
+        history: List<ChatTurn>,
+        message: String,
+        hasImage: Boolean,
+        noteContext: String?
+    ): String {
+        val transcript = StringBuilder()
+        for (t in history.takeLast(10)) {
+            transcript.append(if (t.role == "user") "User: " else "Assistant: ")
+                .append(t.text.take(1500)).append("\n\n")
+        }
+        val notePart = if (!noteContext.isNullOrBlank()) {
+            "The user is asking about this note — use it as context, and say so if a " +
+                "question has nothing to do with it:\n" + noteContext.take(4000) + "\n\n"
+        } else ""
+        return "You are a helpful AI assistant, like ChatGPT or Gemini. " +
+            "Answer professionally and clearly, in the same language the user writes in " +
+            "(Bengali if they write Bengali, English if they write English). " +
+            "Use **bold** for key terms, short paragraphs, and numbered steps or dash " +
+            "bullets when they help. If you are not sure about a fact, say so honestly " +
+            "instead of guessing. Write math in plain readable text, never LaTeX.\n\n" +
+            notePart +
+            "Conversation so far:\n" + transcript.toString() +
+            "User: " + message.take(2000) +
+            (if (hasImage) "\n(The user attached a photo with this message — look at it and answer about what it shows.)" else "") +
+            "\nAssistant:"
+    }
+
+    /**
+     * Generates one image from a text description (Nano Banana 2.1).
+     * Returns the PNG bytes. Honest limit: image output is NOT on
+     * Gemini's free tier — it needs a paid project, so a free key
+     * fails here (HTTP 403 / quota 0).
+     */
+    suspend fun generateImageBytes(context: Context, prompt: String): Result<ByteArray> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val key = getApiKey(context) ?: throw IllegalStateException("NO_API_KEY")
+                val body = JSONObject()
+                    .put(
+                        "contents", JSONArray().put(
+                            JSONObject().put(
+                                "parts", JSONArray().put(
+                                    JSONObject().put("text", prompt)
+                                )
+                            )
+                        )
+                    )
+                    .put(
+                        "generationConfig", JSONObject()
+                            .put("responseModalities", JSONArray().put("IMAGE"))
+                            .put("imageConfig", JSONObject().put("imageSize", "1K"))
+                    )
+                val raw = callGeminiRaw(key, body.toString(), timeoutSeconds = 90, model = IMAGE_MODEL)
+                val parts = JSONObject(raw)
+                    .getJSONArray("candidates").getJSONObject(0)
+                    .getJSONObject("content").getJSONArray("parts")
+                for (i in 0 until parts.length()) {
+                    val data = parts.optJSONObject(i)
+                        ?.optJSONObject("inlineData")?.optString("data").orEmpty()
+                    if (data.isNotBlank()) return@runCatching Base64.decode(data, Base64.DEFAULT)
+                }
+                throw IllegalStateException("NO_IMAGE")
             }
         }
 
@@ -351,7 +719,9 @@ object GeminiSummarizer {
                 " Follow it — for example, if they say only certain questions or a " +
                 "certain part of the photo, answer only those."
         } else ""
-        return lengthNote + mathNote + extra
+        val unsure = " If you are not sure about a fact, a step or an answer, mark that " +
+            "line with ⚠️ so the user can check it against the book."
+        return lengthNote + mathNote + extra + unsure
     }
 
     /** The answer format for a study type, in the requested language. */
@@ -392,7 +762,10 @@ object GeminiSummarizer {
             "MATH" -> "a step-by-step solution to the math problem below in $langName, " +
                 "exactly like a Bangladesh school textbook solution: each step on its " +
                 "own line with the working shown, then the final answer, then a short " +
-                "explanation in easy language of why each step is done"
+                "explanation in easy language of why each step is done. Follow this worked " +
+                "example's style, not its problem: Question: Solve 2x + 6 = 14. " +
+                "Step 1: 2x = 14 − 6 = 8. Step 2: x = 8 / 2 = 4. Answer: x = 4. " +
+                "Explanation: first move 6 to the other side, then divide by 2"
             "MCQ" -> "an answer to the multiple-choice question below in $langName, " +
                 "in Bangladesh school textbook style: first the correct option " +
                 "(its letter and text), then why it is correct, then briefly why " +
@@ -446,7 +819,8 @@ object GeminiSummarizer {
         lang: String = "bn",
         lengthKey: String = "MEDIUM",
         extraNote: String = "",
-        jpegBytes: ByteArray
+        jpegBytes: ByteArray,
+        model: String = MODEL
     ): Result<Pair<String, String>> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -458,8 +832,10 @@ object GeminiSummarizer {
                     "around the title.\n\nTopic: " + topic.take(500) +
                     "\nThe attached photo shows the question — use anything in it, " +
                     "including a diagram, graph or table, to answer."
-                val out = generateWithImage(key, prompt, jpegBytes)
-                splitStudyReply(out)
+                val first = splitStudyReply(generateForStudy(key, prompt, model, jpegBytes))
+                verifyStudyAnswer(key, topic, first, model).getOrNull()?.let { verified ->
+                    runCatching { splitStudyReply(verified) }.getOrNull()
+                } ?: first
             }
         }
 
@@ -480,7 +856,9 @@ object GeminiSummarizer {
                     val prompt = "List every separate question visible in this photo, in order, " +
                         "one per line, exactly as printed, including numbers, math symbols and " +
                         "formulas. Do not number them, do not answer them, do not add any other words."
-                    val out = generateWithImage(key, prompt, jpegBytes).trim()
+                    val out = generateWithImage(
+                        key, prompt, jpegBytes, temperature = STUDY_TEMPERATURE
+                    ).trim()
                     if (out.isBlank()) throw IllegalStateException("Empty reply")
                     out.lineSequence()
                         .map { it.trim() }
@@ -524,13 +902,15 @@ object GeminiSummarizer {
                     "Write math in plain readable text, never LaTeX: use √ for square root, " +
                     "/ for fractions, ^ for powers and dy/dx for derivatives — never $...$, " +
                     "\\frac, \\sqrt or any other LaTeX command. " +
+                    "If you are not sure about a fact, a step or an answer, mark that " +
+                    "line with ⚠️ so the user can check it against the book. " +
                     "If the question has lettered or numbered parts (a, b, c…), answer every " +
                     "part on its own line in order, like (a) answer — one short explanation beside it. " +
                     "If it is a multiple-choice question, give the correct option and explain " +
                     "why the others are wrong. Use the note's context when it is relevant. " +
                     "Reply with only the answer, no extra commentary.\n\n" +
                     "Note context:\n" + noteContext.take(4000) + "\n\nQuestion: " + question.take(1000)
-                val out = generateText(key, prompt).trim()
+                val out = generateText(key, prompt, temperature = STUDY_TEMPERATURE).trim()
                 if (out.isBlank()) throw IllegalStateException("Empty reply")
                 out
             }
@@ -599,7 +979,9 @@ object GeminiSummarizer {
                     "ONLY when you are confident, and wrap ONLY that word in [? ?] " +
                     "(example: [? letter ?]) so the user can check it. Never invent a whole sentence.\n" +
                     "Reply with only the corrected text, nothing else.\n\nOCR text:\n" + ocr
-                val fixed = generateWithImage(key, prompt, jpegBytes)
+                val fixed = generateWithImage(
+                    key, prompt, jpegBytes, temperature = STUDY_TEMPERATURE
+                )
                 // Safety net: the vision pass fixes wording, it does not
                 // delete whole sections — if its reply is much shorter
                 // than the OCR text, it dropped part of the page (seen:

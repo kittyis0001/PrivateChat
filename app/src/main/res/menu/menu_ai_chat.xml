@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_ai_save_note"
+        android:title="@string/notes_ai_chat_save_note"
+        android:showAsAction="never" />
+    <item
+        android:id="@+id/action_ai_export"
+        android:title="@string/notes_ai_chat_export"
+        android:showAsAction="never" />
+    <item
+        android:id="@+id/action_ai_create_image"
+        android:title="@string/notes_ai_chat_create_image"
+        android:showAsAction="never" />
+    <item
+        android:id="@+id/action_ai_new_chat"
+        android:title="@string/notes_ai_chat_new"
+        android:showAsAction="never" />
+    <group
+        android:id="@+id/ai_chat_model_group"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/action_model_fast"
+            android:title="@string/notes_ai_chat_model_fast"
+            android:checkable="true"
+            android:checked="true"
+            android:showAsAction="never" />
+        <item
+            android:id="@+id/action_model_accurate"
+            android:title="@string/notes_ai_chat_model_accurate"
+            android:checkable="true"
+            android:showAsAction="never" />
+    </group>
+</menu>

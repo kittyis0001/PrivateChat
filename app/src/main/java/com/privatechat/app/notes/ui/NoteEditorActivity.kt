@@ -104,6 +104,7 @@ class NoteEditorActivity : AppCompatActivity() {
         const val EXTRA_STUDY_LANG = "study_lang"
         const val EXTRA_STUDY_LENGTH = "study_length"
         const val EXTRA_STUDY_NOTE = "study_note"
+        const val EXTRA_STUDY_MODEL = "study_model"
         private val DATE_FMT = SimpleDateFormat("d MMM yyyy, h:mm a", Locale.getDefault())
 
         /** Selectable pastel card colors; "" (first entry) = default. */
@@ -193,6 +194,7 @@ class NoteEditorActivity : AppCompatActivity() {
     private var studyLang: String? = null
     private var studyLength: String? = null
     private var studyNote: String? = null
+    private var studyModel: String? = null
     /** Last @ai answer, so Ask AI again rewrites it instead of adding a second one. */
     private var aiAnswerStart = -1
     private var aiAnswerEnd = -1
@@ -419,6 +421,7 @@ class NoteEditorActivity : AppCompatActivity() {
         findViewById<View>(R.id.editorShareImage).setOnClickListener { shareNoteAsImage() }
         findViewById<View>(R.id.editorSavePdf).setOnClickListener { savePdfToDownloads() }
         findViewById<View>(R.id.editorAskAi).setOnClickListener { askAiAboutNote() }
+        findViewById<View>(R.id.editorAskAiChat).setOnClickListener { askAiChatAboutNote() }
         findViewById<View>(R.id.editorRegenerate).setOnClickListener { regenerateStudyNote() }
         findViewById<View>(R.id.editorSaveImage).setOnClickListener { saveNoteAsImage() }
         findViewById<View>(R.id.editorAutoCategory).setOnClickListener { suggestCategory() }
@@ -489,6 +492,7 @@ class NoteEditorActivity : AppCompatActivity() {
                 studyLang = intent.getStringExtra(EXTRA_STUDY_LANG)
                 studyLength = intent.getStringExtra(EXTRA_STUDY_LENGTH)
                 studyNote = intent.getStringExtra(EXTRA_STUDY_NOTE)
+                studyModel = intent.getStringExtra(EXTRA_STUDY_MODEL)
                 findViewById<View>(R.id.editorRegenerate).visibility =
                     if (studyTopic != null) View.VISIBLE else View.GONE
             }
@@ -1694,6 +1698,23 @@ class NoteEditorActivity : AppCompatActivity() {
      * The question is answered in its own language (Bengali or
      * English). Nothing is sent anywhere until the button is tapped.
      */
+    /**
+     * Opens the AI chat with this note as context, so the user can
+     * ask anything about it in a full conversation.
+     */
+    private fun askAiChatAboutNote() {
+        val content = contentInput.text?.toString().orEmpty()
+        if (content.isBlank()) {
+            Toast.makeText(this, getString(R.string.notes_ai_chat_note_empty), Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(
+            Intent(this, AiChatActivity::class.java)
+                .putExtra(AiChatActivity.EXTRA_NOTE_CONTEXT, content.take(4000))
+                .putExtra(AiChatActivity.EXTRA_NOTE_TITLE, titleInput.text.toString().trim())
+        )
+    }
+
     private fun askAiAboutNote() {
         val editable = contentInput.text ?: return
         val text = editable.toString()
@@ -1830,14 +1851,28 @@ class NoteEditorActivity : AppCompatActivity() {
             .create()
         loading.show()
         lifecycleScope.launch {
-            val result = GeminiSummarizer.writeStudyMaterial(
-                this@NoteEditorActivity,
-                topic,
-                studyType ?: "PARAGRAPH",
-                studyLang ?: "bn",
-                studyLength ?: "MEDIUM",
-                studyNote ?: ""
-            )
+            val model = GeminiSummarizer.modelForKey(studyModel)
+            // Several questions joined with blank lines (a multi-question
+            // note) are answered one by one again; a single question
+            // takes the single-call path.
+            val parts = topic.split("\n\n").map { it.trim() }.filter { it.isNotBlank() }
+            val result = if (parts.size > 1) {
+                GeminiSummarizer.answerQuestionsOneByOne(
+                    this@NoteEditorActivity, parts,
+                    studyType ?: "PARAGRAPH", studyLang ?: "bn",
+                    studyLength ?: "MEDIUM", studyNote ?: "", model
+                )
+            } else {
+                GeminiSummarizer.writeStudyMaterial(
+                    this@NoteEditorActivity,
+                    topic,
+                    studyType ?: "PARAGRAPH",
+                    studyLang ?: "bn",
+                    studyLength ?: "MEDIUM",
+                    studyNote ?: "",
+                    model
+                )
+            }
             loading.dismiss()
             result.onSuccess { (title, body) ->
                 titleInput.setText(title)
