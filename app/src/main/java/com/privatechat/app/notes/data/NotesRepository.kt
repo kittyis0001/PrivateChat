@@ -21,9 +21,11 @@ class NotesRepository(context: Context) {
     private val extras = db.noteExtrasDao()
     private val habits = db.habitDao()
     private val voice = db.voiceNoteDao()
+    private val calcHistory = db.calculatorHistoryDao()
 
     companion object {
         val DEFAULT_CATEGORIES = listOf("Personal", "Study", "Work", "Shopping List", "Important")
+        const val MAX_CALCULATOR_HISTORY = 200
         const val TRASH_RETENTION_MS: Long = 30L * 24 * 60 * 60 * 1000
     }
 
@@ -260,9 +262,37 @@ class NotesRepository(context: Context) {
         stickies.insert(sticky.copy(id = 0))
     }
 
-    suspend fun importNote(note: Note) = withContext(Dispatchers.IO) {
+    /** Imports one note; returns the new row id (the caller needs it
+     *  to re-attach the note's photos from a backup). */
+    suspend fun importNote(note: Note): Long = withContext(Dispatchers.IO) {
         notes.insert(note.copy(id = 0))
     }
+
+    // ---- v8: calculator history ----
+
+    suspend fun getCalculatorHistory(): List<CalculatorHistory> =
+        withContext(Dispatchers.IO) { calcHistory.getAll() }
+
+    /** Saves one history entry and trims the table to the newest 200. */
+    suspend fun addCalculatorHistory(expression: String, result: String): Long =
+        withContext(Dispatchers.IO) {
+            val id = calcHistory.insert(
+                CalculatorHistory(expression = expression, result = result)
+            )
+            calcHistory.trimTo(MAX_CALCULATOR_HISTORY)
+            id
+        }
+
+    suspend fun clearCalculatorHistory() = withContext(Dispatchers.IO) {
+        calcHistory.deleteAll()
+    }
+
+    /** Inserts one history entry from the cloud sync (keeps its own time). */
+    suspend fun importCalculatorHistory(entry: CalculatorHistory) =
+        withContext(Dispatchers.IO) {
+            calcHistory.insert(entry.copy(id = 0))
+            calcHistory.trimTo(MAX_CALCULATOR_HISTORY)
+        }
 
     suspend fun importCategory(category: Category) = withContext(Dispatchers.IO) {
         categories.insert(category.copy(id = 0))

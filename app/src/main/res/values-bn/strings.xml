@@ -8,6 +8,7 @@
     <string name="notes_clear">মুছো</string>
     <string name="notes_empty_title">তোমার প্রথম নোট তৈরি করো</string>
     <string name="notes_empty_body">পেন্সিল বাটনে চাপ দিয়ে লেখা শুরু করো। তোমার নোট এই ডিভাইসেই থাকবে।</string>
+    <string name="notes_widget_empty">এখনো কোনো নোট নেই — লিখতে + চাপুন</string>
     <string name="notes_create_first">লেখা শুরু করো</string>
     <string name="notes_lock_title">Notes লক করা আছে</string>
     <string name="notes_lock_subtitle">চালিয়ে যেতে Notes পাসওয়ার্ড দাও। এই লক শুধু এই ডিভাইসে তোমার নোটগুলোকে রক্ষা করে।</string>
@@ -21,6 +22,19 @@
     <string name="notes_quick_title">Quick Note</string>
     <string name="notes_sticky_title">Sticky Notes</string>
     <string name="notes_tool_title">Note Tool</string>
+    <string name="notes_tool_datetime">তারিখ ও সময়</string>
+    <string name="notes_calculator">ক্যালকুলেটর</string>
+    <string name="calculator_converter">কনভার্টার</string>
+    <string name="calculator_history">ইতিহাস</string>
+    <string name="calculator_clear_history">ইতিহাস মুছুন</string>
+    <string name="calculator_clear_history_confirm">ক্যালকুলেটরের সব ইতিহাস মুছে ফেলবে?</string>
+    <string name="calculator_no_history">এখনো কোনো ইতিহাস নেই</string>
+    <string name="calculator_error">ভুল</string>
+    <string name="converter_length">দৈর্ঘ্য</string>
+    <string name="converter_weight">ওজন</string>
+    <string name="converter_temperature">তাপমাত্রা</string>
+    <string name="converter_area">ক্ষেত্রফল</string>
+    <string name="converter_volume">আয়তন</string>
     <string name="notes_settings_title">সেটিংস</string>
     <string name="notes_archive_title">আর্কাইভ</string>
     <string name="notes_trash_title">ট্র্যাশ</string>

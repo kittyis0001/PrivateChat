@@ -1,0 +1,479 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#000000">
+
+    <!-- Tabs + menu (like the reference calculator). -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/calcTab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/notes_calculator"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:padding="8dp" />
+
+        <TextView
+            android:id="@+id/converterTab"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/calculator_converter"
+            android:textColor="#8E8E93"
+            android:textSize="20sp"
+            android:padding="8dp"
+            android:layout_marginStart="16dp" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/calcMenu"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⋮"
+            android:textColor="#FFFFFF"
+            android:textSize="26sp"
+            android:padding="8dp" />
+    </LinearLayout>
+
+    <!-- Calculator view. -->
+    <LinearLayout
+        android:id="@+id/calcView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@+id/calcExpression"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:textColor="#8E8E93"
+            android:textSize="30sp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:paddingHorizontal="20dp" />
+
+        <TextView
+            android:id="@+id/calcResult"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:textColor="#FFFFFF"
+            android:textSize="54sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:paddingHorizontal="20dp"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcAc"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="AC"
+                    android:textColor="#FF9F0A"
+                    android:textSize="26sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcBackspace"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="⌫"
+                    android:textColor="#FF9F0A"
+                    android:textSize="26sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcPercent"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="%"
+                    android:textColor="#FF9F0A"
+                    android:textSize="26sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcDivide"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="÷"
+                    android:textColor="#FF9F0A"
+                    android:textSize="30sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc7"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="7"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc8"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="8"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc9"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="9"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcMultiply"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="×"
+                    android:textColor="#FF9F0A"
+                    android:textSize="30sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc4"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="4"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc5"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="5"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc6"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="6"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcMinus"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="−"
+                    android:textColor="#FF9F0A"
+                    android:textSize="30sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc1"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc2"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="2"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc3"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="3"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcPlus"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="+"
+                    android:textColor="#FF9F0A"
+                    android:textSize="30sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/calcHistoryBtn"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:src="@drawable/ic_calc_history"
+                    android:scaleType="centerInside"
+                    android:contentDescription="@string/calculator_history" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calc0"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="0"
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcDot"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button"
+                    android:text="."
+                    android:textColor="#FFFFFF"
+                    android:textSize="28sp" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/calcEquals"
+                    android:layout_width="0dp"
+                    android:layout_height="72dp"
+                    android:layout_weight="1"
+                    android:layout_margin="6dp"
+                    android:background="@drawable/bg_calc_button_equals"
+                    android:text="="
+                    android:textColor="#FFFFFF"
+                    android:textSize="30sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Converter view. -->
+    <LinearLayout
+        android:id="@+id/converterView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:padding="20dp"
+        android:visibility="gone">
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/convCatLength"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/converter_length"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/convCatWeight"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/converter_weight"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/convCatTemp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/converter_temperature"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/convCatArea"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/converter_area"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp"
+                    android:layout_marginEnd="8dp" />
+
+                <TextView
+                    android:id="@+id/convCatVolume"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/converter_volume"
+                    android:textColor="#FFFFFF"
+                    android:textSize="15sp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="10dp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="28dp">
+
+            <EditText
+                android:id="@+id/convFromValue"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="1"
+                android:textColor="#FFFFFF"
+                android:textSize="30sp"
+                android:inputType="numberDecimal|numberSigned"
+                android:background="@android:color/transparent" />
+
+            <Spinner
+                android:id="@+id/convFromUnit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/convSwap"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⇅"
+            android:textColor="#FF9F0A"
+            android:textSize="28sp"
+            android:padding="12dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/convToValue"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="#FFFFFF"
+                android:textSize="30sp" />
+
+            <Spinner
+                android:id="@+id/convToUnit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

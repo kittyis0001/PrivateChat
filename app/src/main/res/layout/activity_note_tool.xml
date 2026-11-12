@@ -76,6 +76,14 @@
                 android:text="@string/notes_tool_checklist" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/toolDateTime"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/notes_tool_datetime"
+                android:layout_marginStart="8dp" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/toolCopy"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"

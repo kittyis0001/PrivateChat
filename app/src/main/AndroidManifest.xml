@@ -65,6 +65,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Kitty Notes calculator (Notes tool only; never saved as a note). -->
+        <activity
+            android:name=".notes.ui.CalculatorActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PrivateChat" />
+        <activity
+            android:name=".notes.ui.CalculatorHistoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PrivateChat" />
+
         <!-- QR scan orientation fix: the ZXing library declares its
              CaptureActivity as sensorLandscape, so tapping Scan QR
              flipped the scanner sideways even when the phone is held
@@ -202,6 +212,24 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Kitty Notes home-screen widget (Notes database only). -->
+        <receiver
+            android:name=".notes.widget.NotesWidgetProvider"
+            android:exported="false"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/notes_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".notes.widget.NotesWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
 
         <!-- Lets Kitty Notes share a generated file (note-as-image,
              scanned PDF, …) with another app without exposing a
