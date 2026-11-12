@@ -52,6 +52,17 @@ class NoteToolActivity : AppCompatActivity() {
             input.setSelection(input.text.length)
         }
         findViewById<View>(R.id.toolClear).setOnClickListener { input.text.clear() }
+        // Insert the current date & time at the cursor (same format
+        // as the editor's "Last edited" line), replacing any selection.
+        findViewById<View>(R.id.toolDateTime).setOnClickListener {
+            val stamp = java.text.SimpleDateFormat(
+                "d MMM yyyy, h:mm a", java.util.Locale.getDefault()
+            ).format(java.util.Date())
+            val start = input.selectionStart.coerceAtLeast(0)
+            val end = input.selectionEnd.coerceAtLeast(start)
+            input.text.replace(start, end, stamp)
+            input.setSelection((start + stamp.length).coerceAtMost(input.text.length))
+        }
         updateStats()
     }
 

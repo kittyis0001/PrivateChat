@@ -20,10 +20,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v5 adds locked and expiresAt columns (per-note lock, self-destruct).
  * v6 adds a countdownAt column (countdown note).
  * v7 adds ai_chats and ai_chat_messages tables (saved AI chats).
+ * v8 adds a calculator_history table (calculator history).
  */
 @Database(
-    entities = [Note::class, Category::class, StickyNote::class, NoteImage::class, ChecklistItem::class, Habit::class, HabitTick::class, VoiceNote::class, AiChat::class, AiChatMessageEntity::class],
-    version = 7,
+    entities = [Note::class, Category::class, StickyNote::class, NoteImage::class, ChecklistItem::class, Habit::class, HabitTick::class, VoiceNote::class, AiChat::class, AiChatMessageEntity::class, CalculatorHistory::class],
+    version = 8,
     exportSchema = false
 )
 abstract class NotesDatabase : RoomDatabase() {
@@ -34,6 +35,7 @@ abstract class NotesDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao
     abstract fun voiceNoteDao(): VoiceNoteDao
     abstract fun aiChatDao(): AiChatDao
+    abstract fun calculatorHistoryDao(): CalculatorHistoryDao
 
     companion object {
         @Volatile
@@ -143,13 +145,26 @@ abstract class NotesDatabase : RoomDatabase() {
             }
         }
 
+        /** Additive v7 -> v8 migration (calculator history: one new table). */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS calculator_history (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "expression TEXT NOT NULL, " +
+                        "result TEXT NOT NULL, " +
+                        "createdAt INTEGER NOT NULL)"
+                )
+            }
+        }
+
         fun get(context: Context): NotesDatabase {
             return instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     NotesDatabase::class.java,
                     "kitty_notes.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8).build().also { instance = it }
             }
         }
     }

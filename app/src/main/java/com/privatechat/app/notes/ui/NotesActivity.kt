@@ -55,6 +55,7 @@ import com.privatechat.app.notes.security.NoteLockAuth
 import com.privatechat.app.notes.security.NotesLockManager
 import com.privatechat.app.notes.sync.NotesSyncManager
 import com.privatechat.app.notes.sync.WeatherForecast
+import com.privatechat.app.notes.widget.NotesWidgetProvider
 import com.privatechat.app.notes.util.DocumentScan
 import com.privatechat.app.notes.util.GeminiSummarizer
 import com.privatechat.app.notes.util.LoadingDialog
@@ -161,6 +162,13 @@ class NotesActivity : AppCompatActivity() {
     /** A text shared from another app while the Notes lock is on. */
     private var pendingSharedText: String? = null
     private var pendingSharedTitle: String? = null
+    /** A note id tapped in the home-screen widget while the Notes lock is on. */
+    private var pendingWidgetNoteId: Long? = null
+
+    companion object {
+        /** Widget tap: open this note after the app lock (0 = new note). */
+        const val EXTRA_OPEN_NOTE_ID = "open_note_id"
+    }
     /** QR parts collected across scans of one multi-part note. */
     private val qrCollected = mutableListOf<String>()
     /** Bulk select: long-press is kept for the actions menu, selection
@@ -168,16 +176,20 @@ class NotesActivity : AppCompatActivity() {
     private var selectionMode: Boolean = false
     private val selectedIds = mutableSetOf<Long>()
 
-    private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+    private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri == null) return@registerForActivityResult
         val progress = LoadingDialog.show(this)
         lifecycleScope.launch {
             runCatching {
-                // JSON build + file write run off the UI thread: a big
+                // ZIP build + file write run off the UI thread: a big
                 // backup used to freeze the home list while it wrote.
                 withContext(Dispatchers.IO) {
-                    val json = NotesBackup.exportJson(repo.getAllForBackup(), repo.getCategoriesOnce(), repo.getStickiesOnce())
-                    contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                    val notes = repo.getAllForBackup()
+                    val photos = NotesBackup.collectPhotos(this@NotesActivity, repo, notes)
+                    val zip = NotesBackup.zipBytes(
+                        notes, repo.getCategoriesOnce(), repo.getStickiesOnce(), photos
+                    )
+                    contentResolver.openOutputStream(uri)?.use { it.write(zip) }
                 }
             }.onSuccess {
                 progress.dismiss()
@@ -195,44 +207,79 @@ class NotesActivity : AppCompatActivity() {
         lifecycleScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    val text = contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                    val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         ?: error("empty")
-                    val parsed = NotesBackup.parseJson(text)
-                    // Keep note->category grouping by matching category names:
-                    // reuse an existing category id, or insert the category
-                    // and use its new id. Notes whose name is unknown stay No Tag.
-                    val oldIdToName = parsed.categories.associate { it.id to it.name }
-                    val nameToId = repo.getCategoriesOnce().associate { it.name to it.id }.toMutableMap()
-                    var imported = 0
-                    parsed.notes.forEach { n ->
-                        val name = n.categoryId?.let { oldIdToName[it] }
-                        val mappedId: Long? = when {
-                            name == null -> null
-                            nameToId.containsKey(name) -> nameToId[name]
-                            else -> {
-                                val srcCat = parsed.categories.firstOrNull { it.name == name }
-                                val newId = repo.addCategory(name)
-                                if (srcCat != null && srcCat.isDefault) {
-                                    // mark default-ness is cosmetic; id mapping is what matters
-                                }
-                                nameToId[name] = newId
-                                newId
-                            }
-                        }
-                        repo.importNote(n.copy(categoryId = mappedId))
-                        imported++
+                    // A ZIP backup (notes.json + photos) or an old plain
+                    // JSON backup: both restore through the same path.
+                    if (NotesBackup.isZip(bytes)) {
+                        val zip = NotesBackup.parseZip(bytes)
+                        restoreParsed(zip.parsed, zip.photoBytes)
+                    } else {
+                        restoreParsed(NotesBackup.parseJson(bytes.toString(Charsets.UTF_8)), emptyMap())
                     }
-                    parsed.stickies.forEach { repo.importSticky(it) }
-                    imported
                 }
-            }.onSuccess { count ->
+            }.onSuccess { (count, photos) ->
                 progress.dismiss()
-                Toast.makeText(this@NotesActivity, getString(R.string.notes_restore_done, count), Toast.LENGTH_SHORT).show()
+                val message = if (photos > 0) {
+                    getString(R.string.notes_restore_done_photos, count, photos)
+                } else {
+                    getString(R.string.notes_restore_done, count)
+                }
+                Toast.makeText(this@NotesActivity, message, Toast.LENGTH_SHORT).show()
             }.onFailure {
                 progress.dismiss()
                 Toast.makeText(this@NotesActivity, getString(R.string.notes_restore_failed), Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    /**
+     * Restores one parsed backup. Returns (notes restored, photos
+     * restored). Photos are copied into note storage under fresh file
+     * names, so re-importing the same backup never makes two notes
+     * share one file (deleting one photo deletes its file).
+     */
+    private suspend fun restoreParsed(
+        parsed: NotesBackup.Parsed,
+        photoBytes: Map<String, ByteArray>
+    ): Pair<Int, Int> {
+        // Keep note->category grouping by matching category names:
+        // reuse an existing category id, or insert the category
+        // and use its new id. Notes whose name is unknown stay No Tag.
+        val oldIdToName = parsed.categories.associate { it.id to it.name }
+        val nameToId = repo.getCategoriesOnce().associate { it.name to it.id }.toMutableMap()
+        var imported = 0
+        var photosRestored = 0
+        parsed.notes.forEach { n ->
+            val name = n.categoryId?.let { oldIdToName[it] }
+            val mappedId: Long? = when {
+                name == null -> null
+                nameToId.containsKey(name) -> nameToId[name]
+                else -> {
+                    val srcCat = parsed.categories.firstOrNull { it.name == name }
+                    val newId = repo.addCategory(name)
+                    if (srcCat != null && srcCat.isDefault) {
+                        // mark default-ness is cosmetic; id mapping is what matters
+                    }
+                    nameToId[name] = newId
+                    newId
+                }
+            }
+            val newNoteId = repo.importNote(n.copy(categoryId = mappedId))
+            imported++
+            parsed.photosByCreatedAt[n.createdAt].orEmpty().forEach { fileName ->
+                val bytes = photoBytes[fileName] ?: return@forEach
+                val newName = NoteImageStore.newFileName()
+                runCatching {
+                    NoteImageStore.file(this@NotesActivity, newName).writeBytes(bytes)
+                }.onSuccess {
+                    repo.addImageRecord(newNoteId, newName)
+                    photosRestored++
+                }
+            }
+        }
+        parsed.stickies.forEach { repo.importSticky(it) }
+        return imported to photosRestored
     }
 
     // lateinit: the callback re-launches this launcher for the next QR
@@ -456,6 +503,8 @@ class NotesActivity : AppCompatActivity() {
         // Study pack: daily self-destruct sweep (expired notes to Trash).
         ExpiryWorker.scheduleDaily(this)
         handleShareIntent()
+        // Home-screen widget tap: open the tapped note (after the lock).
+        handleWidgetIntent()
 
         // Kitty Notes Plus housekeeping (Notes data only): permanently
         // remove Trash entries older than 30 days, and re-arm any note
@@ -478,6 +527,9 @@ class NotesActivity : AppCompatActivity() {
         observeData()
         applyAccent()
         refreshSyncHeader()
+        // The home-screen widget shows the latest notes: refresh it
+        // whenever the user comes back here (no-op if none is placed).
+        NotesWidgetProvider.updateAll(this)
         // Signed in: pull any notes that arrived from another device.
         // The merge skips notes already here, so this never duplicates.
         if (NotesSyncManager.isSignedIn()) {
@@ -543,6 +595,7 @@ class NotesActivity : AppCompatActivity() {
                     findViewById<View>(R.id.notesFab).visibility = View.VISIBLE
                     error.visibility = View.GONE
                     openPendingShare()
+                    openPendingWidgetNote()
                 } else {
                     progress.dismiss()
                     error.visibility = View.VISIBLE
@@ -587,6 +640,7 @@ class NotesActivity : AppCompatActivity() {
                         findViewById<View>(R.id.notesFab).visibility = View.VISIBLE
                         error.visibility = View.GONE
                         openPendingShare()
+                        openPendingWidgetNote()
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
@@ -810,6 +864,7 @@ class NotesActivity : AppCompatActivity() {
             add(0, 4, 3, getString(R.string.notes_privacy_title))
             add(0, 5, 4, getString(R.string.notes_sort_title))
             add(0, 6, 5, getString(R.string.notes_select_title))
+            add(0, 7, 6, getString(R.string.notes_calculator))
         }
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -819,6 +874,7 @@ class NotesActivity : AppCompatActivity() {
                 4 -> { showPrivacy(); true }
                 5 -> { showSortDialog(); true }
                 6 -> { enterSelectionMode(); true }
+                7 -> { startActivity(Intent(this, CalculatorActivity::class.java)); true }
                 else -> false
             }
         }
@@ -1227,6 +1283,25 @@ class NotesActivity : AppCompatActivity() {
         val title = pendingSharedTitle
         pendingSharedTitle = null
         openEditorWithTemplate(title, text)
+    }
+
+    /** A note tapped in the home-screen widget. Goes through the app
+     *  lock like a share-in, so a widget tap never bypasses it; a
+     *  locked note still asks for the Notes password (openEditor). */
+    private fun handleWidgetIntent() {
+        if (!intent.hasExtra(EXTRA_OPEN_NOTE_ID)) return
+        val noteId = intent.getLongExtra(EXTRA_OPEN_NOTE_ID, 0L)
+        if (NotesLockManager.isLockEnabled(this) && !NotesLockManager.unlockedThisProcess) {
+            pendingWidgetNoteId = noteId
+            return
+        }
+        openEditor(noteId)
+    }
+
+    private fun openPendingWidgetNote() {
+        val noteId = pendingWidgetNoteId ?: return
+        pendingWidgetNoteId = null
+        openEditor(noteId)
     }
 
     /**

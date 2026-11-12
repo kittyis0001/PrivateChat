@@ -354,7 +354,6 @@ class NoteEditorActivity : AppCompatActivity() {
         previewButton.setOnClickListener { togglePreview() }
 
         findViewById<View>(R.id.editorBack).setOnClickListener { saveAndFinish() }
-        findViewById<View>(R.id.editorSave).setOnClickListener { saveAndFinish() }
         findViewById<View>(R.id.editorPin).setOnClickListener {
             pinned = !pinned
             Toast.makeText(this, if (pinned) getString(R.string.notes_pinned) else getString(R.string.notes_unpinned), Toast.LENGTH_SHORT).show()
@@ -1304,23 +1303,25 @@ class NoteEditorActivity : AppCompatActivity() {
      * anywhere to close) shows the photo properly.
      */
     private fun showPhoto(image: NoteImage) {
-        val imageView = ImageView(this).apply {
+        val imageView = ZoomableImageView(this).apply {
             setBackgroundColor(Color.BLACK)
-            scaleType = ImageView.ScaleType.FIT_CENTER
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         }
+        // No fitCenter(): the view fits the photo itself (and keeps its
+        // MATRIX scale type); Glide setting FIT_CENTER would break zoom.
         Glide.with(this)
             .load(NoteImageStore.file(this, image.fileName))
-            .fitCenter()
             .into(imageView)
-        Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen).apply {
+        val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        // Single tap still closes; pinch zooms and drag pans while zoomed.
+        imageView.onSingleTap = { dialog.dismiss() }
+        dialog.apply {
             setContentView(imageView)
             setCancelable(true)
             setCanceledOnTouchOutside(true)
-            imageView.setOnClickListener { dismiss() }
             window?.setLayout(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT

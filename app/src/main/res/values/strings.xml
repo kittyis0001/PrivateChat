@@ -13,6 +13,7 @@
     <string name="notes_clear">Clear</string>
     <string name="notes_empty_title">Create your first note</string>
     <string name="notes_empty_body">Any notes to add? Add your first note by tapping on add button</string>
+    <string name="notes_widget_empty">No notes yet — tap + to write one</string>
     <string name="notes_create_first">Start writing one</string>
     <string name="notes_lock_title">Notes Locked</string>
     <string name="notes_lock_subtitle">Enter your Notes password to continue. This lock protects only your notes on this device.</string>
@@ -71,7 +72,6 @@
     <string name="notes_delete_short">Delete</string>
     <string name="notes_preview">Preview</string>
     <string name="notes_preview_edit">Edit</string>
-    <string name="notes_save_note">Save Note</string>
     <string name="notes_editor_title_hint">Title</string>
     <string name="notes_editor_content_hint">Start writing…</string>
     <string name="notes_calendar_basis">Dates use each note\'s last-edited date.</string>
@@ -84,6 +84,19 @@
     <string name="notes_tool_hint">Paste or write text here…</string>
     <string name="notes_tool_stats">Words: %1$d · Characters: %2$d · Without spaces: %3$d</string>
     <string name="notes_tool_checklist">Checklist</string>
+    <string name="notes_tool_datetime">Date &amp; time</string>
+    <string name="notes_calculator">Calculator</string>
+    <string name="calculator_converter">Converter</string>
+    <string name="calculator_history">History</string>
+    <string name="calculator_clear_history">Clear history</string>
+    <string name="calculator_clear_history_confirm">Delete all calculator history?</string>
+    <string name="calculator_no_history">No history yet</string>
+    <string name="calculator_error">Error</string>
+    <string name="converter_length">Length</string>
+    <string name="converter_weight">Weight</string>
+    <string name="converter_temperature">Temperature</string>
+    <string name="converter_area">Area</string>
+    <string name="converter_volume">Volume</string>
     <string name="notes_section_general">General</string>
     <string name="notes_section_others">Others</string>
     <string name="notes_section_lock">Lock</string>
@@ -130,6 +143,7 @@
     <string name="notes_backup_done">Backup saved</string>
     <string name="notes_backup_failed">Backup failed</string>
     <string name="notes_restore_done">Restored %1$d notes</string>
+    <string name="notes_restore_done_photos">Restored %1$d notes, %2$d photos</string>
     <string name="notes_restore_failed">Restore failed — invalid file</string>
     <string name="tpl_daily_journal">Daily Journal</string>
     <string name="tpl_daily_journal_body">Date:
